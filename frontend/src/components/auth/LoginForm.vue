@@ -6,6 +6,7 @@ import { isGoogleSignInEnabled } from '../../utils/google/googleAuthConfig'
 import { isTurnstileEnabled } from '../../utils/turnstile/turnstileConfig'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseCard from '../ui/BaseCard.vue'
+import BrandMark from '../ui/BrandMark.vue'
 import GoogleSignInButton from '../ui/GoogleSignInButton.vue'
 import TurnstileWidget from '../ui/TurnstileWidget.vue'
 
@@ -64,7 +65,10 @@ async function onGoogleCredential(idToken: string) {
 <template>
   <div class="auth-screen">
     <BaseCard class="auth-card">
-      <p class="auth-wordmark">Berries</p>
+      <div class="auth-wordmark">
+        <BrandMark size="1.125rem" />
+        <span>Berries</span>
+      </div>
       <h1 class="auth-title">Iniciar sesión</h1>
       <p class="auth-subtitle">Entra para ver tu balance y tus movimientos.</p>
 
@@ -119,6 +123,9 @@ async function onGoogleCredential(idToken: string) {
 }
 
 .auth-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
   font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.08em;

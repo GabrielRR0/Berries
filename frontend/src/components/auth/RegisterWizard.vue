@@ -8,6 +8,7 @@ import { SUPPORTED_CURRENCIES } from '../../utils/currency/supportedCurrencies'
 import { isGoogleSignInEnabled } from '../../utils/google/googleAuthConfig'
 import { isTurnstileEnabled } from '../../utils/turnstile/turnstileConfig'
 import BaseButton from '../ui/BaseButton.vue'
+import BrandMark from '../ui/BrandMark.vue'
 import GoogleSignInButton from '../ui/GoogleSignInButton.vue'
 import TurnstileWidget from '../ui/TurnstileWidget.vue'
 
@@ -213,7 +214,10 @@ async function onSubmit() {
 <template>
   <div class="auth-screen">
     <div class="wizard-page">
-      <p class="auth-wordmark">Berries</p>
+      <div class="auth-wordmark">
+        <BrandMark size="1.125rem" />
+        <span>Berries</span>
+      </div>
 
       <div class="wizard-progress">
         <span v-for="n in 4" :key="n" class="wizard-progress-segment" :class="{ filled: n <= step }" />
@@ -408,6 +412,9 @@ async function onSubmit() {
 }
 
 .auth-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
   font-size: 0.8125rem;
   font-weight: 700;
   letter-spacing: 0.08em;

@@ -10,6 +10,8 @@
 // Arranca transparente sobre el contenido y solo se vuelve cristal/blur al
 // scrollear hacia abajo - pedido explicito del usuario, igual que las apps
 // nativas de telefono.
+import BrandMark from '../ui/BrandMark.vue'
+
 withDefaults(defineProps<{ avatarInitials?: string; scrolled?: boolean }>(), {
   avatarInitials: '',
   scrolled: false,
@@ -30,7 +32,7 @@ defineEmits<{ avatarClick: []; helpClick: [] }>()
 
     <div class="wordmark">
       <slot name="logo">
-        <span class="wordmark-text">Berries</span>
+        <BrandMark size="1.75rem" />
       </slot>
     </div>
 
@@ -147,14 +149,9 @@ defineEmits<{ avatarClick: []; helpClick: [] }>()
 .wordmark {
   flex: 1;
   display: flex;
+  align-items: center;
   justify-content: center;
-}
-
-.wordmark-text {
-  font-size: 1.0625rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--text-h);
+  gap: 0.4375rem;
 }
 
 .header-actions {
