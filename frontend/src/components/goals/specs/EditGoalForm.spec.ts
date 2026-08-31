@@ -1,0 +1,79 @@
+import { mount } from '@vue/test-utils'
+import { describe, expect, it } from 'vitest'
+import type { Goal, SavingsCapacity } from '../../../services/goals/interfaces/goals.interface'
+import EditGoalForm from '../EditGoalForm.vue'
+
+const GOAL: Goal = {
+  id: 'goal-1',
+  userId: 'user-1',
+  title: 'TV',
+  targetAmount: 240,
+  currency: 'USD',
+  targetDate: '2026-11-28',
+  totalSaved: 80,
+  status: 'active',
+  goalType: 'custom',
+  createdAt: '2026-08-01T00:00:00Z',
+  completedAt: null,
+  suggestedMonthlyContribution: 53.33,
+  lastCheckInPostponed: false,
+}
+
+describe('EditGoalForm', () => {
+  it('arranca prellenado con los datos de la meta', () => {
+    const wrapper = mount(EditGoalForm, { props: { goal: GOAL } })
+
+    expect((wrapper.find('input[type="text"]').element as HTMLInputElement).value).toBe('TV')
+    expect((wrapper.find('input[type="date"]').element as HTMLInputElement).value).toBe('2026-11-28')
+    expect((wrapper.find('input[type="number"]').element as HTMLInputElement).value).toBe('240')
+  })
+
+  it('emite "submit" con los datos editados', async () => {
+    const wrapper = mount(EditGoalForm, { props: { goal: GOAL } })
+
+    await wrapper.find('input[type="number"]').setValue('300')
+    await wrapper.find('form').trigger('submit')
+
+    expect(wrapper.emitted('submit')).toEqual([
+      [{ title: 'TV', targetAmount: 300, currency: 'USD', targetDate: '2026-11-28' }],
+    ])
+  })
+
+  it('calcula el total a partir del aporte mensual cuando se usa ese modo', async () => {
+    const wrapper = mount(EditGoalForm, { props: { goal: GOAL } })
+
+    await wrapper.findAll('.amount-mode-option')[1]!.trigger('click')
+    await wrapper.find('.field-row input[type="number"]').setValue('80')
+    await wrapper.find('form').trigger('submit')
+
+    const emitted = wrapper.emitted('submit')
+    expect(emitted).toBeTruthy()
+    const [input] = emitted![0] as [{ targetAmount: number }]
+    expect(input.targetAmount).toBeGreaterThan(0)
+  })
+
+  it('emite "cancel" al hacer click en Cancelar', async () => {
+    const wrapper = mount(EditGoalForm, { props: { goal: GOAL } })
+
+    await wrapper.find('.form-actions button[type="button"]').trigger('click')
+
+    expect(wrapper.emitted('cancel')).toBeTruthy()
+  })
+
+  it('muestra el boton "Guardar cambios"', () => {
+    const wrapper = mount(EditGoalForm, { props: { goal: GOAL } })
+
+    expect(wrapper.find('button[type="submit"]').text()).toBe('Guardar cambios')
+  })
+
+  it('avisa cuando el aporte implicito supera el disponible promedio', async () => {
+    const capacity: SavingsCapacity = { avgMonthlyIncome: 500, avgMonthlyExpense: 480, avgMonthlyAvailable: 20 }
+    const wrapper = mount(EditGoalForm, { props: { goal: GOAL, savingsCapacity: capacity } })
+
+    await wrapper.find('input[type="number"]').setValue('10000')
+
+    const hint = wrapper.find('.capacity-hint')
+    expect(hint.exists()).toBe(true)
+    expect(hint.classes()).toContain('warning')
+  })
+})

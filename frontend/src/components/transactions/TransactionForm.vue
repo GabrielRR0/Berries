@@ -1,0 +1,294 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { useWalletsStore } from '../../stores/wallets.store'
+import { createTransaction } from '../../services/transactions/transactions.service'
+import type { Transaction, TransactionType } from '../../services/transactions/interfaces/transactions.interface'
+import { formatCurrency } from '../../utils/formatters/formatCurrency'
+import BaseButton from '../ui/BaseButton.vue'
+import BaseCard from '../ui/BaseCard.vue'
+import CategoryField from './CategoryField.vue'
+
+// Registro manual de un movimiento. Transactions no tiene un Pinia store
+// propio (a diferencia de wallets) - es estado local por pantalla, asi que
+// este form llama directo al service y emite la transaction creada para que
+// TransactionsMain.vue la agregue a su lista local sin re-pedir todo.
+// initialType: quien monta el form ya puede saber que tipo quiere (ej. la
+// box de "Ingresos"/"Gastos" en Inicio, ver IncomeExpenseSummary.vue) - el
+// toggle sigue editable, esto solo define con que arranca seleccionado.
+const props = withDefaults(defineProps<{ initialType?: TransactionType }>(), { initialType: 'expense' })
+const emit = defineEmits<{ created: [transaction: Transaction]; cancel: [] }>()
+
+const walletsStore = useWalletsStore()
+
+const walletId = ref('')
+const type = ref<TransactionType>(props.initialType)
+const amount = ref<number | null>(null)
+const category = ref('')
+const description = ref('')
+const submitting = ref(false)
+const errorMessage = ref('')
+
+const selectedWallet = computed(() => walletsStore.wallets.find((wallet) => wallet.id === walletId.value) ?? null)
+
+// "Usé todo lo que tenía" en un click - pedido explicito del usuario, mismo criterio
+// en DraftReviewCard.vue.
+function useMaxAmount() {
+  if (selectedWallet.value) amount.value = selectedWallet.value.balance
+}
+
+// Aviso, nunca bloqueante (el backend tampoco valida saldo en una transaction manual,
+// solo en transferencias) - el usuario puede seguir igual, solo se le avisa.
+const exceedsBalance = computed(
+  () => type.value === 'expense' && selectedWallet.value !== null && (amount.value ?? 0) > selectedWallet.value.balance,
+)
+
+async function onSubmit() {
+  if (!walletId.value || !category.value.trim() || (amount.value ?? 0) <= 0) return
+
+  errorMessage.value = ''
+  submitting.value = true
+  try {
+    const transaction = await createTransaction({
+      walletId: walletId.value,
+      type: type.value,
+      amount: amount.value as number,
+      category: category.value.trim(),
+      description: description.value.trim() || undefined,
+    })
+    emit('created', transaction)
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'No se pudo registrar el movimiento.'
+  } finally {
+    submitting.value = false
+  }
+}
+</script>
+
+<template>
+  <BaseCard class="transaction-form">
+    <h2 class="form-title">Nuevo movimiento</h2>
+
+    <form class="form-body" @submit.prevent="onSubmit">
+      <div class="type-toggle" role="tablist">
+        <button
+          type="button"
+          class="type-option"
+          role="tab"
+          :aria-selected="type === 'expense'"
+          :class="{ active: type === 'expense' }"
+          @click="type = 'expense'"
+        >
+          Gasto
+        </button>
+        <button
+          type="button"
+          class="type-option"
+          role="tab"
+          :aria-selected="type === 'income'"
+          :class="{ active: type === 'income' }"
+          @click="type = 'income'"
+        >
+          Ingreso
+        </button>
+      </div>
+
+      <label class="field">
+        <span class="field-label">Billetera</span>
+        <select v-model="walletId" required>
+          <option value="" disabled>Elige una billetera</option>
+          <option v-for="wallet in walletsStore.wallets" :key="wallet.id" :value="wallet.id">
+            {{ wallet.name }} ({{ wallet.currency }}) — {{ formatCurrency(wallet.balance, wallet.currency) }}
+          </option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Monto</span>
+        <div class="amount-input-row">
+          <input v-model.number="amount" type="number" min="0.01" step="0.01" required placeholder="0.00" />
+          <button v-if="selectedWallet" type="button" class="max-amount-trigger" @click="useMaxAmount">Max</button>
+        </div>
+      </label>
+
+      <p v-if="exceedsBalance" class="balance-warning" role="alert">
+        Supera el saldo de esta billetera ({{ formatCurrency(selectedWallet?.balance ?? 0, selectedWallet?.currency ?? '') }}).
+      </p>
+
+      <CategoryField v-model="category" :kind="type" />
+
+      <label class="field">
+        <span class="field-label">Descripción (opcional)</span>
+        <input v-model="description" type="text" placeholder="Detalle del movimiento" />
+      </label>
+
+      <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
+
+      <div class="form-actions">
+        <BaseButton type="button" variant="secondary" size="sm" :disabled="submitting" @click="$emit('cancel')">
+          Cancelar
+        </BaseButton>
+        <BaseButton type="submit" size="sm" :disabled="submitting">
+          {{ submitting ? 'Guardando...' : 'Guardar' }}
+        </BaseButton>
+      </div>
+    </form>
+  </BaseCard>
+</template>
+
+<style scoped>
+.transaction-form {
+  animation: form-enter var(--duration-base) var(--ease-out) both;
+}
+
+.form-title {
+  font-size: 1rem;
+}
+
+.form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.type-toggle {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 0.375rem;
+  padding: 0.25rem;
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  border: 1px solid var(--glass-border);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .type-toggle {
+    background: var(--bg-inset);
+  }
+}
+
+.type-option {
+  padding: 0.375rem 0.875rem;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.type-option:hover {
+  color: var(--text-h);
+}
+
+.type-option:active {
+  transform: scale(0.94);
+}
+
+.type-option.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.field-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.field input,
+.field select {
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-inset);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 1rem;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.amount-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.amount-input-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.max-amount-trigger {
+  flex-shrink: 0;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--glass-border);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.max-amount-trigger:hover {
+  opacity: 0.85;
+}
+
+.balance-warning {
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-muted);
+  color: var(--accent);
+  font-size: 0.8125rem;
+}
+
+.form-error {
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-muted);
+  color: var(--accent);
+  font-size: 0.8125rem;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+@keyframes form-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>

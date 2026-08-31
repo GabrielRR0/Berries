@@ -1,0 +1,38 @@
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# ORM + migrations (divergencia deliberada de s-rank/tayuya-check — ver README raíz de Berry)
+sqlalchemy==2.0.36
+alembic==1.14.0
+psycopg2-binary==2.9.10
+
+# Settings & validation
+pydantic==2.10.4
+pydantic-settings==2.7.0
+email-validator==2.2.0
+
+# Auth
+PyJWT==2.10.1
+bcrypt==4.2.1
+
+# Encriptación de columnas financieras (ver app/core/encryption.py) — ya estaba
+# instalado transitivamente (pywebpush la usa), se declara explícito porque ahora
+# la app la importa directo.
+cryptography==50.0.0
+
+# Abuse mitigation (mismo patrón que s-rank/tayuya-check)
+slowapi==0.1.9
+
+# Web Push (dominio notifications — se conecta de último)
+pywebpush==2.0.3
+
+# Cliente HTTP para APIs externas (OCR/Whisper/tasas de cambio — interfaces listas, conexión diferida)
+httpx==0.28.1
+
+# Uploads (recibos, audio)
+python-multipart==0.0.20
+
+# Testing
+pytest==8.3.4
+pytest-cov==6.0.0

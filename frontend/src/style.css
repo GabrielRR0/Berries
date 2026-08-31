@@ -1,0 +1,298 @@
+/* Berry - identidad visual negro/rojo.
+
+   DESVIACION DELIBERADA de ../../DESIGN.md raiz (que exige claro+oscuro
+   siempre): Berry es dark-only por ahora, a proposito. Es una app de
+   finanzas personales con una paleta de marca fija (negro + rojo, estilo
+   Revolut/N26), no un producto neutro en escala de grises + un acento que
+   cambia entre claro/oscuro como el resto del portafolio. No agregar un
+   modo claro "para cumplir la regla" sin revisar esta decision primero -
+   fue tomada a proposito, no es un olvido. */
+:root {
+  color-scheme: dark;
+
+  /* Fondo casi negro (nunca #000 puro - fatiga visual, DESIGN.md #2) y
+     superficies un escalon mas claras para que las cards se distingan del
+     fondo sin depender solo del borde. */
+  --bg: #0a0a0a;
+  --bg-surface: #18181b;
+  --bg-inset: #131316;
+  --bg-raised: #202024;
+  --border: #2a2a2e;
+  --border-subtle: #1f1f23;
+
+  /* Texto casi blanco sobre fondo oscuro, gris medio para ayuda/secundario -
+     igual criterio que DESIGN.md #2, solo que sobre base siempre-oscura. */
+  --text-h: #f6f6f7;
+  --text: #d4d4d8;
+  --text-muted: #8b8b93;
+
+  /* Unico acento del proyecto: rojo. Se usa SOLO para el CTA primario, el
+     tab activo, montos de gasto y badges de alerta - nunca para decorar
+     bordes o fondos grandes (misma disciplina de "un acento" de
+     DESIGN.md #2, con rojo en vez de gris+1). A proposito no existe un
+     segundo tono para "ingreso" (ni verde ni azul): los montos positivos
+     usan texto neutro claro, ver IncomeExpenseSummary.vue. */
+  --accent: #ef4444;
+  --accent-strong: #dc2626;
+  --accent-contrast: #ffffff;
+  --accent-muted: rgba(239, 68, 68, 0.14);
+  --accent-border: rgba(239, 68, 68, 0.35);
+
+  /* Tipografia: system font stack, sin cargar fuentes externas
+     (DESIGN.md #3). */
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  /* Radios consistentes: 8px controles chicos, 16px cards (DESIGN.md #4). */
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* Sombras sutiles unicamente - nunca duras ni de color (DESIGN.md #4). */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  /* Elevacion de hover para cards (BaseCard.vue) - SOLO aparece durante el
+     hover mismo, nunca en reposo (la regla de "nunca borde Y sombra marcada
+     a la vez" se mantiene en reposo). Blur grande a proposito: contra un
+     fondo casi negro, una sombra chica casi no se nota. */
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.55);
+
+  /* Borde mas visible en hover de cards - mismo tono de --glass-border, al
+     doble de opacidad, sin introducir un color nuevo (DESIGN.md #2). */
+  --glass-border-hover: rgba(255, 255, 255, 0.16);
+
+  /* Anillo de foco de teclado (:focus-visible). Deliberadamente neutro
+     (blanco/gris, no --accent) - el rojo ya esta tomado por los anillos de
+     ".is-tour-active" del onboarding (BalanceCard/QuickActionsGrid/
+     IncomeExpenseSummary); usar el mismo color los volveria indistinguibles.
+     Doble anillo (hueco del color de fondo + anillo claro) para leerse igual
+     de bien sobre una superficie solida, sobre cristal, o sobre --accent. */
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px rgba(246, 246, 247, 0.9);
+
+  /* Glassmorphism ("modo cristal" tipo Apple, pedido explicito del usuario):
+     superficies traslucidas + backdrop-filter, reservadas para lo que FLOTA
+     sobre contenido que se mueve debajo (header fijo, tab bar fija,
+     coach-marks, tarjetas de modal) - nunca en cards de lista comunes, donde
+     no hay nada detras que se note al desenfocar. Necesitan un fondo con
+     algo de color detras para que el blur se vea (ver --hero-glow abajo). */
+  --glass-bg: rgba(24, 24, 27, 0.55);
+  --glass-bg-strong: rgba(24, 24, 27, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --blur-sm: 12px;
+  --blur-md: 20px;
+
+  /* Resplandor rojo sutil arriba de cada pantalla (inspirado en el swoosh de
+     las capturas "Rial", recoloreado a la paleta negro/rojo de Berry) - le
+     da a los headers/tab bars de cristal algo con textura detras para
+     desenfocar; sin esto el blur no se notaria contra un fondo plano. */
+  --hero-glow: radial-gradient(120% 55% at 50% -10%, rgba(239, 68, 68, 0.22), transparent 70%);
+
+  --header-height: 4rem;
+
+  /* Easing/duraciones estandar (DESIGN.md #5): opacity/transform unicamente,
+     ease-out para lo que entra. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-base: 300ms;
+
+  /* Easing propio para el slide de paginas (ver .slide-left/.slide-right mas
+     abajo) - --ease-out esta pensado para micro-interacciones cortas y es
+     MUY agresivo al arrancar (con un desplazamiento de varios rem, el 90%+
+     del movimiento pasaba en el primer 15-20% de la duracion y el resto era
+     un arrastre imperceptible - se sentia como que "no animaba"). Esta curva
+     reparte el movimiento a lo largo de todo el --duration-base, para que el
+     slide se vea como tal. */
+  --ease-slide: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Easing propio para los digitos tipo "odometro" de AnimatedCurrency.vue -
+     pedido explicito del usuario ("una animacion... diferente a las
+     demas"). A diferencia de --ease-out/--ease-slide (sin overshoot, por
+     disciplina de DESIGN.md para contenido que entra), este SI pasa un poco
+     de largo antes de asentarse - un digito de reloj/odometro mecanico se
+     siente mas real con ese leve rebote que frenando en seco. Excepcion
+     deliberada, acotada a este unico caso de uso. */
+  --ease-odometer: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  font: 16px/1.6 var(--sans);
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  overscroll-behavior: none;
+}
+
+/* Sin scrollbar visible en modo telefono/tablet (pedido explicito del
+   usuario: "en apps de tlf no veo que tengan un scroll visible") - el
+   scroll sigue funcionando igual, solo se oculta el indicador. Acotado a
+   este ancho (no siempre) para no tocar el caso de una ventana de
+   escritorio bien ancha, donde un scrollbar nativo si es lo esperado. */
+@media (max-width: 1024px) {
+  html {
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+#app {
+  min-height: 100dvh;
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--sans);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-h);
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+button,
+input {
+  font-family: var(--sans);
+}
+
+/* Foco de teclado global (:focus-visible nunca matchea con click/touch, solo
+   con navegacion real por teclado) - cubre BaseButton, RouterLink (<a>),
+   inputs/selects/tabs de toda la app sin tener que tocar cada archivo.
+   Compone con el foco propio que ya tienen algunos inputs (ej. .search-input
+   en TransactionsMain.vue: border-color al acento) - son propiedades
+   distintas (box-shadow vs border-color), asi que ambas se ven a la vez. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Entrada de contenido en escritorio (fade + slide sutil, DESIGN.md #5) -
+   declarado global (no en un <style scoped>) para que un solo @keyframes
+   sirva a todas las pantallas que lo usan via "animation: content-enter ..."
+   en vez de duplicarlo en cada archivo. SIEMPRE usar animation-fill-mode
+   "backwards" al aplicar esto, nunca "both"/"forwards": una animacion con
+   fill forwards/both deja el transform pisado para siempre despues de
+   terminar, lo que romperia en silencio cualquier :hover con transform
+   sobre el mismo elemento (ver BaseCard.vue). */
+@keyframes content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Base global de 16px para cualquier input/select/textarea de la app - pedido
+   explicito del usuario: "ningun input debe hacer que el tlf haga zoom"
+   (tanto Android como iOS). Por debajo de 16px, iOS Safari hace zoom
+   automatico al enfocar un campo, lo que rompe la sensacion de app nativa.
+   Cada componente puede seguir declarando su propio font-size mas grande si
+   hace falta (esto es solo un piso) - lo que no debe pasar es que alguno se
+   quede en el tamaño chico por defecto del navegador o un valor puesto a
+   mano por debajo de 16px. */
+input,
+select,
+textarea {
+  font-size: 1rem;
+}
+
+a {
+  color: inherit;
+}
+
+/* Modulo de transiciones de pagina (ver
+   composables/navigation/usePageTransition.ts + App.vue): direccional tipo
+   "swipe entre tabs" al estilo Instagram, con Vue <Transition> + CSS nativo
+   nada mas - sin GSAP/Framer Motion (vetados en DESIGN.md raiz por pesados;
+   un slide direccional simple no los necesita). Ambos lados (el que entra y
+   el que sale) animan a la vez, no en secuencia, por eso quedan absolute
+   dentro de un contenedor position:relative mientras dura la transicion. */
+.route-transition-viewport {
+  position: relative;
+  min-height: 100dvh;
+  min-height: 100vh;
+  overflow-x: clip;
+}
+
+.slide-left-enter-active,
+.slide-left-leave-active,
+.slide-right-enter-active,
+.slide-right-leave-active,
+.fade-enter-active,
+.fade-leave-active {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  transition:
+    transform var(--duration-base) var(--ease-slide),
+    opacity var(--duration-base) var(--ease-slide);
+}
+
+/* 5rem (no 1-2rem): a esa distancia el desplazamiento apenas se notaba en
+   pantalla - el pedido explicito era que SE VEA como deslizar de pagina
+   (tipo Instagram), no un micro-ajuste. Sigue siendo solo una fraccion del
+   ancho de pantalla, no un carrusel de 100% - "fluido" pero notorio. */
+.slide-left-enter-from {
+  transform: translateX(5rem);
+  opacity: 0;
+}
+
+.slide-left-leave-to {
+  transform: translateX(-5rem);
+  opacity: 0;
+}
+
+.slide-right-enter-from {
+  transform: translateX(-5rem);
+  opacity: 0;
+}
+
+.slide-right-leave-to {
+  transform: translateX(5rem);
+  opacity: 0;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

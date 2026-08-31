@@ -1,0 +1,54 @@
+# --- Secretos: NUNCA subir ---
+# .env real (contiene DATABASE_URL con password, JWT_SECRET, MASTER_ENCRYPTION_KEY).
+# .env.example SÍ se sube (es la plantilla con placeholders, sin datos reales).
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# --- Python (backend) ---
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Bases de datos SQLite locales (incluye respaldos .bak-* dejados por migraciones
+# probadas en desarrollo) - nunca la base real, y nunca datos de usuario ni de prueba.
+*.db
+*.db-journal
+*.db.bak-*
+backend/berry_dev.db*
+
+# --- Node / frontend ---
+node_modules/
+**/node_modules/
+dist/
+dist-ssr/
+frontend/dist/
+.vite/
+*.local
+
+# --- Logs y artefactos varios ---
+*.log
+npm-debug.log*
+
+# --- Editor / SO ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Artefacto accidental de una redirección mal interpretada en Windows/bash - "nul" es
+# además un nombre de dispositivo reservado en Windows, mejor ni tenerlo trackeado.
+nul
+**/nul

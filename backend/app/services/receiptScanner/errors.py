@@ -1,0 +1,2 @@
+class OcrNotConfiguredError(Exception):
+    pass
