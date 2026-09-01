@@ -6,31 +6,50 @@
 // Authorization: Bearer <token>.
 
 import { useAuthStore } from '../../stores/auth.store'
-import type { AnalyticsCategoryType, CategoryBreakdown, MonthlyComparison, PeriodSummary } from './interfaces/analytics.interface'
+import type {
+  AnalyticsCategoryType,
+  CategoryBreakdown,
+  CategoryMonthlyTrend,
+  MonthlyComparison,
+  PeriodSummary,
+} from './interfaces/analytics.interface'
 
 // Forma "sobre el cable" tal cual la devuelve el backend (ver
 // berry/backend/app/schemas/analytics/*) - solo interna a este archivo, el
 // resto de la app siempre trabaja con PeriodSummary/CategoryBreakdown/
-// MonthlyComparison.
+// MonthlyComparison. Los campos Decimal viajan como STRING en el JSON (no
+// como number - FastAPI/Pydantic los serializa asi), mismo bug ya encontrado
+// y corregido en goals.service.ts/debts.service.ts: se tipan number|string
+// aca y se normalizan con Number(...) en cada mapper de abajo.
 interface PeriodSummaryWire {
   period: string
-  total_income: number
-  total_expense: number
-  net_savings: number
-  previous_period_net_savings: number
+  total_income: number | string
+  total_expense: number | string
+  net_savings: number | string
+  previous_period_net_savings: number | string
 }
 
 interface CategoryBreakdownWire {
   category: string
-  total: number
+  total: number | string
   percentage: number
 }
 
 interface MonthlyComparisonWire {
   month: string
-  total_income: number
-  total_expense: number
-  net: number
+  total_income: number | string
+  total_expense: number | string
+  net: number | string
+}
+
+interface CategoryMonthlyTrendItemWire {
+  category: string
+  monthly_totals: (number | string)[]
+}
+
+interface CategoryMonthlyTrendWire {
+  months: string[]
+  categories: CategoryMonthlyTrendItemWire[]
 }
 
 // Error tipado que carga el status HTTP ademas del mensaje (ver
@@ -53,19 +72,34 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 function mapPeriodSummary(wire: PeriodSummaryWire): PeriodSummary {
   return {
     period: wire.period,
-    totalIncome: wire.total_income,
-    totalExpense: wire.total_expense,
-    netSavings: wire.net_savings,
-    previousPeriodNetSavings: wire.previous_period_net_savings,
+    totalIncome: Number(wire.total_income),
+    totalExpense: Number(wire.total_expense),
+    netSavings: Number(wire.net_savings),
+    previousPeriodNetSavings: Number(wire.previous_period_net_savings),
   }
 }
 
 function mapCategoryBreakdown(wire: CategoryBreakdownWire): CategoryBreakdown {
-  return { category: wire.category, total: wire.total, percentage: wire.percentage }
+  return { category: wire.category, total: Number(wire.total), percentage: wire.percentage }
 }
 
 function mapMonthlyComparison(wire: MonthlyComparisonWire): MonthlyComparison {
-  return { month: wire.month, totalIncome: wire.total_income, totalExpense: wire.total_expense, net: wire.net }
+  return {
+    month: wire.month,
+    totalIncome: Number(wire.total_income),
+    totalExpense: Number(wire.total_expense),
+    net: Number(wire.net),
+  }
+}
+
+function mapCategoryMonthlyTrend(wire: CategoryMonthlyTrendWire): CategoryMonthlyTrend {
+  return {
+    months: wire.months,
+    categories: wire.categories.map((entry) => ({
+      category: entry.category,
+      monthlyTotals: entry.monthly_totals.map(Number),
+    })),
+  }
 }
 
 async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
@@ -134,4 +168,25 @@ export async function getMonthlyComparison(months?: number): Promise<MonthlyComp
   }
 
   return ((await response.json()) as MonthlyComparisonWire[]).map(mapMonthlyComparison)
+}
+
+export async function getCategoryMonthlyTrend(
+  type: AnalyticsCategoryType,
+  months?: number,
+): Promise<CategoryMonthlyTrend> {
+  const params = new URLSearchParams({ type })
+  if (months !== undefined) params.set('months', String(months))
+
+  const response = await fetch(`${API_BASE_URL}/api/analytics/categories/trend?${params.toString()}`, {
+    headers: { ...authHeaders() },
+  })
+
+  if (!response.ok) {
+    throw new AnalyticsApiError(
+      await parseErrorMessage(response, 'No se pudo obtener la tendencia por categoría.'),
+      response.status,
+    )
+  }
+
+  return mapCategoryMonthlyTrend((await response.json()) as CategoryMonthlyTrendWire)
 }

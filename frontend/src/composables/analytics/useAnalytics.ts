@@ -1,24 +1,32 @@
 import { ref } from 'vue'
-import { getCategoryBreakdown, getMonthlyComparison, getPeriodSummary } from '../../services/analytics/analytics.service'
+import {
+  getCategoryBreakdown,
+  getCategoryMonthlyTrend,
+  getMonthlyComparison,
+  getPeriodSummary,
+} from '../../services/analytics/analytics.service'
 import type {
   AnalyticsCategoryType,
   CategoryBreakdown,
+  CategoryMonthlyTrend,
   MonthlyComparison,
   PeriodSummary,
 } from '../../services/analytics/interfaces/analytics.interface'
 
 // Envoltorio reactivo de services/analytics/analytics.service.ts, llamado
-// desde AnalyticsMain.vue. Cada una de las 3 llamadas tiene su propio flag
+// desde AnalyticsMain.vue. Cada una de las 4 llamadas tiene su propio flag
 // de loading (se piden en paralelo desde la pantalla, no tiene sentido un
 // solo isLoading global que las mezcle a todas).
 export function useAnalytics() {
   const periodSummary = ref<PeriodSummary | null>(null)
   const categoryBreakdown = ref<CategoryBreakdown[]>([])
   const monthlyComparison = ref<MonthlyComparison[]>([])
+  const categoryTrend = ref<CategoryMonthlyTrend | null>(null)
 
   const isLoadingSummary = ref(false)
   const isLoadingCategories = ref(false)
   const isLoadingMonthly = ref(false)
+  const isLoadingCategoryTrend = ref(false)
 
   const error = ref<string | null>(null)
 
@@ -62,16 +70,31 @@ export function useAnalytics() {
     }
   }
 
+  async function fetchCategoryTrend(type: AnalyticsCategoryType, months?: number): Promise<void> {
+    isLoadingCategoryTrend.value = true
+    error.value = null
+    try {
+      categoryTrend.value = await getCategoryMonthlyTrend(type, months)
+    } catch (err) {
+      error.value = toMessage(err, 'No se pudo obtener la tendencia por categoría.')
+    } finally {
+      isLoadingCategoryTrend.value = false
+    }
+  }
+
   return {
     periodSummary,
     categoryBreakdown,
     monthlyComparison,
+    categoryTrend,
     isLoadingSummary,
     isLoadingCategories,
     isLoadingMonthly,
+    isLoadingCategoryTrend,
     error,
     fetchPeriodSummary,
     fetchCategoryBreakdown,
     fetchMonthlyComparison,
+    fetchCategoryTrend,
   }
 }

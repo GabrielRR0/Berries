@@ -244,3 +244,58 @@ def test_monthly_isolates_transactions_between_users(client):
     body = response.json()
     assert len(body) == 1
     assert Decimal(body[0]["total_income"]) == Decimal("10.00")
+
+
+# --- GET /api/analytics/categories/trend ---------------------------------------------
+
+
+def test_categories_trend_requires_auth(client):
+    response = client.get("/api/analytics/categories/trend", params={"type": "expense"})
+
+    assert response.status_code == 401
+
+
+def test_categories_trend_requires_type_param(client):
+    token = _register(client)
+
+    response = client.get("/api/analytics/categories/trend", headers=_auth_headers(token))
+
+    assert response.status_code == 422
+
+
+def test_categories_trend_returns_monthly_totals_per_category(client):
+    token = _register(client)
+    wallet = _create_wallet(client, token)
+    now = datetime.now(timezone.utc)
+
+    _create_transaction(client, token, wallet["id"], "expense", "80.00", "Mercado", _dt(now.year, now.month))
+
+    response = client.get(
+        "/api/analytics/categories/trend", params={"type": "expense", "months": 2}, headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["months"]) == 2
+    assert body["months"][-1] == f"{now.year:04d}-{now.month:02d}"
+    mercado = next(item for item in body["categories"] if item["category"] == "Mercado")
+    assert Decimal(mercado["monthly_totals"][0]) == Decimal("0")
+    assert Decimal(mercado["monthly_totals"][1]) == Decimal("80.00")
+
+
+def test_categories_trend_isolates_transactions_between_users(client):
+    token_a = _register(client, "a@example.com")
+    token_b = _register(client, "b@example.com")
+    wallet_a = _create_wallet(client, token_a)
+    wallet_b = _create_wallet(client, token_b, "Banco")
+    now = datetime.now(timezone.utc)
+    _create_transaction(client, token_a, wallet_a["id"], "expense", "10.00", "Comida", now)
+    _create_transaction(client, token_b, wallet_b["id"], "expense", "999.00", "Comida", now)
+
+    response = client.get(
+        "/api/analytics/categories/trend", params={"type": "expense", "months": 1}, headers=_auth_headers(token_a)
+    )
+
+    body = response.json()
+    assert len(body["categories"]) == 1
+    assert Decimal(body["categories"][0]["monthly_totals"][0]) == Decimal("10.00")

@@ -2,7 +2,12 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from app.models.transactions.transaction_model import Transaction
-from app.services.analytics.analytics_service import get_category_breakdown, get_monthly_comparison, get_period_summary
+from app.services.analytics.analytics_service import (
+    get_category_breakdown,
+    get_category_monthly_trend,
+    get_monthly_comparison,
+    get_period_summary,
+)
 from app.services.auth.auth_service import register_user
 from app.services.transactions.transaction_service import create_transaction
 from app.services.wallets.transfer_service import execute_transfer
@@ -257,3 +262,77 @@ def test_monthly_comparison_does_not_leak_other_users_transactions(db):
 
     assert len(items) == 1
     assert items[0].total_income == Decimal("10.00")
+
+
+# --- get_category_monthly_trend -----------------------------------------------------
+
+
+def test_category_monthly_trend_tracks_one_category_across_months(db):
+    user = _user(db)
+    wallet = _wallet(db, user.id)
+    now = datetime.now(timezone.utc)
+    y_minus1, m_minus1 = _shift(now.year, now.month, -1)
+    create_transaction(db, user.id, wallet.id, "expense", Decimal("80.00"), "Mercado", occurred_at=_dt(y_minus1, m_minus1))
+    create_transaction(db, user.id, wallet.id, "expense", Decimal("120.00"), "Mercado", occurred_at=now)
+
+    trend = get_category_monthly_trend(db, user.id, "expense", months=2)
+
+    assert len(trend.months) == 2
+    assert trend.months[-1] == f"{now.year:04d}-{now.month:02d}"
+    mercado = next(item for item in trend.categories if item.category == "Mercado")
+    assert mercado.monthly_totals == [Decimal("80.00"), Decimal("120.00")]
+
+
+def test_category_monthly_trend_includes_zero_for_month_without_that_category(db):
+    user = _user(db)
+    wallet = _wallet(db, user.id)
+    now = datetime.now(timezone.utc)
+    create_transaction(db, user.id, wallet.id, "expense", Decimal("50.00"), "Gasolina", occurred_at=now)
+
+    trend = get_category_monthly_trend(db, user.id, "expense", months=3)
+
+    gasolina = next(item for item in trend.categories if item.category == "Gasolina")
+    assert gasolina.monthly_totals == [Decimal("0"), Decimal("0"), Decimal("50.00")]
+
+
+def test_category_monthly_trend_caps_at_top_n_and_groups_the_rest_as_otros(db):
+    user = _user(db)
+    wallet = _wallet(db, user.id)
+    now = datetime.now(timezone.utc)
+    # 6 categorías con montos claramente distintos, top_n default = 5.
+    amounts = [("Renta", "600"), ("Mercado", "300"), ("Gasolina", "150"), ("Ocio", "90"), ("Salud", "60"), ("Ropa", "20")]
+    for category, amount in amounts:
+        create_transaction(db, user.id, wallet.id, "expense", Decimal(amount), category, occurred_at=now)
+
+    trend = get_category_monthly_trend(db, user.id, "expense", months=1)
+
+    categories = [item.category for item in trend.categories]
+    assert categories == ["Renta", "Mercado", "Gasolina", "Ocio", "Salud", "Otros"]
+    otros = trend.categories[-1]
+    assert otros.monthly_totals == [Decimal("20.00")]
+
+
+def test_category_monthly_trend_without_enough_categories_has_no_otros_entry(db):
+    user = _user(db)
+    wallet = _wallet(db, user.id)
+    now = datetime.now(timezone.utc)
+    create_transaction(db, user.id, wallet.id, "expense", Decimal("40.00"), "Comida", occurred_at=now)
+
+    trend = get_category_monthly_trend(db, user.id, "expense", months=1)
+
+    assert [item.category for item in trend.categories] == ["Comida"]
+
+
+def test_category_monthly_trend_does_not_leak_other_users_transactions(db):
+    user_a = _user(db, "a@example.com")
+    user_b = _user(db, "b@example.com")
+    wallet_a = _wallet(db, user_a.id)
+    wallet_b = _wallet(db, user_b.id, "Banco")
+    now = datetime.now(timezone.utc)
+    create_transaction(db, user_a.id, wallet_a.id, "expense", Decimal("10.00"), "Comida", occurred_at=now)
+    create_transaction(db, user_b.id, wallet_b.id, "expense", Decimal("999.00"), "Comida", occurred_at=now)
+
+    trend = get_category_monthly_trend(db, user_a.id, "expense", months=1)
+
+    assert len(trend.categories) == 1
+    assert trend.categories[0].monthly_totals == [Decimal("10.00")]

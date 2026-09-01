@@ -21,8 +21,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.transactions.transaction_model import Transaction
-from app.schemas.analytics.analytics_schemas import CategoryBreakdownItem, MonthlyComparisonItem, PeriodSummaryResponse
+from app.schemas.analytics.analytics_schemas import (
+    CategoryBreakdownItem,
+    CategoryMonthlyTrendItem,
+    CategoryMonthlyTrendResponse,
+    MonthlyComparisonItem,
+    PeriodSummaryResponse,
+)
 from app.services.analytics.errors import InvalidPeriodError
+
+_OTHER_CATEGORY_LABEL = "Otros"
 
 _MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
@@ -168,3 +176,55 @@ def get_monthly_comparison(db: Session, user_id: uuid.UUID, months: int = 6) -> 
             )
         )
     return items
+
+
+def get_category_monthly_trend(
+    db: Session, user_id: uuid.UUID, kind: str, months: int = 6, top_n: int = 5
+) -> CategoryMonthlyTrendResponse:
+    """Cuánto se movió cada categoría mes a mes en la ventana pedida (ej. "cuánto gasté
+    en Mercado cada uno de los últimos 6 meses") — a diferencia de get_category_breakdown
+    (un solo mes, forma de torta), acá se repite la misma agrupación por categoría una
+    vez por cada mes de la ventana. Solo se devuelven las `top_n` categorías con mayor
+    total ACUMULADO en toda la ventana, una por una; el resto se junta en una única
+    entrada "Otros" para que la lista se mantenga legible (un usuario con 20+
+    categorías no debería ver 20+ filas de sparkline)."""
+    months = max(1, min(months, 24))
+    current_month = _resolve_month(None)
+    ordered_months = [_shift_month(current_month, -offset) for offset in range(months - 1, -1, -1)]
+
+    totals_by_month: list[dict[str, Decimal]] = []
+    grand_totals: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
+
+    for month in ordered_months:
+        start, end = _month_bounds(month)
+        rows = _transactions_in_range(db, user_id, kind, start, end)
+        month_totals: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
+        for row in rows:
+            month_totals[row.category] += row.amount
+            grand_totals[row.category] += row.amount
+        totals_by_month.append(month_totals)
+
+    ranked_categories = sorted(grand_totals.items(), key=lambda entry: entry[1], reverse=True)
+    top_categories = [category for category, _ in ranked_categories[:top_n]]
+    other_categories = [category for category, _ in ranked_categories[top_n:]]
+
+    items = [
+        CategoryMonthlyTrendItem(
+            category=category,
+            monthly_totals=[month_totals.get(category, Decimal("0")) for month_totals in totals_by_month],
+        )
+        for category in top_categories
+    ]
+
+    if other_categories:
+        items.append(
+            CategoryMonthlyTrendItem(
+                category=_OTHER_CATEGORY_LABEL,
+                monthly_totals=[
+                    sum((month_totals.get(category, Decimal("0")) for category in other_categories), Decimal("0"))
+                    for month_totals in totals_by_month
+                ],
+            )
+        )
+
+    return CategoryMonthlyTrendResponse(months=ordered_months, categories=items)

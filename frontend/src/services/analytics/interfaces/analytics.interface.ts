@@ -24,3 +24,13 @@ export interface MonthlyComparison {
   totalExpense: number
   net: number
 }
+
+export interface CategoryMonthlyTrendEntry {
+  category: string
+  monthlyTotals: number[]
+}
+
+export interface CategoryMonthlyTrend {
+  months: string[]
+  categories: CategoryMonthlyTrendEntry[]
+}

@@ -26,3 +26,18 @@ class MonthlyComparisonItem(BaseModel):
     total_income: Decimal
     total_expense: Decimal
     net: Decimal
+
+
+class CategoryMonthlyTrendItem(BaseModel):
+    category: str
+    # Un total por cada mes de `CategoryMonthlyTrendResponse.months`, mismo orden y
+    # misma cantidad (nunca se omite un mes sin movimientos - queda en 0).
+    monthly_totals: list[Decimal]
+
+
+class CategoryMonthlyTrendResponse(BaseModel):
+    months: list[str]
+    # Las categorías con mayor total ACUMULADO en toda la ventana, de mayor a menor,
+    # más una última entrada "Otros" (solo si sobran categorías) con el resto sumado -
+    # ver get_category_monthly_trend().
+    categories: list[CategoryMonthlyTrendItem]

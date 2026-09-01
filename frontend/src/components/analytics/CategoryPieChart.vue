@@ -11,10 +11,25 @@ import type { CategoryBreakdown } from '../../services/analytics/interfaces/anal
 // el color.
 const props = defineProps<{ data: CategoryBreakdown[] }>()
 
-const TONES = ['var(--text-h)', 'var(--text)', 'var(--text-muted)', 'var(--border)', 'var(--bg-raised)']
-
 const RADIUS = 15.5
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
+
+// Rampa de brillo (blanco --text-h en rgb, 246 246 246 - no hay forma de
+// modular la opacidad de una custom property en JS, asi que se hardcodea el
+// rgb equivalente) en vez de una lista fija de 5 tonos: con una lista fija,
+// una 6ta categoria (ej. "Otros") repetia el MISMO color que la primera
+// (index % length) - bug real encontrado durante el rediseño de Analisis,
+// se veia como una porcion fantasma fusionada con la de "Renta" en vez de
+// una porcion distinta y propia. La rampa se recalcula segun cuantas
+// categorias haya ese mes, asi que siempre queda un tono distinto por
+// porcion sin importar el total.
+const MIN_TONE_OPACITY = 0.12
+
+function toneFor(index: number, total: number): string {
+  if (total <= 1) return 'rgba(246, 246, 247, 1)'
+  const opacity = 1 - (index / (total - 1)) * (1 - MIN_TONE_OPACITY)
+  return `rgba(246, 246, 247, ${opacity.toFixed(2)})`
+}
 
 interface Segment {
   category: string
@@ -33,7 +48,7 @@ const segments = computed<Segment[]>(() => {
       category: entry.category,
       percentage: entry.percentage,
       total: entry.total,
-      color: TONES[index % TONES.length],
+      color: toneFor(index, props.data.length),
       dasharray: `${dash} ${Math.max(0, CIRCUMFERENCE - dash)}`,
       // Offset negativo para que cada tramo arranque donde termino el
       // anterior; rotate(-90) en el <circle> lo pone a partir de las 12.
@@ -111,6 +126,11 @@ const segments = computed<Segment[]>(() => {
   height: 0.625rem;
   flex-shrink: 0;
   border-radius: var(--radius-pill);
+  /* Los tonos mas tenues de la rampa (categorias chicas, al final de la
+     lista) quedan casi invisibles contra el fondo de cristal sin un borde
+     propio - a diferencia del donut (donde el trazo grueso ya se distingue
+     por su tamaño), esta pastilla es demasiado chica para eso. */
+  border: 1px solid var(--border);
 }
 
 .legend-label {

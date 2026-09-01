@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getCategoryBreakdown, getMonthlyComparison, getPeriodSummary } from '../../../services/analytics/analytics.service'
+import {
+  getCategoryBreakdown,
+  getCategoryMonthlyTrend,
+  getMonthlyComparison,
+  getPeriodSummary,
+} from '../../../services/analytics/analytics.service'
 import type {
   CategoryBreakdown,
+  CategoryMonthlyTrend,
   MonthlyComparison,
   PeriodSummary,
 } from '../../../services/analytics/interfaces/analytics.interface'
@@ -11,6 +17,7 @@ vi.mock('../../../services/analytics/analytics.service', () => ({
   getPeriodSummary: vi.fn(),
   getCategoryBreakdown: vi.fn(),
   getMonthlyComparison: vi.fn(),
+  getCategoryMonthlyTrend: vi.fn(),
 }))
 
 const PERIOD_SUMMARY: PeriodSummary = {
@@ -25,23 +32,40 @@ const CATEGORIES: CategoryBreakdown[] = [{ category: 'Comida', total: 300, perce
 
 const MONTHLY: MonthlyComparison[] = [{ month: '2026-08', totalIncome: 1200, totalExpense: 800, net: 400 }]
 
+const CATEGORY_TREND: CategoryMonthlyTrend = {
+  months: ['2026-07', '2026-08'],
+  categories: [{ category: 'Mercado', monthlyTotals: [80, 120] }],
+}
+
 describe('useAnalytics', () => {
   beforeEach(() => {
     vi.mocked(getPeriodSummary).mockReset().mockResolvedValue(PERIOD_SUMMARY)
     vi.mocked(getCategoryBreakdown).mockReset().mockResolvedValue(CATEGORIES)
     vi.mocked(getMonthlyComparison).mockReset().mockResolvedValue(MONTHLY)
+    vi.mocked(getCategoryMonthlyTrend).mockReset().mockResolvedValue(CATEGORY_TREND)
   })
 
   it('arranca vacio, sin cargar y sin error', () => {
-    const { periodSummary, categoryBreakdown, monthlyComparison, isLoadingSummary, isLoadingCategories, isLoadingMonthly, error } =
-      useAnalytics()
+    const {
+      periodSummary,
+      categoryBreakdown,
+      monthlyComparison,
+      categoryTrend,
+      isLoadingSummary,
+      isLoadingCategories,
+      isLoadingMonthly,
+      isLoadingCategoryTrend,
+      error,
+    } = useAnalytics()
 
     expect(periodSummary.value).toBeNull()
     expect(categoryBreakdown.value).toEqual([])
     expect(monthlyComparison.value).toEqual([])
+    expect(categoryTrend.value).toBeNull()
     expect(isLoadingSummary.value).toBe(false)
     expect(isLoadingCategories.value).toBe(false)
     expect(isLoadingMonthly.value).toBe(false)
+    expect(isLoadingCategoryTrend.value).toBe(false)
     expect(error.value).toBeNull()
   })
 
@@ -103,6 +127,26 @@ describe('useAnalytics', () => {
       const { error, fetchMonthlyComparison } = useAnalytics()
 
       await fetchMonthlyComparison()
+
+      expect(error.value).toBe('fallo de red')
+    })
+  })
+
+  describe('fetchCategoryTrend', () => {
+    it('pide la tendencia por categoría con el type y meses dados', async () => {
+      const { categoryTrend, fetchCategoryTrend } = useAnalytics()
+
+      await fetchCategoryTrend('expense', 6)
+
+      expect(getCategoryMonthlyTrend).toHaveBeenCalledWith('expense', 6)
+      expect(categoryTrend.value).toEqual(CATEGORY_TREND)
+    })
+
+    it('guarda el mensaje de error si el servicio falla', async () => {
+      vi.mocked(getCategoryMonthlyTrend).mockRejectedValue(new Error('fallo de red'))
+      const { error, fetchCategoryTrend } = useAnalytics()
+
+      await fetchCategoryTrend('expense')
 
       expect(error.value).toBe('fallo de red')
     })

@@ -5,8 +5,18 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, get_db
 from app.models.auth.user_model import User
-from app.schemas.analytics.analytics_schemas import CategoryBreakdownItem, MonthlyComparisonItem, PeriodSummaryResponse
-from app.services.analytics.analytics_service import get_category_breakdown, get_monthly_comparison, get_period_summary
+from app.schemas.analytics.analytics_schemas import (
+    CategoryBreakdownItem,
+    CategoryMonthlyTrendResponse,
+    MonthlyComparisonItem,
+    PeriodSummaryResponse,
+)
+from app.services.analytics.analytics_service import (
+    get_category_breakdown,
+    get_category_monthly_trend,
+    get_monthly_comparison,
+    get_period_summary,
+)
 from app.services.analytics.errors import InvalidPeriodError
 
 router = APIRouter()
@@ -44,3 +54,13 @@ async def monthly(
     current_user: User = Depends(get_current_user),
 ) -> list[MonthlyComparisonItem]:
     return get_monthly_comparison(db, current_user.id, months)
+
+
+@router.get("/categories/trend", response_model=CategoryMonthlyTrendResponse)
+async def categories_trend(
+    type: Literal["income", "expense"] = Query(),
+    months: int = Query(default=6, ge=1, le=24),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> CategoryMonthlyTrendResponse:
+    return get_category_monthly_trend(db, current_user.id, type, months)
