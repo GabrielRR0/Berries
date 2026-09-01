@@ -6,7 +6,6 @@ import { formatDate } from '../../utils/formatters/formatDate'
 import { GOAL_TYPE_TEMPLATES } from '../../utils/goals/goalTypeTemplates'
 import { monthsBetween } from '../../utils/goals/monthsBetween'
 import BaseButton from '../ui/BaseButton.vue'
-import AmountKeypad from './AmountKeypad.vue'
 import GoalProgressRing from './GoalProgressRing.vue'
 import GoalTypeIcon from './GoalTypeIcon.vue'
 
@@ -82,8 +81,10 @@ const initialAmountValue = computed(() => {
   return Number.isFinite(value) && value > 0 ? value : 0
 })
 
-// El monto activo es el que edita el teclado numerico ahora mismo, segun el modo
-// elegido - un solo AmountKeypad sirve para los dos casos.
+// El monto activo es el que edita el input nativo ahora mismo, segun el modo
+// elegido - pedido explicito del usuario: sacar los botones de numero propios y
+// usar el teclado real del telefono (el teclado a medida tenia ademas un bug real
+// donde solo dejaba escribir un digito y se trababa).
 const activeAmountStr = computed({
   get: () => (useMonthlyAmount.value ? monthlyAmountStr.value : totalAmountStr.value),
   set: (value: string) => {
@@ -167,6 +168,54 @@ const exceedsAvailable = computed(() => {
   return impliedMonthlyContribution.value > props.savingsCapacity.avgMonthlyAvailable
 })
 
+// Explicacion completa del plan en modo "Monto total" - pedido explicito del usuario:
+// antes solo se veia "esto es $360/mes" (y solo si habia datos de capacidad de ahorro
+// disponibles - si no habia, no se explicaba nada). Ahora siempre dice cuantos meses
+// quedan hasta la fecha, el promedio necesario, y si ese promedio sumado a lo ya
+// ahorrado alcanza para completar la meta a tiempo.
+const totalModeHintText = computed(() => {
+  if (useMonthlyAmount.value) return null
+  if (monthsRemaining.value === null || targetAmount.value === null || impliedMonthlyContribution.value === null) return null
+
+  if (initialAmountValue.value >= targetAmount.value) {
+    return (
+      `Ya tienes ahorrado ${formatCurrency(initialAmountValue.value, currency.value)}, que cubre por completo tu meta de ` +
+      `${formatCurrency(targetAmount.value, currency.value)}. No necesitas ahorrar nada más antes del ${formatDate(targetDate.value)}.`
+    )
+  }
+
+  const monthsLabel = monthsRemaining.value === 1 ? 'mes' : 'meses'
+  const initialClause =
+    initialAmountValue.value > 0
+      ? `, sumando los ${formatCurrency(initialAmountValue.value, currency.value)} que ya tienes ahorrados`
+      : ''
+  return (
+    `Te faltan ${monthsRemaining.value} ${monthsLabel} hasta el ${formatDate(targetDate.value)}. ` +
+    `Para reunir ${formatCurrency(targetAmount.value, currency.value)} necesitas ahorrar un promedio de ` +
+    `${formatCurrency(impliedMonthlyContribution.value, currency.value)} al mes${initialClause}. ` +
+    `Ahorrando ese promedio, completarías tu meta a tiempo.`
+  )
+})
+
+// Mismo criterio en modo "Aporte mensual", donde el usuario dicta el aporte y el total
+// se deriva - deja explicito cuanto se junta y para cuando.
+const monthlyModeHintText = computed(() => {
+  if (!useMonthlyAmount.value) return null
+  if (monthsRemaining.value === null || computedTotalFromMonthly.value === null || impliedMonthlyContribution.value === null) {
+    return null
+  }
+
+  const monthsLabel = monthsRemaining.value === 1 ? 'mes' : 'meses'
+  const initialClause =
+    initialAmountValue.value > 0
+      ? ` (más los ${formatCurrency(initialAmountValue.value, currency.value)} que ya tienes ahorrados)`
+      : ''
+  return (
+    `Aportando ${formatCurrency(impliedMonthlyContribution.value, currency.value)} al mes durante ${monthsRemaining.value} ${monthsLabel}` +
+    `${initialClause}, vas a reunir ${formatCurrency(computedTotalFromMonthly.value, currency.value)} para el ${formatDate(targetDate.value)}.`
+  )
+})
+
 const canProceedStep2 = computed(
   () => title.value.trim() !== '' && !!targetDate.value && targetAmount.value !== null && targetAmount.value > 0,
 )
@@ -237,7 +286,18 @@ function onCreate() {
         </GoalProgressRing>
       </div>
 
-      <p class="wizard-amount-display">{{ activeAmountStr || '0' }} {{ currency }}</p>
+      <div class="wizard-amount-input-wrap">
+        <input
+          v-model="activeAmountStr"
+          type="number"
+          min="0"
+          step="0.01"
+          inputmode="decimal"
+          placeholder="0"
+          class="wizard-amount-input"
+        />
+        <span class="wizard-amount-currency">{{ currency }}</span>
+      </div>
       <p class="wizard-amount-label">{{ useMonthlyAmount ? 'Aporte mensual' : 'Monto objetivo' }}</p>
 
       <div class="amount-mode-toggle">
@@ -296,22 +356,20 @@ function onCreate() {
         </div>
       </div>
 
-      <p v-if="useMonthlyAmount && computedTotalFromMonthly !== null" class="wizard-hint">
-        Total estimado: {{ formatCurrency(computedTotalFromMonthly, currency) }} en {{ monthsRemaining }}
-        {{ monthsRemaining === 1 ? 'mes' : 'meses' }}.
-      </p>
+      <p v-if="totalModeHintText" class="wizard-hint">{{ totalModeHintText }}</p>
+      <p v-if="monthlyModeHintText" class="wizard-hint">{{ monthlyModeHintText }}</p>
 
       <p v-if="savingsCapacity && impliedMonthlyContribution !== null" class="capacity-hint" :class="{ warning: exceedsAvailable }">
         <template v-if="exceedsAvailable">
-          Esto es {{ formatCurrency(impliedMonthlyContribution, currency) }}/mes, más de lo que sueles tener disponible
-          ({{ formatCurrency(savingsCapacity.avgMonthlyAvailable, currency) }}/mes en promedio).
+          Ese promedio es más de lo que sueles tener disponible por mes
+          ({{ formatCurrency(savingsCapacity.avgMonthlyAvailable, currency) }}/mes en promedio) - vas a necesitar ahorrar más de lo
+          habitual, o mover la fecha.
         </template>
         <template v-else>
-          Te quedan disponibles ~{{ formatCurrency(savingsCapacity.avgMonthlyAvailable, currency) }}/mes.
+          Te quedan disponibles ~{{ formatCurrency(savingsCapacity.avgMonthlyAvailable, currency) }}/mes en promedio, así que este
+          ritmo es alcanzable.
         </template>
       </p>
-
-      <AmountKeypad v-model="activeAmountStr" />
 
       <BaseButton class="wizard-next" :disabled="!canProceedStep2" @click="goToSummary">Continuar</BaseButton>
     </div>
@@ -508,11 +566,47 @@ function onCreate() {
   color: var(--accent);
 }
 
-.wizard-amount-display {
-  text-align: center;
+.wizard-amount-input-wrap {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.wizard-amount-input {
+  width: 9rem;
+  min-width: 0;
+  padding: 0.375rem 0;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
   font-size: 1.75rem;
   font-weight: 700;
-  color: var(--text-h);
+  text-align: right;
+  transition: border-color var(--duration-fast) var(--ease-out);
+  /* Ocultar las flechitas nativas de incremento - no aportan nada util para un
+     monto y ensucian el input. */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.wizard-amount-input::-webkit-outer-spin-button,
+.wizard-amount-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.wizard-amount-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.wizard-amount-currency {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 .wizard-amount-label {

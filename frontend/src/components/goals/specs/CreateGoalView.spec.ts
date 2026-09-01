@@ -74,9 +74,7 @@ describe('CreateGoalView', () => {
     await wrapper.find('.type-tile-custom').trigger('click')
     await wrapper.find('.wizard-title-input').setValue('MacBook')
     await wrapper.find('input[type="date"]').setValue('2026-12-28')
-    for (const digit of '1200') {
-      await wrapper.findAll('.amount-keypad .key').find((key) => key.text() === digit)!.trigger('click')
-    }
+    await wrapper.find('.wizard-amount-input').setValue('1200')
     await wrapper.find('.wizard-next').trigger('click')
     await wrapper.find('.wizard-next').trigger('click') // "Crear meta"
     await flushPromises()

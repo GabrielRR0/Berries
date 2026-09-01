@@ -4,14 +4,12 @@ import type { SavingsCapacity } from '../../../services/goals/interfaces/goals.i
 import { monthsBetween } from '../../../utils/goals/monthsBetween'
 import CreateGoalWizard from '../CreateGoalWizard.vue'
 
-// Secuencial, NO Promise.all de triggers sin await: el prop modelValue que
-// AmountKeypad recibe del padre se actualiza recien en el siguiente render de Vue
-// (no de forma sincronica), asi que disparar varios clicks sin esperar cada uno
-// hace que cada digito lea un modelValue todavia viejo (se pisan entre si).
+// El monto se escribe con el teclado nativo del telefono/navegador (pedido
+// explicito del usuario: sacar los botones de numero a medida, que ademas
+// tenian un bug real donde solo dejaba escribir un digito y se trababa) -
+// un input type="number" comun, no un componente propio.
 async function typeAmount(wrapper: ReturnType<typeof mount>, digits: string) {
-  for (const digit of digits) {
-    await wrapper.findAll('.amount-keypad .key').find((key) => key.text() === digit)!.trigger('click')
-  }
+  await wrapper.find('.wizard-amount-input').setValue(digits)
 }
 
 describe('CreateGoalWizard', () => {
@@ -54,13 +52,13 @@ describe('CreateGoalWizard', () => {
     expect(wrapper.find('.wizard-back').exists()).toBe(false)
   })
 
-  it('escribir con el teclado numerico actualiza el monto mostrado', async () => {
+  it('escribir en el input actualiza el monto', async () => {
     const wrapper = mount(CreateGoalWizard)
     await wrapper.find('.type-tile-custom').trigger('click')
 
     await typeAmount(wrapper, '240')
 
-    expect(wrapper.find('.wizard-amount-display').text()).toContain('240')
+    expect((wrapper.find('.wizard-amount-input').element as HTMLInputElement).value).toBe('240')
   })
 
   it('"Continuar" queda deshabilitado hasta completar titulo, fecha y monto', async () => {
@@ -114,7 +112,49 @@ describe('CreateGoalWizard', () => {
     await typeAmount(wrapper, '80')
 
     expect(wrapper.find('.wizard-hint').exists()).toBe(true)
-    expect(wrapper.find('.wizard-hint').text()).toContain('Total estimado')
+    expect(wrapper.find('.wizard-hint').text()).toContain('vas a reunir')
+  })
+
+  it('modo "Monto total" explica cuantos meses quedan y el promedio necesario', async () => {
+    const wrapper = mount(CreateGoalWizard)
+    await wrapper.find('.type-tile-custom').trigger('click')
+    await wrapper.find('.wizard-title-input').setValue('MacBook')
+    await wrapper.find('input[type="date"]').setValue('2026-12-28')
+
+    await typeAmount(wrapper, '2540')
+
+    const hint = wrapper.find('.wizard-hint')
+    expect(hint.exists()).toBe(true)
+    expect(hint.text()).toContain('Te faltan')
+    expect(hint.text()).toContain('$2,540.00')
+    expect(hint.text()).toContain('completarías tu meta a tiempo')
+  })
+
+  it('modo "Monto total" con ahorro inicial menciona que se suma al promedio', async () => {
+    const wrapper = mount(CreateGoalWizard)
+    await wrapper.find('.type-tile-custom').trigger('click')
+    await wrapper.find('.wizard-title-input').setValue('MacBook')
+    await wrapper.find('input[type="date"]').setValue('2026-12-28')
+    await typeAmount(wrapper, '2540')
+    await wrapper.find('.initial-savings-toggle').trigger('click')
+    await wrapper.find('.initial-savings-fields input[type="number"]').setValue('700')
+
+    const hint = wrapper.find('.wizard-hint')
+    expect(hint.text()).toContain('sumando los $700.00 que ya tienes ahorrados')
+  })
+
+  it('modo "Monto total" cuando lo ahorrado ya cubre la meta, avisa que no falta nada', async () => {
+    const wrapper = mount(CreateGoalWizard)
+    await wrapper.find('.type-tile-custom').trigger('click')
+    await wrapper.find('.wizard-title-input').setValue('MacBook')
+    await wrapper.find('input[type="date"]').setValue('2026-12-28')
+    await typeAmount(wrapper, '700')
+    await wrapper.find('.initial-savings-toggle').trigger('click')
+    await wrapper.find('.initial-savings-fields input[type="number"]').setValue('700')
+
+    const hint = wrapper.find('.wizard-hint')
+    expect(hint.text()).toContain('cubre por completo tu meta')
+    expect(hint.text()).toContain('No necesitas ahorrar nada más')
   })
 
   it('con datos de voz, salta directo al paso 2 prellenado', () => {
@@ -243,7 +283,9 @@ describe('CreateGoalWizard', () => {
 
     const months = monthsBetween(new Date(), new Date('2026-12-28'))
     const expectedTotal = (80 * months + 700).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    expect(wrapper.find('.wizard-hint').text()).toContain(`Total estimado: $${expectedTotal}`)
+    const hint = wrapper.find('.wizard-hint').text()
+    expect(hint).toContain('más los $700.00 que ya tienes ahorrados')
+    expect(hint).toContain(`vas a reunir $${expectedTotal}`)
   })
 
   it('avisa cuando el aporte implicito supera el disponible promedio', async () => {
