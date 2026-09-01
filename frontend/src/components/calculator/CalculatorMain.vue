@@ -6,24 +6,25 @@ import SectionHeader from '../layout/SectionHeader.vue'
 import BottomSheet from '../ui/BottomSheet.vue'
 import PillToggle from '../ui/PillToggle.vue'
 import BasicCalculator from './BasicCalculator.vue'
-import CurrencyConverterCalculator from './CurrencyConverterCalculator.vue'
 import InstallmentCalculator from './InstallmentCalculator.vue'
 import PercentageCalculator from './PercentageCalculator.vue'
 
 // Pantalla "Calculadora" (/calculadora) - antes un acceso rapido sin
 // navegar ("proximamente", ver QuickActionsGrid.vue), pedido explicito del
-// usuario de construirla "medio completa para finanzas": 4 herramientas
+// usuario de construirla "medio completa para finanzas": herramientas
 // independientes entre si (ningun estado compartido cruza de una a otra al
 // cambiar de modo), elegidas por el usuario de una lista de opciones -
 // mismo criterio de header/estilo que Movimientos/Cuentas/Deudas
-// (SectionHeader + ayuda). Ninguna de las 4 pega a un endpoint nuevo del
-// backend salvo el conversor de moneda, que reusa useCurrency() (ya
-// existente) - el resto es matematica pura client-side.
-type CalculatorMode = 'basica' | 'conversor' | 'cuotas' | 'porcentaje'
+// (SectionHeader + ayuda). Ninguna pega a un endpoint nuevo del backend -
+// es matematica pura client-side.
+//
+// El modo "conversor" (CurrencyConverterCalculator.vue) esta deshabilitado
+// temporalmente a pedido explicito del usuario - el archivo queda intacto
+// para reactivarlo despues, solo se saco de MODE_OPTIONS/el template.
+type CalculatorMode = 'basica' | 'cuotas' | 'porcentaje'
 
 const MODE_OPTIONS: { value: CalculatorMode; label: string }[] = [
   { value: 'basica', label: 'Básica' },
-  { value: 'conversor', label: 'Conversor' },
   { value: 'cuotas', label: 'Cuotas' },
   { value: 'porcentaje', label: 'Porcentaje' },
 ]
@@ -38,7 +39,7 @@ function goBack() {
 </script>
 
 <template>
-  <PageShell>
+  <PageShell hide-tab-bar>
     <SectionHeader title="Calculadora" max-width="64rem" @back="goBack" @help="showHelpSheet = true" />
 
     <div class="calculator-screen">
@@ -50,7 +51,6 @@ function goBack() {
 
       <div class="calculator-panel">
         <BasicCalculator v-if="mode === 'basica'" />
-        <CurrencyConverterCalculator v-else-if="mode === 'conversor'" />
         <InstallmentCalculator v-else-if="mode === 'cuotas'" />
         <PercentageCalculator v-else />
       </div>
@@ -58,10 +58,9 @@ function goBack() {
 
     <BottomSheet v-if="showHelpSheet" title="¿Qué es Calculadora?" @close="showHelpSheet = false">
       <p class="help-text">
-        Cuatro herramientas para cuentas rápidas de todos los días: una calculadora básica, un conversor de moneda al
-        tipo de cambio actual, una simulación de cuotas para planear una deuda antes de cargarla, y dos cuentas de
-        porcentaje (propinas, o qué parte representa un gasto de un total). Ninguna toca tus movimientos ni billeteras
-        reales - son solo cuentas.
+        Herramientas para cuentas rápidas de todos los días: una calculadora básica, una simulación de cuotas para
+        planear una deuda antes de cargarla, y dos cuentas de porcentaje (propinas, o qué parte representa un gasto de
+        un total). Ninguna toca tus movimientos ni billeteras reales - son solo cuentas.
       </p>
     </BottomSheet>
   </PageShell>

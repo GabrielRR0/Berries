@@ -8,6 +8,7 @@ import SectionHeader from '../layout/SectionHeader.vue'
 import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
 import BaseCard from '../ui/BaseCard.vue'
 import BottomSheet from '../ui/BottomSheet.vue'
+import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import PillToggle from '../ui/PillToggle.vue'
 import GoalCard from './GoalCard.vue'
 import GoalCheckInPrompt from './GoalCheckInPrompt.vue'
@@ -142,7 +143,9 @@ onMounted(() => {
       </div>
 
       <p v-if="error" class="goals-error" role="alert">{{ error }}</p>
-      <p v-if="isLoading" class="goals-loading">Cargando metas...</p>
+      <Transition name="loading-fade">
+        <LoadingIndicator v-if="isLoading" class="goals-loading" label="Cargando metas..." />
+      </Transition>
 
       <TransitionGroup
         v-if="hasGoals"
@@ -279,8 +282,6 @@ onMounted(() => {
 
 .goals-loading {
   margin-top: 1rem;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
 }
 
 .goals-list {

@@ -4,6 +4,7 @@ import { listCheckIns } from '../../services/goals/goals.service'
 import type { GoalCheckIn } from '../../services/goals/interfaces/goals.interface'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import { formatDate } from '../../utils/formatters/formatDate'
+import LoadingIndicator from '../ui/LoadingIndicator.vue'
 
 // Historial de check-ins de UNA meta - carga perezosa (solo al abrir el
 // detalle de una meta puntual, ver GoalsMain.vue), no se trae junto con la
@@ -28,22 +29,26 @@ onMounted(async () => {
 
 <template>
   <div class="check-in-history">
-    <p v-if="isLoading" class="check-in-history-status">Cargando historial...</p>
-    <p v-else-if="error" class="check-in-history-status error">{{ error }}</p>
-    <p v-else-if="checkIns.length === 0" class="check-in-history-status">Todavía no hay aportes registrados.</p>
+    <Transition name="loading-fade" mode="out-in">
+      <LoadingIndicator v-if="isLoading" key="loading" label="Cargando historial..." />
+      <p v-else-if="error" key="error" class="check-in-history-status error">{{ error }}</p>
+      <p v-else-if="checkIns.length === 0" key="empty" class="check-in-history-status">
+        Todavía no hay aportes registrados.
+      </p>
 
-    <ul v-else class="check-in-history-list">
-      <li v-for="checkIn in checkIns" :key="checkIn.id" class="check-in-history-item">
-        <div class="check-in-history-row">
-          <span class="check-in-history-date">{{ formatDate(checkIn.createdAt) }}</span>
-          <span class="check-in-history-amount">{{ formatCurrency(checkIn.amountSaved, currency) }}</span>
-        </div>
-        <p v-if="checkIn.newTargetDate" class="check-in-history-postponed">
-          Meta pospuesta a {{ formatDate(checkIn.newTargetDate) }}
-          <span v-if="checkIn.note">— {{ checkIn.note }}</span>
-        </p>
-      </li>
-    </ul>
+      <ul v-else key="list" class="check-in-history-list">
+        <li v-for="checkIn in checkIns" :key="checkIn.id" class="check-in-history-item">
+          <div class="check-in-history-row">
+            <span class="check-in-history-date">{{ formatDate(checkIn.createdAt) }}</span>
+            <span class="check-in-history-amount">{{ formatCurrency(checkIn.amountSaved, currency) }}</span>
+          </div>
+          <p v-if="checkIn.newTargetDate" class="check-in-history-postponed">
+            Meta pospuesta a {{ formatDate(checkIn.newTargetDate) }}
+            <span v-if="checkIn.note">— {{ checkIn.note }}</span>
+          </p>
+        </li>
+      </ul>
+    </Transition>
   </div>
 </template>
 

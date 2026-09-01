@@ -11,6 +11,7 @@ import SectionHeader from '../layout/SectionHeader.vue'
 import ReceiptUpload from '../receiptScanner/ReceiptUpload.vue'
 import BaseCard from '../ui/BaseCard.vue'
 import BottomSheet from '../ui/BottomSheet.vue'
+import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import MonthPager from '../ui/MonthPager.vue'
 import VoiceEntryButton from '../voiceEntry/VoiceEntryButton.vue'
 import DraftReviewCard from './DraftReviewCard.vue'
@@ -251,18 +252,23 @@ function goBack() {
 
         <section class="transactions-section">
           <h2 class="section-title">Historial</h2>
-          <p v-if="transactionsStore.isLoading && transactionsStore.transactions.length === 0" class="transactions-loading">
-            Cargando movimientos...
-          </p>
-          <BaseCard v-else-if="filteredTransactions.length === 0" class="transactions-empty">
-            <p class="transactions-empty-text">No tienes movimientos que coincidan con estos filtros.</p>
-          </BaseCard>
-          <TransactionList
-            v-else
-            :transactions="filteredTransactions"
-            :wallets="walletsStore.wallets"
-            @delete="onDeleteTransaction"
-          />
+          <Transition name="loading-fade" mode="out-in">
+            <LoadingIndicator
+              v-if="transactionsStore.isLoading && transactionsStore.transactions.length === 0"
+              key="loading"
+              label="Cargando movimientos..."
+            />
+            <BaseCard v-else-if="filteredTransactions.length === 0" key="empty" class="transactions-empty">
+              <p class="transactions-empty-text">No tienes movimientos que coincidan con estos filtros.</p>
+            </BaseCard>
+            <TransactionList
+              v-else
+              key="list"
+              :transactions="filteredTransactions"
+              :wallets="walletsStore.wallets"
+              @delete="onDeleteTransaction"
+            />
+          </Transition>
         </section>
       </div>
     </div>
@@ -430,11 +436,6 @@ function goBack() {
   background: var(--accent-muted);
   color: var(--accent);
   font-size: 0.8125rem;
-}
-
-.transactions-loading {
-  color: var(--text-muted);
-  font-size: 0.875rem;
 }
 
 .transactions-empty {

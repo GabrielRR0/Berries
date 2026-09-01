@@ -7,6 +7,7 @@ import type { CreateDebtInput, CreateDebtPaymentInput, DebtDirection } from '../
 import BaseCard from '../ui/BaseCard.vue'
 import BottomSheet from '../ui/BottomSheet.vue'
 import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
+import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
 import PillToggle from '../ui/PillToggle.vue'
@@ -169,7 +170,9 @@ onMounted(() => {
       </div>
 
       <p v-if="error" class="debts-error" role="alert">{{ error }}</p>
-      <p v-if="isLoading" class="debts-loading">Cargando deudas...</p>
+      <Transition name="loading-fade">
+        <LoadingIndicator v-if="isLoading" class="debts-loading" label="Cargando deudas..." />
+      </Transition>
 
       <TransitionGroup
         v-if="hasDebts"
@@ -305,8 +308,6 @@ onMounted(() => {
 
 .debts-loading {
   margin-top: 1rem;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
 }
 
 .debts-list {

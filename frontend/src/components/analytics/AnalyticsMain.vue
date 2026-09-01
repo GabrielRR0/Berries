@@ -5,6 +5,7 @@ import type { AnalyticsCategoryType } from '../../services/analytics/interfaces/
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import PageShell from '../layout/PageShell.vue'
 import BaseCard from '../ui/BaseCard.vue'
+import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import CategoryPieChart from './CategoryPieChart.vue'
 import MonthlyComparisonTable from './MonthlyComparisonTable.vue'
 
@@ -77,7 +78,9 @@ onMounted(() => {
         </div>
 
         <p v-if="periodSummary" class="summary-delta" :class="{ expense: netDelta < 0 }">{{ netDeltaLabel }}</p>
-        <p v-if="isLoadingSummary" class="analytics-loading">Cargando resumen...</p>
+        <Transition name="loading-fade">
+          <LoadingIndicator v-if="isLoadingSummary" label="Cargando resumen..." />
+        </Transition>
       </BaseCard>
 
       <section class="analytics-section">
@@ -108,8 +111,10 @@ onMounted(() => {
         </div>
 
         <BaseCard>
-          <p v-if="isLoadingCategories" class="analytics-loading">Cargando categorías...</p>
-          <CategoryPieChart v-else :data="categoryBreakdown" />
+          <Transition name="loading-fade" mode="out-in">
+            <LoadingIndicator v-if="isLoadingCategories" key="loading" label="Cargando categorías..." />
+            <CategoryPieChart v-else key="chart" :data="categoryBreakdown" />
+          </Transition>
         </BaseCard>
       </section>
 
@@ -117,8 +122,10 @@ onMounted(() => {
         <h2 class="section-title">Últimos 6 meses</h2>
 
         <BaseCard>
-          <p v-if="isLoadingMonthly" class="analytics-loading">Cargando comparación...</p>
-          <MonthlyComparisonTable v-else :months="monthlyComparison" />
+          <Transition name="loading-fade" mode="out-in">
+            <LoadingIndicator v-if="isLoadingMonthly" key="loading" label="Cargando comparación..." />
+            <MonthlyComparisonTable v-else key="table" :months="monthlyComparison" />
+          </Transition>
         </BaseCard>
       </section>
 
@@ -246,11 +253,6 @@ onMounted(() => {
 .type-toggle-option.active {
   background: var(--accent);
   color: var(--accent-contrast);
-}
-
-.analytics-loading {
-  font-size: 0.8125rem;
-  color: var(--text-muted);
 }
 
 .analytics-error {

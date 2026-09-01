@@ -36,7 +36,7 @@ const router = createRouter({
       path: '/calculadora',
       name: 'calculadora',
       component: () => import('../components/calculator/CalculatorMain.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, hideTabBar: true },
     },
     {
       path: '/movimientos',

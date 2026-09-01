@@ -66,4 +66,28 @@ describe('usePageTransition', () => {
       expect(usePageTransitionName().value).toBe('fade')
     })
   })
+
+  // Bug real reportado por el usuario: el gesto nativo de "volver" del
+  // telefono (o el boton de atras del navegador) ya anima la pagina por su
+  // cuenta - si nuestro <Transition> tambien la animaba desde cero quedaba
+  // como si se arrastrara sola una segunda vez. popstate marca la bandera
+  // que hace que la proxima navegacion no repita esa animacion.
+  describe('navegacion via popstate (gesto nativo de volver / boton atras)', () => {
+    it('la navegacion que sigue a un popstate no repite la animacion (none)', () => {
+      window.dispatchEvent(new PopStateEvent('popstate'))
+
+      updatePageTransitionName(route('dashboard', '/'), route('deudas', '/deudas'))
+
+      expect(usePageTransitionName().value).toBe('none')
+    })
+
+    it('la bandera se consume - la navegacion siguiente vuelve a animar normal', () => {
+      window.dispatchEvent(new PopStateEvent('popstate'))
+      updatePageTransitionName(route('dashboard', '/'), route('deudas', '/deudas'))
+
+      updatePageTransitionName(route('deudas', '/deudas'), route('dashboard', '/'))
+
+      expect(usePageTransitionName().value).toBe('slide-left')
+    })
+  })
 })

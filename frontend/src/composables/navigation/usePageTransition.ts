@@ -18,6 +18,26 @@ const SECTION_ORDER = ['dashboard', 'movimientos', 'cuentas', 'analitica', 'deud
 
 const transitionName = ref('fade')
 
+// Bug real reportado por el usuario: al deslizar con el gesto nativo de
+// "volver" del telefono (el swipe desde el borde en iOS Safari, o el gesto/
+// boton de atras en Android), ese gesto ya anima la pagina por su cuenta -
+// el navegador la arrastra siguiendo el dedo. Si DESPUES nuestro propio
+// <Transition> (ver App.vue) tambien anima el mismo cambio de ruta desde
+// cero, la pagina parece "arrastrarse sola" una segunda vez apenas termina
+// el gesto. popstate es el mismo evento tanto para ese gesto como para el
+// boton de atras del navegador - se escucha aca (import que corre ANTES de
+// que router/index.ts llame a createRouter/createWebHistory, ver orden de
+// imports) para marcar la bandera antes de que el listener interno de
+// vue-router dispare los guards de router.beforeEach.
+let isPopNavigation = false
+window.addEventListener(
+  'popstate',
+  () => {
+    isPopNavigation = true
+  },
+  true,
+)
+
 function pathDepth(path: string): number {
   return path.split('/').filter(Boolean).length
 }
@@ -59,5 +79,14 @@ export function updatePageTransitionName(
   to: RouteLocationNormalizedLoaded | { name?: unknown },
   from: RouteLocationNormalizedLoaded | { name?: unknown },
 ): void {
+  if (isPopNavigation) {
+    isPopNavigation = false
+    // 'none' no matchea ningun .none-enter-active/.none-leave-active en
+    // style.css a proposito - Vue hace el cambio de contenido al instante,
+    // sin animacion propia, dejando que la unica animacion visible sea la
+    // que ya hizo el propio navegador con su gesto/boton de atras.
+    transitionName.value = 'none'
+    return
+  }
   transitionName.value = resolveTransitionName(to, from)
 }

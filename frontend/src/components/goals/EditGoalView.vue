@@ -7,6 +7,7 @@ import type { Goal, UpdateGoalInput } from '../../services/goals/interfaces/goal
 import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
 import BaseCard from '../ui/BaseCard.vue'
+import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import EditGoalForm from './EditGoalForm.vue'
 
 // Pantalla propia "/metas/:id/editar" - mismo criterio que CreateGoalView.vue
@@ -57,17 +58,20 @@ async function onSubmit(input: UpdateGoalInput) {
     <SectionHeader title="Editar meta" max-width="40rem" @back="goBack" />
 
     <div class="edit-goal-view">
-      <p v-if="isFetching" class="edit-goal-loading">Cargando meta...</p>
-      <p v-else-if="loadError" class="edit-goal-error" role="alert">{{ loadError }}</p>
+      <Transition name="loading-fade" mode="out-in">
+        <LoadingIndicator v-if="isFetching" key="loading" label="Cargando meta..." />
 
-      <template v-else-if="goal">
-        <p v-if="error" class="edit-goal-error" role="alert">{{ error }}</p>
-        <EditGoalForm :goal="goal" :submitting="isLoading" :savings-capacity="savingsCapacity" @submit="onSubmit" @cancel="goBack" />
-      </template>
+        <p v-else-if="loadError" key="load-error" class="edit-goal-error" role="alert">{{ loadError }}</p>
 
-      <BaseCard v-else class="edit-goal-not-found">
-        <p>No se encontró la meta.</p>
-      </BaseCard>
+        <div v-else-if="goal" key="form">
+          <p v-if="error" class="edit-goal-error" role="alert">{{ error }}</p>
+          <EditGoalForm :goal="goal" :submitting="isLoading" :savings-capacity="savingsCapacity" @submit="onSubmit" @cancel="goBack" />
+        </div>
+
+        <BaseCard v-else key="not-found" class="edit-goal-not-found">
+          <p>No se encontró la meta.</p>
+        </BaseCard>
+      </Transition>
     </div>
   </PageShell>
 </template>
@@ -78,11 +82,6 @@ async function onSubmit(input: UpdateGoalInput) {
   flex-direction: column;
   max-width: 30rem;
   margin: 0 auto;
-}
-
-.edit-goal-loading {
-  font-size: 0.8125rem;
-  color: var(--text-muted);
 }
 
 .edit-goal-error {

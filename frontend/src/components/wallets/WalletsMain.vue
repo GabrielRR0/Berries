@@ -6,6 +6,7 @@ import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
 import BaseCard from '../ui/BaseCard.vue'
 import BottomSheet from '../ui/BottomSheet.vue'
+import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import CreateWalletForm from './CreateWalletForm.vue'
 import TransferForm from './TransferForm.vue'
 import WalletCard from './WalletCard.vue'
@@ -73,27 +74,33 @@ async function onDeleteWallet(walletId: string) {
 
       <p v-if="walletsStore.error" class="wallets-error" role="alert">{{ walletsStore.error }}</p>
 
-      <p v-if="walletsStore.isLoading && walletsStore.wallets.length === 0" class="wallets-loading">
-        Cargando billeteras...
-      </p>
+      <Transition name="loading-fade" mode="out-in">
+        <LoadingIndicator
+          v-if="walletsStore.isLoading && walletsStore.wallets.length === 0"
+          key="loading"
+          class="wallets-loading"
+          label="Cargando billeteras..."
+        />
 
-      <BaseCard v-else-if="walletsStore.wallets.length === 0" class="wallets-empty">
-        <p class="wallets-empty-title">Todavía no tienes billeteras</p>
-        <p class="wallets-empty-text">
-          Crea tu primera billetera para empezar a llevar tus cuentas en distintas monedas.
-        </p>
-      </BaseCard>
+        <BaseCard v-else-if="walletsStore.wallets.length === 0" key="empty" class="wallets-empty">
+          <p class="wallets-empty-title">Todavía no tienes billeteras</p>
+          <p class="wallets-empty-text">
+            Crea tu primera billetera para empezar a llevar tus cuentas en distintas monedas.
+          </p>
+        </BaseCard>
 
-      <TransitionGroup
-        v-else
-        tag="div"
-        name="wallet-item"
-        class="wallets-list"
-        appear
-        appear-active-class="wallet-item-appear-active"
-      >
-        <WalletCard v-for="wallet in walletsStore.wallets" :key="wallet.id" :wallet="wallet" @delete="onDeleteWallet" />
-      </TransitionGroup>
+        <TransitionGroup
+          v-else
+          key="list"
+          tag="div"
+          name="wallet-item"
+          class="wallets-list"
+          appear
+          appear-active-class="wallet-item-appear-active"
+        >
+          <WalletCard v-for="wallet in walletsStore.wallets" :key="wallet.id" :wallet="wallet" @delete="onDeleteWallet" />
+        </TransitionGroup>
+      </Transition>
     </div>
 
     <BottomSheet v-if="showHelpSheet" title="¿Qué es Cuentas?" @close="showHelpSheet = false">
@@ -194,8 +201,6 @@ async function onDeleteWallet(walletId: string) {
 
 .wallets-loading {
   margin-top: 1.5rem;
-  color: var(--text-muted);
-  font-size: 0.875rem;
 }
 
 .wallets-empty {

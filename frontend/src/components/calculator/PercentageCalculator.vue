@@ -101,6 +101,11 @@ const shareResult = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
+  /* min-width:0 pisa el "auto" por defecto de los items de grid: sin esto,
+     un input (con su ancho intrinseco de ~20ch) fuerza a la columna 1fr a
+     ese minimo y desborda el margen del telefono en pantallas chicas (bug
+     real reportado por el usuario). */
+  min-width: 0;
 }
 
 .field-label {
@@ -110,6 +115,9 @@ const shareResult = computed(() => {
 }
 
 .field input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 0.75rem 0.875rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
@@ -123,6 +131,14 @@ const shareResult = computed(() => {
 .field input:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+/* Pisa el aro de foco global (ver style.css: input:focus-visible{box-shadow:
+   var(--focus-ring)}) - el cambio de color de borde de arriba ya alcanza
+   como señal de foco; el box-shadow encima se veia como un recuadro feo al
+   tocar el input (bug real reportado por el usuario). */
+.field input:focus-visible {
+  box-shadow: none;
 }
 
 .result-card {

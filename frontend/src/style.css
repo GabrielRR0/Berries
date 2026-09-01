@@ -286,6 +286,21 @@ a {
   opacity: 0;
 }
 
+/* Fade simple para reemplazar estados en el flujo normal del documento (ej.
+   LoadingIndicator.vue apareciendo/desapareciendo, o un spinner cambiando a
+   contenido real) - a diferencia del ".fade-*" de arriba (position:absolute,
+   pensado para el viewport de transicion de rutas), este NO saca el elemento
+   del flujo, para no romper el alto de tarjetas/listas mientras anima. */
+.loading-fade-enter-active,
+.loading-fade-leave-active {
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.loading-fade-enter-from,
+.loading-fade-leave-to {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

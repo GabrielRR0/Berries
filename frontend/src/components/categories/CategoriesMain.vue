@@ -5,6 +5,7 @@ import { useCategories } from '../../composables/categories/useCategories'
 import type { CategoryKind } from '../../services/categories/interfaces/categories.interface'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseCard from '../ui/BaseCard.vue'
+import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
 
@@ -77,7 +78,9 @@ async function onDelete(categoryId: string) {
       </p>
 
       <p v-if="error" class="categories-error" role="alert">{{ error }}</p>
-      <p v-if="isLoading" class="categories-loading">Cargando categorías...</p>
+      <Transition name="loading-fade">
+        <LoadingIndicator v-if="isLoading" label="Cargando categorías..." />
+      </Transition>
 
       <section class="category-section">
         <h2 class="section-title">Ingresos</h2>
@@ -174,11 +177,6 @@ async function onDelete(categoryId: string) {
   background: var(--accent-muted);
   color: var(--accent);
   font-size: 0.8125rem;
-}
-
-.categories-loading {
-  font-size: 0.8125rem;
-  color: var(--text-muted);
 }
 
 .category-section {
