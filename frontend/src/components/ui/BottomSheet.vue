@@ -41,6 +41,17 @@ defineEmits<{ close: [] }>()
   align-items: flex-end;
   justify-content: center;
   background: rgba(0, 0, 0, 0.6);
+  /* Sin esto el fondo quedaba solo oscurecido pero nitido detras del scrim -
+     pedido explicito del usuario, que se vea borroso (efecto vidrio real,
+     no solo un tinte oscuro). */
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sheet-scrim {
+    background: rgba(0, 0, 0, 0.75);
+  }
 }
 
 .sheet-panel {
