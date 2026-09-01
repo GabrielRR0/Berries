@@ -61,6 +61,53 @@ def test_build_goal_response_includes_goal_type(db):
     assert response.goal_type == "computer"
 
 
+# --- initial_amount -------------------------------------------------------------------
+
+
+def test_create_goal_rejects_negative_initial_amount(db):
+    with pytest.raises(GoalValidationError):
+        create_goal(db, uuid.uuid4(), "MacBook", Decimal("1200"), "USD", _FUTURE, initial_amount=Decimal("-10"))
+
+
+def test_create_goal_starts_with_the_initial_amount_already_saved(db):
+    goal = create_goal(db, uuid.uuid4(), "MacBook", Decimal("1200"), "USD", _FUTURE, initial_amount=Decimal("700"))
+
+    assert goal.total_saved == Decimal("700")
+    assert goal.status == "active"
+
+
+def test_create_goal_records_the_initial_amount_as_a_check_in_with_its_note(db):
+    goal = create_goal(
+        db,
+        uuid.uuid4(),
+        "MacBook",
+        Decimal("1200"),
+        "USD",
+        _FUTURE,
+        initial_amount=Decimal("700"),
+        initial_amount_note="Si vendo mi laptop u otras pertenencias",
+    )
+
+    assert len(goal.check_ins) == 1
+    check_in = goal.check_ins[0]
+    assert check_in.amount_saved == Decimal("700")
+    assert check_in.note == "Si vendo mi laptop u otras pertenencias"
+    assert check_in.period_month == date.today().replace(day=1)
+
+
+def test_create_goal_without_initial_amount_creates_no_check_in(db):
+    goal = create_goal(db, uuid.uuid4(), "TV", Decimal("240"), "USD", _FUTURE)
+
+    assert goal.check_ins == []
+
+
+def test_create_goal_completes_instantly_when_initial_amount_covers_the_target(db):
+    goal = create_goal(db, uuid.uuid4(), "MacBook", Decimal("700"), "USD", _FUTURE, initial_amount=Decimal("700"))
+
+    assert goal.status == "completed"
+    assert goal.completed_at is not None
+
+
 def test_get_goal_owned_by_user_raises_for_other_users_goal(db):
     owner_id = uuid.uuid4()
     other_id = uuid.uuid4()

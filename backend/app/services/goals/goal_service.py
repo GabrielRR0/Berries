@@ -5,6 +5,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.goals.goal_check_in_model import GoalCheckIn
 from app.models.goals.goal_model import Goal
 from app.schemas.goals.goal_schemas import GoalResponse, GoalType, Status
 from app.services.analytics.analytics_service import get_monthly_comparison
@@ -21,6 +22,8 @@ def create_goal(
     currency: str,
     target_date: date,
     goal_type: GoalType = "custom",
+    initial_amount: Decimal = Decimal("0"),
+    initial_amount_note: str | None = None,
 ) -> Goal:
     target_amount = Decimal(target_amount)
     if target_amount <= 0:
@@ -28,16 +31,41 @@ def create_goal(
     if target_date <= date.today():
         raise GoalValidationError("target_date debe ser una fecha futura")
 
+    initial_amount = Decimal(initial_amount)
+    if initial_amount < 0:
+        raise GoalValidationError("initial_amount no puede ser negativo")
+
     goal = Goal(
         user_id=user_id,
         title=title,
         target_amount=target_amount,
         currency_id=get_currency_by_code(db, currency).id,
         target_date=target_date,
-        total_saved=Decimal("0"),
+        total_saved=initial_amount,
         goal_type=goal_type,
     )
+    # Mismo criterio de completado instantaneo que record_check_in/update_goal: si lo
+    # que ya tenia alcanza o supera el objetivo, la meta nace completada.
+    if initial_amount >= target_amount:
+        goal.status = "completed"
+        goal.completed_at = datetime.now(timezone.utc)
     db.add(goal)
+    db.flush()
+
+    # El monto inicial queda como el primer GoalCheckIn de la meta (no solo un
+    # numero en total_saved) para que el detalle opcional ("si vendo mi laptop u
+    # otras pertenencias") tenga donde guardarse - mismo campo "note" que un
+    # check-in normal (ver record_check_in en check_in_service.py).
+    if initial_amount > 0:
+        db.add(
+            GoalCheckIn(
+                goal_id=goal.id,
+                period_month=date.today().replace(day=1),
+                amount_saved=initial_amount,
+                note=initial_amount_note,
+            )
+        )
+
     db.commit()
     db.refresh(goal)
     return goal

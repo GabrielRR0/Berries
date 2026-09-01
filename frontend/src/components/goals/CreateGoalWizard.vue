@@ -61,6 +61,27 @@ const useMonthlyAmount = ref(props.initialAmountIsMonthly)
 const totalAmountStr = ref(props.initialAmountIsMonthly ? '' : (props.initialAmount?.toString() ?? ''))
 const monthlyAmountStr = ref(props.initialAmountIsMonthly ? (props.initialAmount?.toString() ?? '') : '')
 
+// "Ya tengo $700 ahorrado (si vendo mi laptop)" - pedido explicito del usuario: un
+// headstart opcional hacia la meta, con un detalle libre de donde sale. Se manda como
+// initialAmount/initialAmountNote (ver goal_service.create_goal en el backend, que lo
+// guarda como el primer GoalCheckIn de la meta). Colapsado por default - "Ya tengo
+// algo ahorrado" es la excepcion, no el caso comun.
+const hasInitialAmount = ref(false)
+const initialAmountStr = ref('')
+const initialAmountNote = ref('')
+
+function clearInitialAmount() {
+  hasInitialAmount.value = false
+  initialAmountStr.value = ''
+  initialAmountNote.value = ''
+}
+
+const initialAmountValue = computed(() => {
+  if (!hasInitialAmount.value) return 0
+  const value = Number(initialAmountStr.value)
+  return Number.isFinite(value) && value > 0 ? value : 0
+})
+
 // El monto activo es el que edita el teclado numerico ahora mismo, segun el modo
 // elegido - un solo AmountKeypad sirve para los dos casos.
 const activeAmountStr = computed({
@@ -112,12 +133,14 @@ const monthsRemaining = computed(() => {
 
 // Mismo calculo que contribution_calculator._months_between del backend (ver
 // monthsBetween.ts) - previsualizacion en vivo del total cuando el usuario indica
-// el aporte mensual en vez del monto total.
+// el aporte mensual en vez del monto total. En modo mensual el usuario nunca dicta
+// el monto objetivo directamente - el objetivo es lo que el aporte mensual mas lo
+// que ya tiene ahorrado van a sumar en total.
 const computedTotalFromMonthly = computed(() => {
   if (!useMonthlyAmount.value || monthsRemaining.value === null) return null
   const monthly = Number(monthlyAmountStr.value)
   if (!Number.isFinite(monthly) || monthly <= 0) return null
-  return monthly * monthsRemaining.value
+  return monthly * monthsRemaining.value + initialAmountValue.value
 })
 
 const targetAmount = computed(() => {
@@ -126,13 +149,17 @@ const targetAmount = computed(() => {
   return Number.isFinite(total) && total > 0 ? total : null
 })
 
+// Cuanto falta reunir por mes descontando lo que ya se tiene ahorrado - mismo
+// calculo que contribution_calculator.compute_monthly_contribution del backend
+// ((target_amount - total_saved) / meses restantes).
 const impliedMonthlyContribution = computed(() => {
   if (useMonthlyAmount.value) {
     const monthly = Number(monthlyAmountStr.value)
     return Number.isFinite(monthly) && monthly > 0 ? monthly : null
   }
   if (monthsRemaining.value === null || targetAmount.value === null) return null
-  return targetAmount.value / monthsRemaining.value
+  const remaining = Math.max(targetAmount.value - initialAmountValue.value, 0)
+  return remaining / monthsRemaining.value
 })
 
 const exceedsAvailable = computed(() => {
@@ -156,6 +183,10 @@ function onCreate() {
     currency: currency.value.trim().toUpperCase(),
     targetDate: targetDate.value,
     goalType: goalType.value,
+    ...(initialAmountValue.value > 0 ? { initialAmount: initialAmountValue.value } : {}),
+    ...(initialAmountValue.value > 0 && initialAmountNote.value.trim()
+      ? { initialAmountNote: initialAmountNote.value.trim() }
+      : {}),
   })
 }
 </script>
@@ -231,6 +262,40 @@ function onCreate() {
         </label>
       </div>
 
+      <div class="initial-savings-block">
+        <button
+          v-if="!hasInitialAmount"
+          type="button"
+          class="initial-savings-toggle"
+          @click="hasInitialAmount = true"
+        >
+          + Ya tienes algo ahorrado para esto
+        </button>
+
+        <div v-else class="initial-savings-fields">
+          <div class="initial-savings-header">
+            <span class="field-label">Ya tienes ahorrado</span>
+            <button type="button" class="initial-savings-remove" @click="clearInitialAmount">Quitar</button>
+          </div>
+          <input
+            v-model="initialAmountStr"
+            type="number"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+            class="wizard-title-input"
+            :placeholder="`0.00 ${currency}`"
+          />
+          <textarea
+            v-model="initialAmountNote"
+            class="wizard-title-input initial-savings-note"
+            rows="2"
+            maxlength="500"
+            placeholder="Detalle (opcional). Ej.: si vendo mi laptop u otras pertenencias"
+          />
+        </div>
+      </div>
+
       <p v-if="useMonthlyAmount && computedTotalFromMonthly !== null" class="wizard-hint">
         Total estimado: {{ formatCurrency(computedTotalFromMonthly, currency) }} en {{ monthsRemaining }}
         {{ monthsRemaining === 1 ? 'mes' : 'meses' }}.
@@ -280,7 +345,15 @@ function onCreate() {
           <dt>Ahorro mensual</dt>
           <dd class="summary-highlight">{{ formatCurrency(impliedMonthlyContribution, currency) }} / mes</dd>
         </div>
+        <div v-if="initialAmountValue > 0" class="summary-row">
+          <dt>Ya tienes ahorrado</dt>
+          <dd>{{ formatCurrency(initialAmountValue, currency) }}</dd>
+        </div>
       </dl>
+
+      <p v-if="initialAmountValue > 0 && initialAmountNote.trim()" class="wizard-hint">
+        {{ initialAmountNote.trim() }}
+      </p>
 
       <BaseButton class="wizard-next" :disabled="submitting" @click="onCreate">
         {{ submitting ? 'Creando...' : 'Crear meta' }}
@@ -522,6 +595,66 @@ function onCreate() {
   height: 100%;
   opacity: 0;
   cursor: pointer;
+}
+
+.initial-savings-toggle {
+  align-self: flex-start;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--accent-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.initial-savings-toggle:hover {
+  background: var(--accent-muted);
+}
+
+.initial-savings-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.875rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+}
+
+.initial-savings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.initial-savings-remove {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.initial-savings-remove:hover {
+  color: var(--accent);
+}
+
+.initial-savings-note {
+  resize: none;
+  font-family: inherit;
 }
 
 .wizard-hint,

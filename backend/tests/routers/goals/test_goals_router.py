@@ -68,3 +68,69 @@ def test_get_one_requires_auth(client):
     response = client.get(f"/api/goals/{uuid.uuid4()}")
 
     assert response.status_code in (401, 403)
+
+
+# --- initial_amount -------------------------------------------------------------------
+
+
+def test_create_with_initial_amount_starts_saved_and_completed_state_accordingly(client):
+    token = _register(client)
+
+    response = client.post(
+        "/api/goals",
+        json={
+            "title": "MacBook",
+            "target_amount": "1200",
+            "currency": "USD",
+            "target_date": _FUTURE,
+            "goal_type": "computer",
+            "initial_amount": "700",
+            "initial_amount_note": "Si vendo mi laptop u otras pertenencias",
+        },
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["total_saved"] == "700"
+    assert body["status"] == "active"
+
+    check_ins = client.get(f"/api/goals/{body['id']}/check-ins", headers=_auth_headers(token))
+    assert check_ins.status_code == 200
+    rows = check_ins.json()
+    assert len(rows) == 1
+    assert rows[0]["amount_saved"] == "700"
+    assert rows[0]["note"] == "Si vendo mi laptop u otras pertenencias"
+
+
+def test_create_without_initial_amount_creates_no_check_in(client):
+    token = _register(client)
+
+    created = client.post(
+        "/api/goals",
+        json={"title": "TV", "target_amount": "240", "currency": "USD", "target_date": _FUTURE},
+        headers=_auth_headers(token),
+    )
+    goal_id = created.json()["id"]
+
+    check_ins = client.get(f"/api/goals/{goal_id}/check-ins", headers=_auth_headers(token))
+
+    assert check_ins.json() == []
+
+
+def test_create_rejects_negative_initial_amount(client):
+    token = _register(client)
+
+    response = client.post(
+        "/api/goals",
+        json={
+            "title": "TV",
+            "target_amount": "240",
+            "currency": "USD",
+            "target_date": _FUTURE,
+            "initial_amount": "-10",
+        },
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 422

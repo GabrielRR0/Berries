@@ -90,6 +90,72 @@ describe('goals.service', () => {
       })
     })
 
+    it('manda initial_amount/initial_amount_note solo cuando vienen', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse(GOAL_WIRE, { status: 201 }))
+
+      await createGoal({
+        title: 'MacBook',
+        targetAmount: 1200,
+        currency: 'USD',
+        targetDate: '2026-11-28',
+        goalType: 'computer',
+        initialAmount: 700,
+        initialAmountNote: 'Si vendo mi laptop u otras pertenencias',
+      })
+
+      expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).toEqual({
+        title: 'MacBook',
+        target_amount: 1200,
+        currency: 'USD',
+        target_date: '2026-11-28',
+        goal_type: 'computer',
+        initial_amount: 700,
+        initial_amount_note: 'Si vendo mi laptop u otras pertenencias',
+      })
+    })
+
+    it('sin initial_amount, no lo manda en el body', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse(GOAL_WIRE, { status: 201 }))
+
+      await createGoal({ title: 'TV', targetAmount: 240, currency: 'USD', targetDate: '2026-11-28', goalType: 'custom' })
+
+      const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+      expect(body.initial_amount).toBeUndefined()
+      expect(body.initial_amount_note).toBeUndefined()
+    })
+
+    // Decimal en el backend serializa como STRING en el JSON (ver mismo bug real
+    // encontrado y corregido en debts.service.ts) - total_saved arrancaba siempre en
+    // "0" antes de esta funcionalidad, asi que nunca se habia notado; con un aporte
+    // inicial real, un string sin coercion rompe formatCurrency.ts en USDT
+    // (amount.toFixed no existe en un string).
+    it('coacciona los montos que llegan como string a number', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse(
+          {
+            ...GOAL_WIRE,
+            target_amount: '1200',
+            total_saved: '700',
+            suggested_monthly_contribution: '166.67',
+          },
+          { status: 201 },
+        ),
+      )
+
+      const result = await createGoal({
+        title: 'MacBook',
+        targetAmount: 1200,
+        currency: 'USD',
+        targetDate: '2026-11-28',
+        goalType: 'computer',
+        initialAmount: 700,
+      })
+
+      expect(result.targetAmount).toBe(1200)
+      expect(result.totalSaved).toBe(700)
+      expect(result.suggestedMonthlyContribution).toBe(166.67)
+    })
+
     it('lanza GoalsApiError con el status y el detail del backend en error', async () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ detail: 'Monto inválido.' }, { ok: false, status: 400 }))
 

@@ -34,6 +34,11 @@ export interface CreateGoalInput {
   currency: string
   targetDate: string
   goalType: GoalType
+  // Opcional - "ya tengo $700 si vendo mi laptop" (pedido explicito del usuario).
+  // Se guarda como el primer GoalCheckIn de la meta (ver goal_service.create_goal),
+  // el detalle de donde sale la plata queda en initialAmountNote.
+  initialAmount?: number
+  initialAmountNote?: string
 }
 
 // A diferencia de CreateGoalInput, "editar" no permite cambiar la plantilla/icono

@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
 import type { SavingsCapacity } from '../../../services/goals/interfaces/goals.interface'
+import { monthsBetween } from '../../../utils/goals/monthsBetween'
 import CreateGoalWizard from '../CreateGoalWizard.vue'
 
 // Secuencial, NO Promise.all de triggers sin await: el prop modelValue que
@@ -129,6 +130,120 @@ describe('CreateGoalWizard', () => {
 
     expect(wrapper.find('.wizard-title-input').exists()).toBe(true)
     expect((wrapper.find('.wizard-title-input').element as HTMLInputElement).value).toBe('MacBook')
+  })
+
+  // "Ya tienes algo ahorrado" - pedido explicito del usuario: un headstart opcional
+  // hacia la meta ("tengo $700 si vendo mi laptop"), con un detalle libre de donde
+  // sale la plata.
+  it('el bloque "ya tienes ahorrado" arranca colapsado, sin campos visibles', async () => {
+    const wrapper = mount(CreateGoalWizard)
+    await wrapper.find('.type-tile-custom').trigger('click')
+
+    expect(wrapper.find('.initial-savings-toggle').exists()).toBe(true)
+    expect(wrapper.find('.initial-savings-fields').exists()).toBe(false)
+  })
+
+  it('tocar el toggle revela el monto y el detalle, "Quitar" los vuelve a colapsar', async () => {
+    const wrapper = mount(CreateGoalWizard)
+    await wrapper.find('.type-tile-custom').trigger('click')
+
+    await wrapper.find('.initial-savings-toggle').trigger('click')
+    expect(wrapper.find('.initial-savings-fields').exists()).toBe(true)
+
+    await wrapper.find('.initial-savings-remove').trigger('click')
+    expect(wrapper.find('.initial-savings-fields').exists()).toBe(false)
+    expect(wrapper.find('.initial-savings-toggle').exists()).toBe(true)
+  })
+
+  it('"Crear meta" incluye initialAmount/initialAmountNote cuando se completan', async () => {
+    const wrapper = mount(CreateGoalWizard)
+    await wrapper.findAll('.type-tile').find((tile) => tile.text().includes('Comprar un computador'))!.trigger('click')
+    await wrapper.find('input[type="date"]').setValue('2026-12-28')
+    await typeAmount(wrapper, '1200')
+    await wrapper.find('.initial-savings-toggle').trigger('click')
+    await wrapper.find('.initial-savings-fields input[type="number"]').setValue('700')
+    await wrapper.find('.initial-savings-note').setValue('Si vendo mi laptop u otras pertenencias')
+    await wrapper.find('.wizard-next').trigger('click')
+
+    await wrapper.find('.wizard-next').trigger('click')
+
+    expect(wrapper.emitted('create')).toEqual([
+      [
+        {
+          title: 'Comprar un computador',
+          targetAmount: 1200,
+          currency: 'USD',
+          targetDate: '2026-12-28',
+          goalType: 'computer',
+          initialAmount: 700,
+          initialAmountNote: 'Si vendo mi laptop u otras pertenencias',
+        },
+      ],
+    ])
+  })
+
+  it('sin nada ahorrado, "Crear meta" no manda initialAmount/initialAmountNote', async () => {
+    const wrapper = mount(CreateGoalWizard)
+    await wrapper.find('.type-tile-custom').trigger('click')
+    await wrapper.find('.wizard-title-input').setValue('TV')
+    await wrapper.find('input[type="date"]').setValue('2026-12-28')
+    await typeAmount(wrapper, '240')
+    await wrapper.find('.wizard-next').trigger('click')
+
+    await wrapper.find('.wizard-next').trigger('click')
+
+    const [payload] = wrapper.emitted('create')![0] as [Record<string, unknown>]
+    expect(payload.initialAmount).toBeUndefined()
+    expect(payload.initialAmountNote).toBeUndefined()
+  })
+
+  it('el resumen muestra cuanto ya tiene ahorrado y su detalle', async () => {
+    const wrapper = mount(CreateGoalWizard)
+    await wrapper.find('.type-tile-custom').trigger('click')
+    await wrapper.find('.wizard-title-input').setValue('MacBook')
+    await wrapper.find('input[type="date"]').setValue('2026-12-28')
+    await typeAmount(wrapper, '1200')
+    await wrapper.find('.initial-savings-toggle').trigger('click')
+    await wrapper.find('.initial-savings-fields input[type="number"]').setValue('700')
+    await wrapper.find('.initial-savings-note').setValue('Si vendo mi laptop u otras pertenencias')
+
+    await wrapper.find('.wizard-next').trigger('click')
+
+    expect(wrapper.text()).toContain('Ya tienes ahorrado')
+    expect(wrapper.text()).toContain('$700.00')
+    expect(wrapper.text()).toContain('Si vendo mi laptop u otras pertenencias')
+  })
+
+  it('el ahorro ya reunido descuenta del aporte mensual sugerido (monto total)', async () => {
+    const wrapper = mount(CreateGoalWizard)
+    await wrapper.find('.type-tile-custom').trigger('click')
+    await wrapper.find('.wizard-title-input').setValue('MacBook')
+    await wrapper.find('input[type="date"]').setValue('2026-12-28')
+    await typeAmount(wrapper, '1200')
+    await wrapper.find('.initial-savings-toggle').trigger('click')
+    await wrapper.find('.initial-savings-fields input[type="number"]').setValue('1200')
+
+    await wrapper.find('.wizard-next').trigger('click')
+
+    // Objetivo ya cubierto del todo por lo ahorrado -> nada que sugerir por mes.
+    expect(wrapper.text()).toContain('Ahorro mensual')
+    expect(wrapper.text()).toContain('$0.00 / mes')
+  })
+
+  it('modo "Aporte mensual" suma lo ya ahorrado al total estimado', async () => {
+    const wrapper = mount(CreateGoalWizard)
+    await wrapper.find('.type-tile-custom').trigger('click')
+    await wrapper.find('.wizard-title-input').setValue('TV')
+    await wrapper.find('input[type="date"]').setValue('2026-12-28')
+    await wrapper.find('.initial-savings-toggle').trigger('click')
+    await wrapper.find('.initial-savings-fields input[type="number"]').setValue('700')
+
+    await wrapper.findAll('.amount-mode-option').find((btn) => btn.text() === 'Aporte mensual')!.trigger('click')
+    await typeAmount(wrapper, '80')
+
+    const months = monthsBetween(new Date(), new Date('2026-12-28'))
+    const expectedTotal = (80 * months + 700).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    expect(wrapper.find('.wizard-hint').text()).toContain(`Total estimado: $${expectedTotal}`)
   })
 
   it('avisa cuando el aporte implicito supera el disponible promedio', async () => {

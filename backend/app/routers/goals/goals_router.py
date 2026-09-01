@@ -56,6 +56,8 @@ async def create(
             currency=payload.currency,
             target_date=payload.target_date,
             goal_type=payload.goal_type,
+            initial_amount=payload.initial_amount,
+            initial_amount_note=payload.initial_amount_note,
         )
     except (GoalValidationError, UnsupportedCurrencyError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

@@ -22,32 +22,39 @@ import type {
 // Forma "sobre el cable" tal cual la devuelve el backend (ver
 // berry/backend/app/schemas/goals/goal_schemas.py) - solo interna a este
 // archivo, el resto de la app siempre trabaja con Goal/GoalCheckIn/etc.
+// Los montos (Decimal en el backend) llegan como number O string segun el
+// valor - FastAPI/Pydantic serializa Decimal como string en el JSON (ver
+// mismo criterio ya aplicado en debts.service.ts/wallets.service.ts) - de ahi
+// el "number | string" en cada campo de monto y el Number(...) en cada mapper
+// de abajo. Sin esto, formatCurrency.ts revienta con "x.toFixed is not a
+// function" apenas la moneda es USDT (unico branch que no pasa por
+// Intl.NumberFormat, que sí tolera un string).
 interface GoalWire {
   id: string
   user_id: string
   title: string
-  target_amount: number
+  target_amount: number | string
   currency: string
   target_date: string
-  total_saved: number
+  total_saved: number | string
   status: GoalStatus
   goal_type: GoalType
   created_at: string
   completed_at: string | null
-  suggested_monthly_contribution: number
+  suggested_monthly_contribution: number | string
   last_check_in_postponed: boolean
 }
 
 interface GoalSummaryWire {
-  total_saved: number
-  total_target: number
+  total_saved: number | string
+  total_target: number | string
 }
 
 interface GoalCheckInWire {
   id: string
   goal_id: string
   period_month: string
-  amount_saved: number
+  amount_saved: number | string
   previous_target_date: string | null
   new_target_date: string | null
   note: string | null
@@ -59,21 +66,21 @@ interface PendingCheckInWire {
   title: string
   currency: string
   target_date: string
-  suggested_amount: number
+  suggested_amount: number | string
 }
 
 interface GoalVoicePreviewWire {
   title: string | null
-  amount: number | null
+  amount: number | string | null
   amount_is_monthly: boolean
   currency: string
   target_date: string | null
 }
 
 interface SavingsCapacityWire {
-  avg_monthly_income: number
-  avg_monthly_expense: number
-  avg_monthly_available: number
+  avg_monthly_income: number | string
+  avg_monthly_expense: number | string
+  avg_monthly_available: number | string
 }
 
 // Error tipado que carga el status HTTP ademas del mensaje (ver
@@ -96,21 +103,21 @@ function mapGoal(wire: GoalWire): Goal {
     id: wire.id,
     userId: wire.user_id,
     title: wire.title,
-    targetAmount: wire.target_amount,
+    targetAmount: Number(wire.target_amount),
     currency: wire.currency,
     targetDate: wire.target_date,
-    totalSaved: wire.total_saved,
+    totalSaved: Number(wire.total_saved),
     status: wire.status,
     goalType: wire.goal_type,
     createdAt: wire.created_at,
     completedAt: wire.completed_at,
-    suggestedMonthlyContribution: wire.suggested_monthly_contribution,
+    suggestedMonthlyContribution: Number(wire.suggested_monthly_contribution),
     lastCheckInPostponed: wire.last_check_in_postponed,
   }
 }
 
 function mapGoalSummary(wire: GoalSummaryWire): GoalSummary {
-  return { totalSaved: wire.total_saved, totalTarget: wire.total_target }
+  return { totalSaved: Number(wire.total_saved), totalTarget: Number(wire.total_target) }
 }
 
 function mapCheckIn(wire: GoalCheckInWire): GoalCheckIn {
@@ -118,7 +125,7 @@ function mapCheckIn(wire: GoalCheckInWire): GoalCheckIn {
     id: wire.id,
     goalId: wire.goal_id,
     periodMonth: wire.period_month,
-    amountSaved: wire.amount_saved,
+    amountSaved: Number(wire.amount_saved),
     previousTargetDate: wire.previous_target_date,
     newTargetDate: wire.new_target_date,
     note: wire.note,
@@ -132,14 +139,14 @@ function mapPendingCheckIn(wire: PendingCheckInWire): PendingCheckIn {
     title: wire.title,
     currency: wire.currency,
     targetDate: wire.target_date,
-    suggestedAmount: wire.suggested_amount,
+    suggestedAmount: Number(wire.suggested_amount),
   }
 }
 
 function mapVoicePreview(wire: GoalVoicePreviewWire): GoalVoicePreview {
   return {
     title: wire.title,
-    amount: wire.amount,
+    amount: wire.amount === null ? null : Number(wire.amount),
     amountIsMonthly: wire.amount_is_monthly,
     currency: wire.currency,
     targetDate: wire.target_date,
@@ -148,9 +155,9 @@ function mapVoicePreview(wire: GoalVoicePreviewWire): GoalVoicePreview {
 
 function mapSavingsCapacity(wire: SavingsCapacityWire): SavingsCapacity {
   return {
-    avgMonthlyIncome: wire.avg_monthly_income,
-    avgMonthlyExpense: wire.avg_monthly_expense,
-    avgMonthlyAvailable: wire.avg_monthly_available,
+    avgMonthlyIncome: Number(wire.avg_monthly_income),
+    avgMonthlyExpense: Number(wire.avg_monthly_expense),
+    avgMonthlyAvailable: Number(wire.avg_monthly_available),
   }
 }
 
@@ -165,16 +172,28 @@ function authHeaders(): Record<string, string> {
 }
 
 export async function createGoal(input: CreateGoalInput): Promise<Goal> {
+  const payload: {
+    title: string
+    target_amount: number
+    currency: string
+    target_date: string
+    goal_type: string
+    initial_amount?: number
+    initial_amount_note?: string
+  } = {
+    title: input.title,
+    target_amount: input.targetAmount,
+    currency: input.currency,
+    target_date: input.targetDate,
+    goal_type: input.goalType,
+  }
+  if (input.initialAmount) payload.initial_amount = input.initialAmount
+  if (input.initialAmountNote) payload.initial_amount_note = input.initialAmountNote
+
   const response = await fetch(`${API_BASE_URL}/api/goals`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({
-      title: input.title,
-      target_amount: input.targetAmount,
-      currency: input.currency,
-      target_date: input.targetDate,
-      goal_type: input.goalType,
-    }),
+    body: JSON.stringify(payload),
   })
 
   if (!response.ok) {
