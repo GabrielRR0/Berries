@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.models.auth.user_model import User
 from app.models.currency.currency_model import Currency
 from app.models.debts.debt_model import Debt
+from app.models.debts.debt_payment_model import DebtPayment
 from app.models.debts.installment_model import Installment
 from app.models.goals.goal_check_in_model import GoalCheckIn
 from app.models.goals.goal_model import Goal
@@ -16,6 +17,7 @@ from app.models.transactions.transaction_model import Transaction
 from app.models.wallets.wallet_model import Wallet
 from app.services.auth.account_deletion_service import delete_own_account
 from app.services.auth.auth_service import register_user
+from app.services.debts.debt_payment_service import create_debt_payment
 from app.services.debts.debt_service import create_debt
 from app.services.goals.check_in_service import record_check_in
 from app.services.goals.goal_service import create_goal
@@ -44,6 +46,11 @@ def _seed_full_account(db, email: str) -> User:
     )
     assert db.scalar(select(Installment).where(Installment.debt_id == debt.id)) is not None
 
+    # Con wallet_id: ademas de la fila de DebtPayment, deja una Transaction propia -
+    # borrar la cuenta tiene que limpiar ambas sin violar ninguna FK (bug real
+    # encontrado probando en vivo contra Postgres, ver account_deletion_service.py).
+    create_debt_payment(db, debt.id, user.id, amount=Decimal("10"), currency="USD", wallet_id=wallet.id)
+
     goal = create_goal(db, user.id, "MacBook", Decimal("1200"), "USD", date.today() + timedelta(days=90))
     record_check_in(db, goal.id, user.id, Decimal("100"))
 
@@ -70,6 +77,7 @@ def test_delete_own_account_removes_every_row_the_user_owns(db):
     assert db.scalars(select(Transaction).where(Transaction.user_id == user_id)).all() == []
     assert db.scalars(select(Debt).where(Debt.user_id == user_id)).all() == []
     assert db.scalars(select(Installment)).all() == []
+    assert db.scalars(select(DebtPayment)).all() == []
     assert db.scalars(select(Goal).where(Goal.user_id == user_id)).all() == []
     assert db.scalars(select(GoalCheckIn)).all() == []
     assert db.scalars(select(TransactionDraft).where(TransactionDraft.user_id == user_id)).all() == []
@@ -96,6 +104,10 @@ def test_delete_own_account_does_not_touch_another_users_data(db):
 
     assert db.get(User, survivor.id) is not None
     assert len(db.scalars(select(Wallet).where(Wallet.user_id == survivor.id)).all()) == 1
-    assert len(db.scalars(select(Transaction).where(Transaction.user_id == survivor.id)).all()) == 1
+    # 2, no 1: la manual de _seed_full_account + la que genera create_debt_payment
+    # con wallet_id (ver comentario arriba, en _seed_full_account).
+    assert len(db.scalars(select(Transaction).where(Transaction.user_id == survivor.id)).all()) == 2
     assert len(db.scalars(select(Debt).where(Debt.user_id == survivor.id)).all()) == 1
     assert len(db.scalars(select(Goal).where(Goal.user_id == survivor.id)).all()) == 1
+    survivor_debt_id = db.scalar(select(Debt.id).where(Debt.user_id == survivor.id))
+    assert len(db.scalars(select(DebtPayment).where(DebtPayment.debt_id == survivor_debt_id)).all()) == 1

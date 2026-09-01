@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { Debt } from '../../services/debts/interfaces/debts.interface'
+import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
+import BaseButton from '../ui/BaseButton.vue'
 import BaseCard from '../ui/BaseCard.vue'
+import BottomSheet from '../ui/BottomSheet.vue'
+import DebtPaymentHistory from './DebtPaymentHistory.vue'
 import InstallmentSchedule from './InstallmentSchedule.vue'
 
 // Tarjeta de una deuda individual (usada por DebtsMain.vue): contraparte,
 // direccion, monto total y - si tiene cuotas - el detalle via
 // InstallmentSchedule.vue. Deudas de pago unico (installments vacio, ver
 // contrato de POST /api/debts) muestran una nota en vez del listado.
+//
+// Abonos libres (AddDebtPaymentForm.vue/DebtPaymentHistory.vue) - pedido
+// explicito del usuario: registrar cualquier pago parcial en cualquier
+// momento y ver el historial, ademas de (opcional) las cuotas de arriba.
 //
 // El borrado ahora pide confirmacion en dos pasos (antes el "×" del header
 // borraba de una) - pedido explicito del usuario ("los estilos y
@@ -17,13 +25,24 @@ import InstallmentSchedule from './InstallmentSchedule.vue'
 // una deuda entera es al menos tan irreversible como esos casos.
 const props = defineProps<{ debt: Debt }>()
 
-const emit = defineEmits<{ pay: [installmentId: string]; unpay: [installmentId: string]; remove: [] }>()
+const emit = defineEmits<{
+  pay: [installmentId: string]
+  unpay: [installmentId: string]
+  remove: []
+  openAddPayment: []
+  removePayment: [paymentId: string]
+}>()
 
 // "Tu debes" es el pasivo del usuario - usa el rojo de marca (mismo criterio
 // que gastos en IncomeExpenseSummary.vue). "Te deben" es texto neutro, sin
 // un segundo tono para "positivo" (ver style.css).
 const isOwedByUser = computed(() => props.debt.direction === 'owed_by_user')
 const directionLabel = computed(() => (isOwedByUser.value ? 'Tú debes' : 'Te deben'))
+
+// El historial vive en un sheet aparte, no inline en la card - pedido explicito
+// del usuario ("cuando hayan muchos pagos se veria poco profesional" mostrarlos
+// todos directo en la box). La card solo muestra un resumen compacto.
+const showHistorySheet = ref(false)
 
 const confirmingDelete = ref(false)
 
@@ -49,13 +68,18 @@ function confirmDelete() {
         <p class="debt-direction" :class="{ owed: isOwedByUser }">{{ directionLabel }}</p>
       </div>
 
-      <p class="debt-amount" :class="{ owed: isOwedByUser }">
-        <AnimatedCurrency
-          :value="debt.totalAmount"
-          :currency="debt.currency"
-          :direction="isOwedByUser ? 'down' : 'up'"
-        />
-      </p>
+      <div class="debt-amount-col">
+        <p class="debt-amount" :class="{ owed: isOwedByUser }">
+          <AnimatedCurrency
+            :value="debt.totalAmount"
+            :currency="debt.currency"
+            :direction="isOwedByUser ? 'down' : 'up'"
+          />
+        </p>
+        <p v-if="debt.amountPaid > 0" class="debt-remaining">
+          Resta {{ formatCurrency(debt.remainingAmount, debt.currency) }}
+        </p>
+      </div>
     </div>
 
     <p v-if="debt.description" class="debt-description">{{ debt.description }}</p>
@@ -68,6 +92,43 @@ function confirmDelete() {
       @unpay="emit('unpay', $event)"
     />
     <p v-else class="debt-lump-sum">Pago único, sin cuotas.</p>
+
+    <button
+      v-if="debt.payments.length"
+      type="button"
+      class="payment-history-trigger"
+      @click="showHistorySheet = true"
+    >
+      <span>{{ debt.payments.length }} {{ debt.payments.length === 1 ? 'pago registrado' : 'pagos registrados' }}</span>
+      <span class="payment-history-arrow" aria-hidden="true">›</span>
+    </button>
+
+    <BaseButton variant="secondary" class="add-payment-trigger" @click="emit('openAddPayment')">
+      Registrar pago
+    </BaseButton>
+
+    <!-- <Teleport to="body">: BaseCard tiene hover con transform (ver
+         BaseCard.vue) - un ancestro con transform activo redefine el
+         "containing block" de cualquier position:fixed adentro (el
+         .sheet-scrim de BottomSheet.vue), asi que sin esto la modal terminaba
+         posicionada/recortada relativa a la card en vez de a toda la pantalla
+         apenas el mouse quedaba encima (bug real, reportado en vivo). Mismo
+         patron ya usado en GoalCard.vue para su dropdown. -->
+    <Teleport to="body">
+      <BottomSheet
+        v-if="showHistorySheet"
+        class="payment-history-sheet"
+        title="Historial de pagos"
+        @close="showHistorySheet = false"
+      >
+        <DebtPaymentHistory
+          :payments="debt.payments"
+          :debt-currency="debt.currency"
+          :direction="debt.direction"
+          @remove="emit('removePayment', $event)"
+        />
+      </BottomSheet>
+    </Teleport>
 
     <!-- Mismo patron que WalletCard.vue: alto fijo, ambos estados
          position:absolute SIEMPRE, para que confirmar el borrado nunca
@@ -126,8 +187,15 @@ function confirmDelete() {
   color: var(--accent);
 }
 
-.debt-amount {
+.debt-amount-col {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+}
+
+.debt-amount {
   font-size: 1.0625rem;
   font-weight: 700;
   color: var(--text-h);
@@ -135,6 +203,11 @@ function confirmDelete() {
 
 .debt-amount.owed {
   color: var(--accent);
+}
+
+.debt-remaining {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .debt-description {
@@ -149,6 +222,48 @@ function confirmDelete() {
   border-top: 1px solid var(--border-subtle);
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+.payment-history-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.payment-history-trigger:hover {
+  color: var(--text-h);
+}
+
+.payment-history-arrow {
+  font-size: 1.125rem;
+  line-height: 1;
+}
+
+.add-payment-trigger {
+  margin-top: 0.75rem;
+  width: 100%;
+}
+
+/* La clase pasada a <BottomSheet> cae en su raiz (.sheet-scrim, ver
+   BottomSheet.vue), no en .sheet-panel - de ahi el :deep() acá. Alto minimo
+   pedido explicito del usuario: con pocos pagos el sheet no debe verse como
+   una tira angosta - min-height le gana a max-height cuando compiten (ver
+   BottomSheet.vue), asi que en viewports muy bajos (celular en horizontal)
+   puede sobrepasar el 80vh de la regla general - trade-off aceptado. */
+.payment-history-sheet :deep(.sheet-panel) {
+  min-height: 24rem;
 }
 
 /* Pulso rojo de una sola vez al pedir confirmacion - mismo criterio que

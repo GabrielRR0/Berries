@@ -32,6 +32,36 @@ class InstallmentResponse(BaseModel):
     paid_at: datetime | None
 
 
+class DebtPaymentCreateRequest(BaseModel):
+    # Lo que efectivamente se pagó, en su propia moneda (ver DebtPayment). No tiene
+    # por qué coincidir con la moneda de la deuda - ej. deuda en USD, pago en USDT.
+    amount: Decimal = Field(gt=0)
+    currency: str = Field(max_length=10)
+    # Obligatorio SOLO cuando `currency` difiere de la moneda de la deuda (ver
+    # debt_payment_service.create_debt_payment - mismo criterio que
+    # TransferForm.vue/converted_amount, sin conversión automática por tasas en vivo).
+    applied_amount: Decimal | None = Field(default=None, gt=0)
+    note: str | None = Field(default=None, max_length=280)
+    paid_at: date | None = None
+    # Opcional: acredita/debita esta billetera real ademas de quedar en el
+    # historial ("sería como un ingreso/gasto de una deuda", pedido explícito).
+    wallet_id: uuid.UUID | None = None
+
+
+class DebtPaymentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    debt_id: uuid.UUID
+    amount: Decimal
+    currency: str
+    applied_amount: Decimal
+    note: str | None
+    paid_at: date
+    wallet_id: uuid.UUID | None
+    created_at: datetime
+
+
 class DebtResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -44,8 +74,26 @@ class DebtResponse(BaseModel):
     description: str | None
     created_at: datetime
     installments: list[InstallmentResponse] = []
+    payments: list[DebtPaymentResponse] = []
+    # Calculados por debt_service.build_debt_response (no son campos reales del
+    # modelo) - cuotas pagadas + abonos registrados, y lo que falta de total_amount.
+    amount_paid: Decimal
+    remaining_amount: Decimal
 
 
 class DebtSummaryResponse(BaseModel):
     total_owed_by_user: Decimal
     total_owed_to_user: Decimal
+
+
+class DebtPaymentVoiceParseRequest(BaseModel):
+    transcript: str = Field(min_length=1)
+
+
+class DebtPaymentVoiceParseResponse(BaseModel):
+    # No persiste nada - solo precarga el formulario de "Registrar pago" para que el
+    # usuario confirme (ver DebtPaymentVoiceParseRequest/payment_voice_parser.py).
+    amount: Decimal | None
+    currency: str
+    paid_at: date
+    note: str

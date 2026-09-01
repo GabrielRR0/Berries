@@ -14,6 +14,18 @@ export interface Installment {
   paidAt: string | null
 }
 
+export interface DebtPayment {
+  id: string
+  debtId: string
+  amount: number
+  currency: string
+  appliedAmount: number
+  note: string | null
+  paidAt: string
+  walletId: string | null
+  createdAt: string
+}
+
 export interface Debt {
   id: string
   userId: string
@@ -24,6 +36,25 @@ export interface Debt {
   description: string | null
   createdAt: string
   installments: Installment[]
+  payments: DebtPayment[]
+  amountPaid: number
+  remainingAmount: number
+}
+
+export interface CreateDebtPaymentInput {
+  amount: number
+  currency: string
+  appliedAmount?: number
+  note?: string
+  paidAt?: string
+  walletId?: string
+}
+
+export interface DebtPaymentVoicePreview {
+  amount: number | null
+  currency: string
+  paidAt: string
+  note: string
 }
 
 export interface DebtSummary {

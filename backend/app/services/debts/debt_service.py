@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.debts.debt_model import Debt
 from app.models.debts.installment_model import Installment
+from app.schemas.debts.debt_schemas import DebtPaymentResponse, DebtResponse, InstallmentResponse
 from app.services.currency.currency_lookup import get_currency_by_code
 from app.services.debts.errors import DebtNotFoundError, DebtValidationError
 
@@ -81,18 +82,53 @@ def delete_debt(db: Session, debt_id: uuid.UUID, user_id: uuid.UUID) -> None:
     db.commit()
 
 
+def get_debt_paid_amount(debt: Debt) -> Decimal:
+    """Suma lo pagado por AMBOS mecanismos: cuotas marcadas pagadas (Installment,
+    monto fijo) y abonos libres registrados (DebtPayment, cualquier monto/momento -
+    ver debt_payment_service.create_debt_payment). Coexisten sin pisarse."""
+    installments_paid = sum((inst.amount for inst in debt.installments if inst.status == "paid"), Decimal("0"))
+    payments_applied = sum((payment.applied_amount for payment in debt.payments), Decimal("0"))
+    return installments_paid + payments_applied
+
+
+def get_debt_remaining_amount(debt: Debt) -> Decimal:
+    """Nunca negativo: un abono que se pasa del total deja la deuda en 0, no en
+    negativo (evita un "saldo a favor" confuso que esta pantalla no maneja)."""
+    remaining = debt.total_amount - get_debt_paid_amount(debt)
+    return remaining if remaining > 0 else Decimal("0")
+
+
+def build_debt_response(debt: Debt) -> DebtResponse:
+    """DebtResponse tiene 2 campos calculados que no son atributos reales del modelo
+    (amount_paid, remaining_amount) - se arma a mano en vez de
+    DebtResponse.model_validate(debt), que solo lee atributos que existen tal cual en
+    el objeto ORM."""
+    return DebtResponse(
+        id=debt.id,
+        user_id=debt.user_id,
+        counterparty_name=debt.counterparty_name,
+        direction=debt.direction,
+        total_amount=debt.total_amount,
+        currency=debt.currency,
+        description=debt.description,
+        created_at=debt.created_at,
+        installments=[InstallmentResponse.model_validate(i) for i in debt.installments],
+        payments=[DebtPaymentResponse.model_validate(p) for p in debt.payments],
+        amount_paid=get_debt_paid_amount(debt),
+        remaining_amount=get_debt_remaining_amount(debt),
+    )
+
+
 def get_debt_summary(db: Session, user_id: uuid.UUID) -> dict[str, Decimal]:
     """Totales simples y explícitos, no clever: por cada deuda, lo pendiente es
-    total_amount menos lo ya pagado en cuotas (una deuda sin cuotas cuenta completa,
-    ya que no hay forma de marcarla parcialmente pagada)."""
+    total_amount menos lo ya pagado (cuotas + abonos, ver get_debt_remaining_amount)."""
     debts = list_debts_for_user(db, user_id)
 
     total_owed_by_user = Decimal("0")
     total_owed_to_user = Decimal("0")
 
     for debt in debts:
-        paid = sum((inst.amount for inst in debt.installments if inst.status == "paid"), Decimal("0"))
-        remaining = debt.total_amount - paid
+        remaining = get_debt_remaining_amount(debt)
         if debt.direction == "owed_by_user":
             total_owed_by_user += remaining
         else:

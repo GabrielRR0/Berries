@@ -1,13 +1,21 @@
 import { ref } from 'vue'
 import {
+  addDebtPayment as addDebtPaymentApi,
   createDebt as createDebtApi,
   deleteDebt as deleteDebtApi,
+  deleteDebtPayment as deleteDebtPaymentApi,
   getDebtSummary as getDebtSummaryApi,
   listDebts as listDebtsApi,
   payInstallment as payInstallmentApi,
   unpayInstallment as unpayInstallmentApi,
 } from '../../services/debts/debts.service'
-import type { CreateDebtInput, Debt, DebtDirection, DebtSummary } from '../../services/debts/interfaces/debts.interface'
+import type {
+  CreateDebtInput,
+  CreateDebtPaymentInput,
+  Debt,
+  DebtDirection,
+  DebtSummary,
+} from '../../services/debts/interfaces/debts.interface'
 
 // Estado local de la pantalla de deudas (no un store de Pinia: ninguna otra
 // pantalla necesita esto ahora mismo, ver limites del trabajo). Envuelve
@@ -102,6 +110,28 @@ export function useDebts() {
     }
   }
 
+  async function addPayment(debtId: string, input: CreateDebtPaymentInput): Promise<void> {
+    error.value = null
+    try {
+      await addDebtPaymentApi(debtId, input)
+      await refetchAll()
+    } catch (err) {
+      error.value = toMessage(err, 'No se pudo registrar el pago.')
+      throw err
+    }
+  }
+
+  async function removePayment(debtId: string, paymentId: string): Promise<void> {
+    error.value = null
+    try {
+      await deleteDebtPaymentApi(debtId, paymentId)
+      await refetchAll()
+    } catch (err) {
+      error.value = toMessage(err, 'No se pudo eliminar el pago.')
+      throw err
+    }
+  }
+
   return {
     debts,
     summary,
@@ -113,5 +143,7 @@ export function useDebts() {
     remove,
     payInstallment,
     unpayInstallment,
+    addPayment,
+    removePayment,
   }
 }

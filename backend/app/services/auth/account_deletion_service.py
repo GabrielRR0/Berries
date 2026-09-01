@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.auth.user_model import User
 from app.models.debts.debt_model import Debt
+from app.models.debts.debt_payment_model import DebtPayment
 from app.models.debts.installment_model import Installment
 from app.models.goals.goal_check_in_model import GoalCheckIn
 from app.models.goals.goal_model import Goal
@@ -25,6 +26,12 @@ def delete_own_account(db: Session, user: User) -> None:
     debt_ids = db.scalars(select(Debt.id).where(Debt.user_id == user.id)).all()
     if debt_ids:
         db.execute(delete(Installment).where(Installment.debt_id.in_(debt_ids)))
+        # DebtPayment referencia debt_id (por Debt, borrada mas abajo) Y transaction_id
+        # (por Transaction, borrada mas abajo en este mismo metodo) - tiene que irse
+        # antes que ambas, no solo antes que Debt (bug real: encontrado probando en
+        # vivo contra Postgres, invisible en SQLite/tests porque ahi las FK no se
+        # validan - ver bitacora de debt_payment_service.delete_debt_payment).
+        db.execute(delete(DebtPayment).where(DebtPayment.debt_id.in_(debt_ids)))
     db.execute(delete(Debt).where(Debt.user_id == user.id))
 
     goal_ids = db.scalars(select(Goal.id).where(Goal.user_id == user.id)).all()

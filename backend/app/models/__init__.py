@@ -4,6 +4,7 @@ from app.models.auth.user_model import User  # noqa: F401
 from app.models.currency.currency_model import Currency  # noqa: F401
 from app.models.currency.exchange_rate_model import ExchangeRate  # noqa: F401
 from app.models.debts.debt_model import Debt  # noqa: F401
+from app.models.debts.debt_payment_model import DebtPayment  # noqa: F401
 from app.models.debts.installment_model import Installment  # noqa: F401
 from app.models.goals.goal_check_in_model import GoalCheckIn  # noqa: F401
 from app.models.goals.goal_model import Goal  # noqa: F401

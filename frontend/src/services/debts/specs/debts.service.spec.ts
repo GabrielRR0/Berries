@@ -2,10 +2,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   DebtsApiError,
+  addDebtPayment,
   createDebt,
   deleteDebt,
+  deleteDebtPayment,
   getDebtSummary,
   listDebts,
+  parseDebtPaymentVoice,
   payInstallment,
   unpayInstallment,
 } from '../debts.service'
@@ -27,6 +30,18 @@ const INSTALLMENT_WIRE = {
   paid_at: null,
 }
 
+const DEBT_PAYMENT_WIRE = {
+  id: 'payment-1',
+  debt_id: 'debt-1',
+  amount: 50,
+  currency: 'USD',
+  applied_amount: 50,
+  note: null,
+  paid_at: '2026-08-30',
+  wallet_id: null,
+  created_at: '2026-08-30T00:00:00Z',
+}
+
 const DEBT_WIRE = {
   id: 'debt-1',
   user_id: 'user-1',
@@ -37,6 +52,9 @@ const DEBT_WIRE = {
   description: 'Préstamo',
   created_at: '2026-08-01T00:00:00Z',
   installments: [INSTALLMENT_WIRE],
+  payments: [DEBT_PAYMENT_WIRE],
+  amount_paid: 50,
+  remaining_amount: 250,
 }
 
 describe('debts.service', () => {
@@ -130,6 +148,21 @@ describe('debts.service', () => {
             paidAt: null,
           },
         ],
+        payments: [
+          {
+            id: 'payment-1',
+            debtId: 'debt-1',
+            amount: 50,
+            currency: 'USD',
+            appliedAmount: 50,
+            note: null,
+            paidAt: '2026-08-30',
+            walletId: null,
+            createdAt: '2026-08-30T00:00:00Z',
+          },
+        ],
+        amountPaid: 50,
+        remainingAmount: 250,
       })
     })
 
@@ -260,6 +293,124 @@ describe('debts.service', () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ detail: 'No se pudo revertir.' }, { ok: false, status: 400 }))
 
       const error: unknown = await unpayInstallment('debt-1', 'inst-1').catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(DebtsApiError)
+    })
+  })
+
+  describe('addDebtPayment', () => {
+    it('manda los campos requeridos en snake_case', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse(DEBT_PAYMENT_WIRE, { status: 201 }))
+
+      await addDebtPayment('debt-1', { amount: 50, currency: 'USD' })
+
+      const [url, init] = vi.mocked(fetch).mock.calls[0]
+      expect(url).toBe('/api/debts/debt-1/payments')
+      expect(init!.method).toBe('POST')
+      expect(init!.headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer jwt-token' })
+      expect(JSON.parse(init!.body as string)).toEqual({ amount: 50, currency: 'USD' })
+    })
+
+    it('incluye los campos opcionales cuando se dan', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse(DEBT_PAYMENT_WIRE, { status: 201 }))
+
+      await addDebtPayment('debt-1', {
+        amount: 50,
+        currency: 'USDT',
+        appliedAmount: 49.5,
+        note: 'Transferencia',
+        paidAt: '2026-08-30',
+        walletId: 'wallet-1',
+      })
+
+      const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+      expect(body).toEqual({
+        amount: 50,
+        currency: 'USDT',
+        applied_amount: 49.5,
+        note: 'Transferencia',
+        paid_at: '2026-08-30',
+        wallet_id: 'wallet-1',
+      })
+    })
+
+    it('mapea la respuesta a camelCase', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse(DEBT_PAYMENT_WIRE, { status: 201 }))
+
+      const result = await addDebtPayment('debt-1', { amount: 50, currency: 'USD' })
+
+      expect(result).toEqual({
+        id: 'payment-1',
+        debtId: 'debt-1',
+        amount: 50,
+        currency: 'USD',
+        appliedAmount: 50,
+        note: null,
+        paidAt: '2026-08-30',
+        walletId: null,
+        createdAt: '2026-08-30T00:00:00Z',
+      })
+    })
+
+    it('lanza DebtsApiError en error', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse({ detail: 'Saldo insuficiente.' }, { ok: false, status: 400 }))
+
+      const error: unknown = await addDebtPayment('debt-1', { amount: 50, currency: 'USD' }).catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(DebtsApiError)
+      expect((error as DebtsApiError).status).toBe(400)
+    })
+  })
+
+  describe('deleteDebtPayment', () => {
+    it('manda DELETE al endpoint del pago', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse(null, { status: 204 }))
+
+      await deleteDebtPayment('debt-1', 'payment-1')
+
+      const [url, init] = vi.mocked(fetch).mock.calls[0]
+      expect(url).toBe('/api/debts/debt-1/payments/payment-1')
+      expect(init!.method).toBe('DELETE')
+    })
+
+    it('lanza DebtsApiError en 404', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse({ detail: 'Pago no encontrado.' }, { ok: false, status: 404 }))
+
+      const error: unknown = await deleteDebtPayment('debt-1', 'missing').catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(DebtsApiError)
+      expect((error as DebtsApiError).status).toBe(404)
+    })
+  })
+
+  describe('parseDebtPaymentVoice', () => {
+    it('manda el transcript al endpoint de parseo', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({ amount: 50, currency: 'USDT', paid_at: '2026-08-30', note: 'ayer me pagaron 50 usdt' }),
+      )
+
+      await parseDebtPaymentVoice('debt-1', 'ayer me pagaron 50 usdt')
+
+      const [url, init] = vi.mocked(fetch).mock.calls[0]
+      expect(url).toBe('/api/debts/debt-1/payments/parse-voice')
+      expect(init!.method).toBe('POST')
+      expect(JSON.parse(init!.body as string)).toEqual({ transcript: 'ayer me pagaron 50 usdt' })
+    })
+
+    it('mapea la respuesta a camelCase', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({ amount: 50, currency: 'USDT', paid_at: '2026-08-30', note: 'ayer me pagaron 50 usdt' }),
+      )
+
+      const result = await parseDebtPaymentVoice('debt-1', 'ayer me pagaron 50 usdt')
+
+      expect(result).toEqual({ amount: 50, currency: 'USDT', paidAt: '2026-08-30', note: 'ayer me pagaron 50 usdt' })
+    })
+
+    it('lanza DebtsApiError en error', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse({ detail: 'Deuda no encontrada.' }, { ok: false, status: 404 }))
+
+      const error: unknown = await parseDebtPaymentVoice('debt-1', 'hoy me pagaron 50').catch((e: unknown) => e)
 
       expect(error).toBeInstanceOf(DebtsApiError)
     })

@@ -2,13 +2,15 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDebts } from '../../composables/debts/useDebts'
-import type { CreateDebtInput, DebtDirection } from '../../services/debts/interfaces/debts.interface'
+import { useWalletsStore } from '../../stores/wallets.store'
+import type { CreateDebtInput, CreateDebtPaymentInput, DebtDirection } from '../../services/debts/interfaces/debts.interface'
 import BaseCard from '../ui/BaseCard.vue'
 import BottomSheet from '../ui/BottomSheet.vue'
 import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
 import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
 import PillToggle from '../ui/PillToggle.vue'
+import AddDebtPaymentForm from './AddDebtPaymentForm.vue'
 import CreateDebtForm from './CreateDebtForm.vue'
 import DebtCard from './DebtCard.vue'
 
@@ -31,14 +33,57 @@ const FILTER_OPTIONS: { value: FilterValue; label: string }[] = [
 ]
 
 const router = useRouter()
+const walletsStore = useWalletsStore()
 
-const { debts, summary, isLoading, error, fetchDebts, fetchSummary, create, remove, payInstallment, unpayInstallment } =
-  useDebts()
+const {
+  debts,
+  summary,
+  isLoading,
+  error,
+  fetchDebts,
+  fetchSummary,
+  create,
+  remove,
+  payInstallment,
+  unpayInstallment,
+  addPayment,
+  removePayment,
+} = useDebts()
 
 const activeFilter = ref<FilterValue>('all')
 const showCreateSheet = ref(false)
 const showHelpSheet = ref(false)
 const isSubmitting = ref(false)
+
+// Sheet compartido (uno solo, no uno por card) para "Registrar pago" - mismo
+// criterio que showCreateSheet: se cierra recien cuando la mutacion realmente
+// termina bien, para que un error (ej. saldo insuficiente en la billetera
+// elegida) deje el formulario abierto y el usuario pueda corregir sin
+// volver a escribir todo.
+const payingDebtId = ref<string | null>(null)
+const payingDebt = computed(() => debts.value.find((debt) => debt.id === payingDebtId.value) ?? null)
+const isSubmittingPayment = ref(false)
+
+function onOpenAddPayment(debtId: string) {
+  payingDebtId.value = debtId
+}
+
+async function onAddPayment(input: CreateDebtPaymentInput) {
+  if (!payingDebtId.value) return
+  isSubmittingPayment.value = true
+  try {
+    await addPayment(payingDebtId.value, input)
+    payingDebtId.value = null
+  } catch {
+    // El mensaje ya queda expuesto via el "error" reactivo del composable.
+  } finally {
+    isSubmittingPayment.value = false
+  }
+}
+
+async function onRemovePayment(debtId: string, paymentId: string) {
+  await removePayment(debtId, paymentId).catch(() => {})
+}
 
 function goBack() {
   router.push({ name: 'dashboard' })
@@ -87,6 +132,10 @@ const hasDebts = computed(() => debts.value.length > 0)
 onMounted(() => {
   fetchDebts()
   fetchSummary()
+  // Necesarias para el select de "acreditar en billetera" de AddDebtPaymentForm.vue
+  // - fetchWallets ya es idempotente (cache con TTL, ver wallets.store.ts), sin
+  // costo extra si otra pantalla ya las cargo antes.
+  walletsStore.fetchWallets()
 })
 </script>
 
@@ -137,6 +186,8 @@ onMounted(() => {
           @remove="onRemove(debt.id)"
           @pay="onPay(debt.id, $event)"
           @unpay="onUnpay(debt.id, $event)"
+          @open-add-payment="onOpenAddPayment(debt.id)"
+          @remove-payment="onRemovePayment(debt.id, $event)"
         />
       </TransitionGroup>
 
@@ -150,11 +201,22 @@ onMounted(() => {
       <p class="help-text">
         Aquí llevas el control de lo que te deben y lo que debes. Puedes registrar una deuda de pago único o dividida
         en cuotas, marcar cada cuota como pagada cuando corresponda, y filtrar la lista según la dirección de la deuda.
+        También puedes registrar abonos parciales en cualquier momento (a mano o por voz) - quedan en el historial de
+        la deuda y, si eliges una billetera, se reflejan ahí como un ingreso o gasto real.
       </p>
     </BottomSheet>
 
     <BottomSheet v-if="showCreateSheet" title="Nueva deuda" @close="showCreateSheet = false">
       <CreateDebtForm :submitting="isSubmitting" @create="onCreate" @cancel="showCreateSheet = false" />
+    </BottomSheet>
+
+    <BottomSheet v-if="payingDebt" title="Registrar pago" @close="payingDebtId = null">
+      <AddDebtPaymentForm
+        :debt="payingDebt"
+        :submitting="isSubmittingPayment"
+        @create="onAddPayment"
+        @cancel="payingDebtId = null"
+      />
     </BottomSheet>
   </PageShell>
 </template>

@@ -8,8 +8,11 @@
 import { useAuthStore } from '../../stores/auth.store'
 import type {
   CreateDebtInput,
+  CreateDebtPaymentInput,
   Debt,
   DebtDirection,
+  DebtPayment,
+  DebtPaymentVoicePreview,
   DebtSummary,
   Installment,
   InstallmentStatus,
@@ -18,13 +21,29 @@ import type {
 // Forma "sobre el cable" tal cual la devuelve el backend (ver
 // berry/backend/app/schemas/debts/*) - solo interna a este archivo, el resto
 // de la app siempre trabaja con Debt/Installment/DebtSummary.
+// "number | string" en cada monto: son Decimal de Pydantic, que llegan como string
+// sobre el cable (mismo motivo/mismo criterio que wallets.service.ts/WalletWire.balance) -
+// formatCurrency.ts llama ".toFixed()" a mano para USDT (Intl.NumberFormat no la
+// reconoce), y un string ahi rompe en silencio si no se convierte antes con Number().
 interface InstallmentWire {
   id: string
   debt_id: string
   due_date: string
-  amount: number
+  amount: number | string
   status: InstallmentStatus
   paid_at: string | null
+}
+
+interface DebtPaymentWire {
+  id: string
+  debt_id: string
+  amount: number | string
+  currency: string
+  applied_amount: number | string
+  note: string | null
+  paid_at: string
+  wallet_id: string | null
+  created_at: string
 }
 
 interface DebtWire {
@@ -32,16 +51,26 @@ interface DebtWire {
   user_id: string
   counterparty_name: string
   direction: DebtDirection
-  total_amount: number
+  total_amount: number | string
   currency: string
   description: string | null
   created_at: string
   installments: InstallmentWire[]
+  payments: DebtPaymentWire[]
+  amount_paid: number | string
+  remaining_amount: number | string
+}
+
+interface DebtPaymentVoicePreviewWire {
+  amount: number | string | null
+  currency: string
+  paid_at: string
+  note: string
 }
 
 interface DebtSummaryWire {
-  total_owed_by_user: number
-  total_owed_to_user: number
+  total_owed_by_user: number | string
+  total_owed_to_user: number | string
 }
 
 // Error tipado que carga el status HTTP ademas del mensaje (ver
@@ -66,9 +95,23 @@ function mapInstallment(wire: InstallmentWire): Installment {
     id: wire.id,
     debtId: wire.debt_id,
     dueDate: wire.due_date,
-    amount: wire.amount,
+    amount: Number(wire.amount),
     status: wire.status,
     paidAt: wire.paid_at,
+  }
+}
+
+function mapDebtPayment(wire: DebtPaymentWire): DebtPayment {
+  return {
+    id: wire.id,
+    debtId: wire.debt_id,
+    amount: Number(wire.amount),
+    currency: wire.currency,
+    appliedAmount: Number(wire.applied_amount),
+    note: wire.note,
+    paidAt: wire.paid_at,
+    walletId: wire.wallet_id,
+    createdAt: wire.created_at,
   }
 }
 
@@ -78,18 +121,30 @@ function mapDebt(wire: DebtWire): Debt {
     userId: wire.user_id,
     counterpartyName: wire.counterparty_name,
     direction: wire.direction,
-    totalAmount: wire.total_amount,
+    totalAmount: Number(wire.total_amount),
     currency: wire.currency,
     description: wire.description,
     createdAt: wire.created_at,
     installments: wire.installments.map(mapInstallment),
+    payments: wire.payments.map(mapDebtPayment),
+    amountPaid: Number(wire.amount_paid),
+    remainingAmount: Number(wire.remaining_amount),
+  }
+}
+
+function mapDebtPaymentVoicePreview(wire: DebtPaymentVoicePreviewWire): DebtPaymentVoicePreview {
+  return {
+    amount: wire.amount === null ? null : Number(wire.amount),
+    currency: wire.currency,
+    paidAt: wire.paid_at,
+    note: wire.note,
   }
 }
 
 function mapDebtSummary(wire: DebtSummaryWire): DebtSummary {
   return {
-    totalOwedByUser: wire.total_owed_by_user,
-    totalOwedToUser: wire.total_owed_to_user,
+    totalOwedByUser: Number(wire.total_owed_by_user),
+    totalOwedToUser: Number(wire.total_owed_to_user),
   }
 }
 
@@ -188,4 +243,49 @@ export async function unpayInstallment(debtId: string, installmentId: string): P
   if (!response.ok) {
     throw new DebtsApiError(await parseErrorMessage(response, 'No se pudo revertir el pago de la cuota.'), response.status)
   }
+}
+
+export async function addDebtPayment(debtId: string, input: CreateDebtPaymentInput): Promise<DebtPayment> {
+  const payload: Record<string, unknown> = { amount: input.amount, currency: input.currency }
+  if (input.appliedAmount !== undefined) payload.applied_amount = input.appliedAmount
+  if (input.note) payload.note = input.note
+  if (input.paidAt) payload.paid_at = input.paidAt
+  if (input.walletId) payload.wallet_id = input.walletId
+
+  const response = await fetch(`${API_BASE_URL}/api/debts/${debtId}/payments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    throw new DebtsApiError(await parseErrorMessage(response, 'No se pudo registrar el pago.'), response.status)
+  }
+
+  return mapDebtPayment((await response.json()) as DebtPaymentWire)
+}
+
+export async function deleteDebtPayment(debtId: string, paymentId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/api/debts/${debtId}/payments/${paymentId}`, {
+    method: 'DELETE',
+    headers: { ...authHeaders() },
+  })
+
+  if (!response.ok) {
+    throw new DebtsApiError(await parseErrorMessage(response, 'No se pudo eliminar el pago.'), response.status)
+  }
+}
+
+export async function parseDebtPaymentVoice(debtId: string, transcript: string): Promise<DebtPaymentVoicePreview> {
+  const response = await fetch(`${API_BASE_URL}/api/debts/${debtId}/payments/parse-voice`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ transcript }),
+  })
+
+  if (!response.ok) {
+    throw new DebtsApiError(await parseErrorMessage(response, 'No se pudo interpretar el audio.'), response.status)
+  }
+
+  return mapDebtPaymentVoicePreview((await response.json()) as DebtPaymentVoicePreviewWire)
 }

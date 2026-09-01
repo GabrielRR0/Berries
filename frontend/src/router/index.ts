@@ -107,4 +107,20 @@ router.beforeEach((to, from) => {
   return true
 })
 
+// Reset del scroll ANTES de que cambie la ruta, no despues (ver
+// .route-transition-viewport en style.css: la pagina que entra y la que sale
+// quedan position:absolute superpuestas mientras dura el slide, asi que el
+// scrollY de la pagina anterior queda "pegado" durante la transicion - se
+// alcanzaba a ver la parte de abajo de la pagina nueva por un instante, y
+// recien al terminar la transicion el navegador lo recortaba de golpe al
+// tope). Haciendolo aca, en vez de con la opcion scrollBehavior (que corre
+// despues de pintado el DOM nuevo), el salto queda resuelto antes de que se
+// pinte el siguiente frame.
+router.beforeEach((to, from) => {
+  if (to.path !== from.path) {
+    window.scrollTo(0, 0)
+  }
+  return true
+})
+
 export default router

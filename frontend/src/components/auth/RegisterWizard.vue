@@ -396,7 +396,12 @@ async function onSubmit() {
 .auth-screen {
   min-height: 100dvh;
   min-height: 100vh;
-  padding: 2rem 1.5rem 3rem;
+  /* calc(...): en un telefono con notch/status bar, viewport-fit=cover (ver
+     index.html) hace que el contenido arranque debajo de esa zona - sin sumar
+     el safe-area-inset-top el padding nominal de 2rem quedaba tapado y el
+     wizard se veia pegado arriba (bug real reportado en un telefono). Mismo
+     patron ya usado en TopHeader.vue/PageShell.vue. */
+  padding: calc(2rem + env(safe-area-inset-top)) 1.5rem 3rem;
   background-color: var(--bg);
   background-image: var(--hero-glow);
   background-repeat: no-repeat;

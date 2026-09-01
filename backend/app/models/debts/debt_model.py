@@ -41,3 +41,8 @@ class Debt(Base):
     installments: Mapped[list["Installment"]] = relationship(
         "Installment", back_populates="debt", cascade="all, delete-orphan", order_by="Installment.due_date"
     )
+    # Abonos/cobros parciales (ver DebtPayment) - mismo criterio de cascada que
+    # installments: borrar la deuda borra su historial de pagos con ella.
+    payments: Mapped[list["DebtPayment"]] = relationship(
+        "DebtPayment", back_populates="debt", cascade="all, delete-orphan", order_by="DebtPayment.paid_at.desc()"
+    )

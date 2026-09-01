@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  addDebtPayment,
   createDebt,
   deleteDebt,
+  deleteDebtPayment,
   getDebtSummary,
   listDebts,
   payInstallment,
   unpayInstallment,
 } from '../../../services/debts/debts.service'
-import type { Debt, DebtSummary } from '../../../services/debts/interfaces/debts.interface'
+import type { Debt, DebtPayment, DebtSummary } from '../../../services/debts/interfaces/debts.interface'
 import { useDebts } from '../useDebts'
 
 vi.mock('../../../services/debts/debts.service', () => ({
@@ -17,6 +19,8 @@ vi.mock('../../../services/debts/debts.service', () => ({
   deleteDebt: vi.fn(),
   payInstallment: vi.fn(),
   unpayInstallment: vi.fn(),
+  addDebtPayment: vi.fn(),
+  deleteDebtPayment: vi.fn(),
 }))
 
 const DEBT: Debt = {
@@ -29,6 +33,21 @@ const DEBT: Debt = {
   description: null,
   createdAt: '2026-08-01T00:00:00Z',
   installments: [],
+  payments: [],
+  amountPaid: 0,
+  remainingAmount: 300,
+}
+
+const PAYMENT: DebtPayment = {
+  id: 'payment-1',
+  debtId: 'debt-1',
+  amount: 50,
+  currency: 'USD',
+  appliedAmount: 50,
+  note: null,
+  paidAt: '2026-08-30',
+  walletId: null,
+  createdAt: '2026-08-30T00:00:00Z',
 }
 
 const SUMMARY: DebtSummary = { totalOwedByUser: 0, totalOwedToUser: 300 }
@@ -41,6 +60,8 @@ describe('useDebts', () => {
     vi.mocked(deleteDebt).mockReset()
     vi.mocked(payInstallment).mockReset()
     vi.mocked(unpayInstallment).mockReset()
+    vi.mocked(addDebtPayment).mockReset()
+    vi.mocked(deleteDebtPayment).mockReset()
   })
 
   it('arranca vacio, sin cargar y sin error', () => {
@@ -185,6 +206,46 @@ describe('useDebts', () => {
 
       await expect(unpay('debt-1', 'inst-1')).rejects.toThrow('no se pudo revertir')
       expect(error.value).toBe('no se pudo revertir')
+    })
+  })
+
+  describe('addPayment', () => {
+    it('registra el pago y refresca la lista', async () => {
+      vi.mocked(addDebtPayment).mockResolvedValue(PAYMENT)
+      const { addPayment } = useDebts()
+
+      await addPayment('debt-1', { amount: 50, currency: 'USD' })
+
+      expect(addDebtPayment).toHaveBeenCalledWith('debt-1', { amount: 50, currency: 'USD' })
+      expect(listDebts).toHaveBeenCalled()
+      expect(getDebtSummary).toHaveBeenCalled()
+    })
+
+    it('propaga el error del servicio', async () => {
+      vi.mocked(addDebtPayment).mockRejectedValue(new Error('saldo insuficiente'))
+      const { error, addPayment } = useDebts()
+
+      await expect(addPayment('debt-1', { amount: 50, currency: 'USD' })).rejects.toThrow('saldo insuficiente')
+      expect(error.value).toBe('saldo insuficiente')
+    })
+  })
+
+  describe('removePayment', () => {
+    it('elimina el pago y refresca la lista', async () => {
+      const { removePayment } = useDebts()
+
+      await removePayment('debt-1', 'payment-1')
+
+      expect(deleteDebtPayment).toHaveBeenCalledWith('debt-1', 'payment-1')
+      expect(listDebts).toHaveBeenCalled()
+    })
+
+    it('propaga el error del servicio', async () => {
+      vi.mocked(deleteDebtPayment).mockRejectedValue(new Error('no encontrado'))
+      const { error, removePayment } = useDebts()
+
+      await expect(removePayment('debt-1', 'missing')).rejects.toThrow('no encontrado')
+      expect(error.value).toBe('no encontrado')
     })
   })
 })
