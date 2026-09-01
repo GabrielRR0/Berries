@@ -5,6 +5,11 @@ import { useAuthStore } from '../stores/auth.store'
 declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
+    // Pedido explicito del usuario: crear/editar una meta es una tarea enfocada
+    // de una sola pantalla (con su propio boton de "atras") - la barra flotante
+    // de navegacion (Inicio/Movimientos/Menu) no aporta nada ahi y solo resta
+    // espacio vertical util en el telefono.
+    hideTabBar?: boolean
   }
 }
 
@@ -73,13 +78,13 @@ const router = createRouter({
       path: '/metas/nueva',
       name: 'metas-nueva',
       component: () => import('../components/goals/CreateGoalView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, hideTabBar: true },
     },
     {
       path: '/metas/:id/editar',
       name: 'metas-editar',
       component: () => import('../components/goals/EditGoalView.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, hideTabBar: true },
     },
     {
       path: '/categorias',

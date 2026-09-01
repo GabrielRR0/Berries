@@ -44,7 +44,7 @@ async function onCreate(input: CreateGoalInput) {
 </script>
 
 <template>
-  <PageShell>
+  <PageShell hide-tab-bar>
     <SectionHeader title="Nueva meta" max-width="40rem" @back="goBack" />
 
     <div class="create-goal-view">
@@ -76,7 +76,7 @@ async function onCreate(input: CreateGoalInput) {
 }
 
 .voice-entry-slot {
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.75rem;
 }
 
 .create-goal-error {

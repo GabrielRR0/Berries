@@ -51,7 +51,7 @@ const PENDING: PendingCheckIn = {
   suggestedAmount: 53.33,
 }
 
-const CAPACITY: SavingsCapacity = { avgMonthlyIncome: 900, avgMonthlyExpense: 600, avgMonthlyAvailable: 300 }
+const CAPACITY: SavingsCapacity = { avgMonthlyIncome: 900, avgMonthlyExpense: 600, avgMonthlyAvailable: 300, hasEnoughHistory: true }
 
 describe('useGoals', () => {
   beforeEach(() => {

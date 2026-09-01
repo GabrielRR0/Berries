@@ -81,6 +81,7 @@ interface SavingsCapacityWire {
   avg_monthly_income: number | string
   avg_monthly_expense: number | string
   avg_monthly_available: number | string
+  has_enough_history: boolean
 }
 
 // Error tipado que carga el status HTTP ademas del mensaje (ver
@@ -158,6 +159,7 @@ function mapSavingsCapacity(wire: SavingsCapacityWire): SavingsCapacity {
     avgMonthlyIncome: Number(wire.avg_monthly_income),
     avgMonthlyExpense: Number(wire.avg_monthly_expense),
     avgMonthlyAvailable: Number(wire.avg_monthly_available),
+    hasEnoughHistory: wire.has_enough_history,
   }
 }
 

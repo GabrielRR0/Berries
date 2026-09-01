@@ -11,12 +11,17 @@
 // copia hacia que se superpusieran dos headers/tab-bars durante el swipe
 // entre rutas. Ahora viven una sola vez en App.vue, fuera de esta pantalla -
 // PageShell solo reserva el espacio para que el contenido no quede tapado.
-withDefaults(defineProps<{ padded?: boolean }>(), { padded: true })
+// hideTabBar: pantallas de tarea enfocada de una sola pantalla (ej. crear/
+// editar una meta - ver App.vue/router: mismo route.meta.hideTabBar que
+// oculta la barra flotante ahi) no reservan el padding-bottom pensado para
+// esa barra - de lo contrario queda un espacio en blanco enorme al pie sin
+// nada debajo (pedido explicito del usuario).
+withDefaults(defineProps<{ padded?: boolean; hideTabBar?: boolean }>(), { padded: true, hideTabBar: false })
 </script>
 
 <template>
   <div class="page-shell">
-    <main class="page-shell-content" :class="{ padded }">
+    <main class="page-shell-content" :class="{ padded, 'no-tab-bar': hideTabBar }">
       <slot />
     </main>
   </div>
@@ -45,5 +50,9 @@ withDefaults(defineProps<{ padded?: boolean }>(), { padded: true })
      el final del contenido. */
   padding: calc(var(--header-height) + env(safe-area-inset-top) + 1rem) 1.25rem
     calc(6rem + env(safe-area-inset-bottom));
+}
+
+.page-shell-content.padded.no-tab-bar {
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
 }
 </style>

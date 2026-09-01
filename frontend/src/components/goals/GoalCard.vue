@@ -40,11 +40,13 @@ const daysRemaining = computed(() => {
   return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
 })
 
-// Mismo criterio informativo (nunca bloqueante) que CreateGoalForm.vue -
+// Mismo criterio informativo (nunca bloqueante) que CreateGoalWizard.vue -
 // compara el aporte ya sugerido por el backend contra el disponible real
-// promedio de los ultimos meses.
+// promedio de los ultimos meses. hasEnoughHistory=false (cuenta nueva, el mes
+// en curso todavia no termino) - pedido explicito del usuario, no mostrar esta
+// advertencia con una sola cifra parcial que no es un promedio real.
 const exceedsAvailable = computed(() => {
-  if (!props.savingsCapacity || props.goal.status !== 'active') return false
+  if (!props.savingsCapacity?.hasEnoughHistory || props.goal.status !== 'active') return false
   return props.goal.suggestedMonthlyContribution > props.savingsCapacity.avgMonthlyAvailable
 })
 

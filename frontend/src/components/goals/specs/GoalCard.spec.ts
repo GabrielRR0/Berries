@@ -259,7 +259,7 @@ describe('GoalCard', () => {
   })
 
   it('avisa cuando el aporte sugerido supera el disponible promedio', () => {
-    const capacity: SavingsCapacity = { avgMonthlyIncome: 500, avgMonthlyExpense: 470, avgMonthlyAvailable: 30 }
+    const capacity: SavingsCapacity = { avgMonthlyIncome: 500, avgMonthlyExpense: 470, avgMonthlyAvailable: 30, hasEnoughHistory: true }
     const wrapper = mountCard({ goal: GOAL, savingsCapacity: capacity })
 
     expect(wrapper.find('.goal-capacity-warning').exists()).toBe(true)
@@ -267,7 +267,17 @@ describe('GoalCard', () => {
   })
 
   it('no avisa cuando el aporte sugerido entra en el disponible promedio', () => {
-    const capacity: SavingsCapacity = { avgMonthlyIncome: 900, avgMonthlyExpense: 200, avgMonthlyAvailable: 700 }
+    const capacity: SavingsCapacity = { avgMonthlyIncome: 900, avgMonthlyExpense: 200, avgMonthlyAvailable: 700, hasEnoughHistory: true }
+    const wrapper = mountCard({ goal: GOAL, savingsCapacity: capacity })
+
+    expect(wrapper.find('.goal-capacity-warning').exists()).toBe(false)
+  })
+
+  // Pedido explicito del usuario: una cuenta nueva (el mes en curso todavia no
+  // termino) no tiene un "promedio" real todavia - no avisar nada con eso, aunque
+  // el numero de ese unico mes parcial superaria el aporte sugerido.
+  it('no avisa aunque el aporte sugerido "supere" el disponible, si la cuenta no tiene suficiente historial', () => {
+    const capacity: SavingsCapacity = { avgMonthlyIncome: 0, avgMonthlyExpense: 5510.01, avgMonthlyAvailable: -5510.01, hasEnoughHistory: false }
     const wrapper = mountCard({ goal: GOAL, savingsCapacity: capacity })
 
     expect(wrapper.find('.goal-capacity-warning').exists()).toBe(false)

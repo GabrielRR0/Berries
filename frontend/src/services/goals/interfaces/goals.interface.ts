@@ -91,4 +91,10 @@ export interface SavingsCapacity {
   avgMonthlyIncome: number
   avgMonthlyExpense: number
   avgMonthlyAvailable: number
+  // False mientras la cuenta no lleva al menos 1 mes calendario completo ANTERIOR
+  // al actual (ver goal_service.get_savings_capacity) - pedido explicito del
+  // usuario: el mes en curso todavia no termino, una sola cifra parcial no es un
+  // "promedio" real. Los componentes que muestran advertencias de capacidad
+  // (CreateGoalWizard.vue, GoalCard.vue) no deben mostrarlas mientras esto sea false.
+  hasEnoughHistory: boolean
 }

@@ -1,5 +1,5 @@
-import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { DOMWrapper, mount } from '@vue/test-utils'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { SavingsCapacity } from '../../../services/goals/interfaces/goals.interface'
 import { monthsBetween } from '../../../utils/goals/monthsBetween'
 import CreateGoalWizard from '../CreateGoalWizard.vue'
@@ -12,7 +12,44 @@ async function typeAmount(wrapper: ReturnType<typeof mount>, digits: string) {
   await wrapper.find('.wizard-amount-input').setValue(digits)
 }
 
+// "Ya tienes ahorrado" vive en un BottomSheet (Teleport a <body> - pedido
+// explicito del usuario, segunda vuelta: "que sea una modal que aparezca
+// desde abajo"). attachTo: document.body + DOMWrapper(document.body) es el
+// mismo patron ya establecido en GoalCard.spec.ts/DebtCard.spec.ts para
+// contenido teletransportado; hay que desmontar cada uno despues para no
+// dejar sheets huerfanos pegados al body real entre tests.
+const mountedWrappers: ReturnType<typeof mount>[] = []
+function mountAttached(props: Record<string, unknown> = {}) {
+  const wrapper = mount(CreateGoalWizard, { props, attachTo: document.body })
+  mountedWrappers.push(wrapper)
+  return wrapper
+}
+
+function inSheet(selector: string) {
+  return new DOMWrapper(document.body).find(selector)
+}
+
+async function setInitialSavings(wrapper: ReturnType<typeof mount>, amount: string, note?: string) {
+  const trigger = wrapper.find('.initial-savings-toggle').exists()
+    ? wrapper.find('.initial-savings-toggle')
+    : wrapper.find('.initial-savings-edit')
+  await trigger.trigger('click')
+
+  await inSheet('.initial-savings-amount-input').setValue(amount)
+  if (note !== undefined) {
+    await inSheet('.initial-savings-note').setValue(note)
+  }
+  const guardar = new DOMWrapper(document.body)
+    .findAll('.initial-savings-sheet-actions button')
+    .find((btn) => btn.text() === 'Guardar')!
+  await guardar.trigger('click')
+}
+
 describe('CreateGoalWizard', () => {
+  afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0)) wrapper.unmount()
+  })
+
   it('arranca en el paso 1, mostrando el grid de plantillas', () => {
     const wrapper = mount(CreateGoalWizard)
 
@@ -59,6 +96,30 @@ describe('CreateGoalWizard', () => {
     await typeAmount(wrapper, '240')
 
     expect((wrapper.find('.wizard-amount-input').element as HTMLInputElement).value).toBe('240')
+  })
+
+  // Pedido explicito del usuario: "1300" se veia feo sin separador de miles.
+  it('el input muestra el monto agrupado de a miles mientras se escribe', async () => {
+    const wrapper = mount(CreateGoalWizard)
+    await wrapper.find('.type-tile-custom').trigger('click')
+
+    await typeAmount(wrapper, '233222')
+
+    expect((wrapper.find('.wizard-amount-input').element as HTMLInputElement).value).toBe('233,222')
+  })
+
+  it('el monto sigue calculandose bien aunque se muestre agrupado (sin comas de mas al enviar)', async () => {
+    const wrapper = mount(CreateGoalWizard)
+    await wrapper.findAll('.type-tile').find((tile) => tile.text().includes('Comprar un computador'))!.trigger('click')
+    await wrapper.find('input[type="date"]').setValue('2026-12-28')
+    await typeAmount(wrapper, '1200')
+    await wrapper.find('.wizard-next').trigger('click')
+
+    await wrapper.find('.wizard-next').trigger('click')
+
+    expect(wrapper.emitted('create')).toEqual([
+      [{ title: 'Comprar un computador', targetAmount: 1200, currency: 'USD', targetDate: '2026-12-28', goalType: 'computer' }],
+    ])
   })
 
   it('"Continuar" queda deshabilitado hasta completar titulo, fecha y monto', async () => {
@@ -131,26 +192,24 @@ describe('CreateGoalWizard', () => {
   })
 
   it('modo "Monto total" con ahorro inicial menciona que se suma al promedio', async () => {
-    const wrapper = mount(CreateGoalWizard)
+    const wrapper = mountAttached()
     await wrapper.find('.type-tile-custom').trigger('click')
     await wrapper.find('.wizard-title-input').setValue('MacBook')
     await wrapper.find('input[type="date"]').setValue('2026-12-28')
     await typeAmount(wrapper, '2540')
-    await wrapper.find('.initial-savings-toggle').trigger('click')
-    await wrapper.find('.initial-savings-fields input[type="number"]').setValue('700')
+    await setInitialSavings(wrapper, '700')
 
     const hint = wrapper.find('.wizard-hint')
     expect(hint.text()).toContain('sumando los $700.00 que ya tienes ahorrados')
   })
 
   it('modo "Monto total" cuando lo ahorrado ya cubre la meta, avisa que no falta nada', async () => {
-    const wrapper = mount(CreateGoalWizard)
+    const wrapper = mountAttached()
     await wrapper.find('.type-tile-custom').trigger('click')
     await wrapper.find('.wizard-title-input').setValue('MacBook')
     await wrapper.find('input[type="date"]').setValue('2026-12-28')
     await typeAmount(wrapper, '700')
-    await wrapper.find('.initial-savings-toggle').trigger('click')
-    await wrapper.find('.initial-savings-fields input[type="number"]').setValue('700')
+    await setInitialSavings(wrapper, '700')
 
     const hint = wrapper.find('.wizard-hint')
     expect(hint.text()).toContain('cubre por completo tu meta')
@@ -175,34 +234,66 @@ describe('CreateGoalWizard', () => {
   // "Ya tienes algo ahorrado" - pedido explicito del usuario: un headstart opcional
   // hacia la meta ("tengo $700 si vendo mi laptop"), con un detalle libre de donde
   // sale la plata.
-  it('el bloque "ya tienes ahorrado" arranca colapsado, sin campos visibles', async () => {
-    const wrapper = mount(CreateGoalWizard)
+  it('el bloque "ya tienes ahorrado" arranca colapsado, sin sheet abierto', async () => {
+    const wrapper = mountAttached()
     await wrapper.find('.type-tile-custom').trigger('click')
 
     expect(wrapper.find('.initial-savings-toggle').exists()).toBe(true)
-    expect(wrapper.find('.initial-savings-fields').exists()).toBe(false)
+    expect(wrapper.find('.initial-savings-summary').exists()).toBe(false)
+    expect(new DOMWrapper(document.body).find('.initial-savings-sheet-body').exists()).toBe(false)
   })
 
-  it('tocar el toggle revela el monto y el detalle, "Quitar" los vuelve a colapsar', async () => {
-    const wrapper = mount(CreateGoalWizard)
+  it('tocar el toggle abre el sheet desde abajo, "Guardar" lo cierra y muestra el resumen', async () => {
+    const wrapper = mountAttached()
     await wrapper.find('.type-tile-custom').trigger('click')
 
     await wrapper.find('.initial-savings-toggle').trigger('click')
-    expect(wrapper.find('.initial-savings-fields').exists()).toBe(true)
+    expect(inSheet('.initial-savings-sheet-body').exists()).toBe(true)
+
+    await inSheet('.initial-savings-amount-input').setValue('700')
+    const guardar = new DOMWrapper(document.body)
+      .findAll('.initial-savings-sheet-actions button')
+      .find((btn) => btn.text() === 'Guardar')!
+    await guardar.trigger('click')
+
+    expect(new DOMWrapper(document.body).find('.initial-savings-sheet-body').exists()).toBe(false)
+    expect(wrapper.find('.initial-savings-summary').text()).toContain('$700.00')
+  })
+
+  it('"Cancelar" cierra el sheet sin guardar nada', async () => {
+    const wrapper = mountAttached()
+    await wrapper.find('.type-tile-custom').trigger('click')
+
+    await wrapper.find('.initial-savings-toggle').trigger('click')
+    await inSheet('.initial-savings-amount-input').setValue('700')
+    const cancelar = new DOMWrapper(document.body)
+      .findAll('.initial-savings-sheet-actions button')
+      .find((btn) => btn.text() === 'Cancelar')!
+    await cancelar.trigger('click')
+
+    expect(new DOMWrapper(document.body).find('.initial-savings-sheet-body').exists()).toBe(false)
+    expect(wrapper.find('.initial-savings-toggle').exists()).toBe(true)
+    expect(wrapper.find('.initial-savings-summary').exists()).toBe(false)
+  })
+
+  it('"Quitar" en el resumen vuelve a mostrar el toggle', async () => {
+    const wrapper = mountAttached()
+    await wrapper.find('.type-tile-custom').trigger('click')
+    await setInitialSavings(wrapper, '700')
+    expect(wrapper.find('.initial-savings-summary').exists()).toBe(true)
 
     await wrapper.find('.initial-savings-remove').trigger('click')
-    expect(wrapper.find('.initial-savings-fields').exists()).toBe(false)
+
+    expect(wrapper.find('.initial-savings-summary').exists()).toBe(false)
     expect(wrapper.find('.initial-savings-toggle').exists()).toBe(true)
   })
 
   it('"Crear meta" incluye initialAmount/initialAmountNote cuando se completan', async () => {
-    const wrapper = mount(CreateGoalWizard)
+    const wrapper = mountAttached()
     await wrapper.findAll('.type-tile').find((tile) => tile.text().includes('Comprar un computador'))!.trigger('click')
     await wrapper.find('input[type="date"]').setValue('2026-12-28')
     await typeAmount(wrapper, '1200')
-    await wrapper.find('.initial-savings-toggle').trigger('click')
-    await wrapper.find('.initial-savings-fields input[type="number"]').setValue('700')
-    await wrapper.find('.initial-savings-note').setValue('Si vendo mi laptop u otras pertenencias')
+    await setInitialSavings(wrapper, '700', 'Si vendo mi laptop u otras pertenencias')
     await wrapper.find('.wizard-next').trigger('click')
 
     await wrapper.find('.wizard-next').trigger('click')
@@ -238,14 +329,12 @@ describe('CreateGoalWizard', () => {
   })
 
   it('el resumen muestra cuanto ya tiene ahorrado y su detalle', async () => {
-    const wrapper = mount(CreateGoalWizard)
+    const wrapper = mountAttached()
     await wrapper.find('.type-tile-custom').trigger('click')
     await wrapper.find('.wizard-title-input').setValue('MacBook')
     await wrapper.find('input[type="date"]').setValue('2026-12-28')
     await typeAmount(wrapper, '1200')
-    await wrapper.find('.initial-savings-toggle').trigger('click')
-    await wrapper.find('.initial-savings-fields input[type="number"]').setValue('700')
-    await wrapper.find('.initial-savings-note').setValue('Si vendo mi laptop u otras pertenencias')
+    await setInitialSavings(wrapper, '700', 'Si vendo mi laptop u otras pertenencias')
 
     await wrapper.find('.wizard-next').trigger('click')
 
@@ -255,13 +344,12 @@ describe('CreateGoalWizard', () => {
   })
 
   it('el ahorro ya reunido descuenta del aporte mensual sugerido (monto total)', async () => {
-    const wrapper = mount(CreateGoalWizard)
+    const wrapper = mountAttached()
     await wrapper.find('.type-tile-custom').trigger('click')
     await wrapper.find('.wizard-title-input').setValue('MacBook')
     await wrapper.find('input[type="date"]').setValue('2026-12-28')
     await typeAmount(wrapper, '1200')
-    await wrapper.find('.initial-savings-toggle').trigger('click')
-    await wrapper.find('.initial-savings-fields input[type="number"]').setValue('1200')
+    await setInitialSavings(wrapper, '1200')
 
     await wrapper.find('.wizard-next').trigger('click')
 
@@ -271,12 +359,11 @@ describe('CreateGoalWizard', () => {
   })
 
   it('modo "Aporte mensual" suma lo ya ahorrado al total estimado', async () => {
-    const wrapper = mount(CreateGoalWizard)
+    const wrapper = mountAttached()
     await wrapper.find('.type-tile-custom').trigger('click')
     await wrapper.find('.wizard-title-input').setValue('TV')
     await wrapper.find('input[type="date"]').setValue('2026-12-28')
-    await wrapper.find('.initial-savings-toggle').trigger('click')
-    await wrapper.find('.initial-savings-fields input[type="number"]').setValue('700')
+    await setInitialSavings(wrapper, '700')
 
     await wrapper.findAll('.amount-mode-option').find((btn) => btn.text() === 'Aporte mensual')!.trigger('click')
     await typeAmount(wrapper, '80')
@@ -289,7 +376,7 @@ describe('CreateGoalWizard', () => {
   })
 
   it('avisa cuando el aporte implicito supera el disponible promedio', async () => {
-    const capacity: SavingsCapacity = { avgMonthlyIncome: 500, avgMonthlyExpense: 480, avgMonthlyAvailable: 20 }
+    const capacity: SavingsCapacity = { avgMonthlyIncome: 500, avgMonthlyExpense: 480, avgMonthlyAvailable: 20, hasEnoughHistory: true }
     const wrapper = mount(CreateGoalWizard, { props: { savingsCapacity: capacity } })
     await wrapper.find('.type-tile-custom').trigger('click')
     await wrapper.find('input[type="date"]').setValue('2026-09-28')
@@ -299,5 +386,18 @@ describe('CreateGoalWizard', () => {
     const hint = wrapper.find('.capacity-hint')
     expect(hint.exists()).toBe(true)
     expect(hint.classes()).toContain('warning')
+  })
+
+  // Pedido explicito del usuario: una cuenta nueva (el mes en curso todavia no
+  // termino) no tiene un "promedio" real todavia - no comparar nada contra eso.
+  it('no muestra la comparacion de capacidad si la cuenta no tiene suficiente historial', async () => {
+    const capacity: SavingsCapacity = { avgMonthlyIncome: 0, avgMonthlyExpense: 5510.01, avgMonthlyAvailable: -5510.01, hasEnoughHistory: false }
+    const wrapper = mount(CreateGoalWizard, { props: { savingsCapacity: capacity } })
+    await wrapper.find('.type-tile-custom').trigger('click')
+    await wrapper.find('input[type="date"]').setValue('2026-09-28')
+
+    await typeAmount(wrapper, '1000')
+
+    expect(wrapper.find('.capacity-hint').exists()).toBe(false)
   })
 })

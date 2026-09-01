@@ -208,14 +208,24 @@ describe('goals.service', () => {
   describe('getSavingsCapacity', () => {
     it('pide el endpoint y mapea el promedio a camelCase', async () => {
       vi.mocked(fetch).mockResolvedValue(
-        mockResponse({ avg_monthly_income: 900, avg_monthly_expense: 600, avg_monthly_available: 300 }),
+        mockResponse({
+          avg_monthly_income: 900,
+          avg_monthly_expense: 600,
+          avg_monthly_available: 300,
+          has_enough_history: true,
+        }),
       )
 
       const result = await getSavingsCapacity()
 
       const [url] = vi.mocked(fetch).mock.calls[0]
       expect(url).toBe('/api/goals/savings-capacity')
-      expect(result).toEqual({ avgMonthlyIncome: 900, avgMonthlyExpense: 600, avgMonthlyAvailable: 300 })
+      expect(result).toEqual({
+        avgMonthlyIncome: 900,
+        avgMonthlyExpense: 600,
+        avgMonthlyAvailable: 300,
+        hasEnoughHistory: true,
+      })
     })
   })
 

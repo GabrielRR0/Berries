@@ -43,7 +43,9 @@ describe('EditGoalView', () => {
   beforeEach(() => {
     push.mockReset()
     vi.mocked(getGoal).mockReset()
-    vi.mocked(getSavingsCapacity).mockReset().mockResolvedValue({ avgMonthlyIncome: 0, avgMonthlyExpense: 0, avgMonthlyAvailable: 0 })
+    vi.mocked(getSavingsCapacity)
+      .mockReset()
+      .mockResolvedValue({ avgMonthlyIncome: 0, avgMonthlyExpense: 0, avgMonthlyAvailable: 0, hasEnoughHistory: false })
     vi.mocked(updateGoal).mockReset()
   })
 

@@ -53,7 +53,7 @@ async function onSubmit(input: UpdateGoalInput) {
 </script>
 
 <template>
-  <PageShell>
+  <PageShell hide-tab-bar>
     <SectionHeader title="Editar meta" max-width="40rem" @back="goBack" />
 
     <div class="edit-goal-view">

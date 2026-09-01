@@ -23,7 +23,7 @@ const { isScrolled } = useScrollHeader()
 // headers/tab-bars superpuestos en el mismo lugar de la pantalla (se vio
 // literalmente al probarlo). El "chrome" queda fijo e inmóvil; solo el
 // contenido de abajo se desliza entre secciones.
-const showChrome = computed(() => Boolean(route.meta.requiresAuth))
+const showChrome = computed(() => Boolean(route.meta.requiresAuth) && !route.meta.hideTabBar)
 // El header (avatar/wordmark/ayuda) pedido explicito del usuario: solo tiene
 // sentido en Inicio, que es la unica pantalla con tour guiado - en el resto
 // de las pantallas el botón de "?" no tendría nada que explicar todavía.

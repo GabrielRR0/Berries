@@ -35,7 +35,9 @@ vi.mock('vue-router', () => ({
 describe('CreateGoalView', () => {
   beforeEach(() => {
     push.mockReset()
-    vi.mocked(getSavingsCapacity).mockReset().mockResolvedValue({ avgMonthlyIncome: 0, avgMonthlyExpense: 0, avgMonthlyAvailable: 0 })
+    vi.mocked(getSavingsCapacity)
+      .mockReset()
+      .mockResolvedValue({ avgMonthlyIncome: 0, avgMonthlyExpense: 0, avgMonthlyAvailable: 0, hasEnoughHistory: false })
     vi.mocked(createGoal).mockReset()
   })
 

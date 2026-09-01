@@ -237,10 +237,13 @@ def test_get_savings_capacity_is_all_zero_with_no_transactions(db):
     assert capacity["avg_monthly_income"] == Decimal("0")
     assert capacity["avg_monthly_expense"] == Decimal("0")
     assert capacity["avg_monthly_available"] == Decimal("0")
+    assert capacity["has_enough_history"] is False
 
 
 def test_get_savings_capacity_averages_income_and_expense_over_the_window(db):
     user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    user.created_at = datetime.now(timezone.utc) - timedelta(days=100)  # cuenta con >= 3 meses de antiguedad
+    db.commit()
     wallet = create_wallet(db, user.id, "Cash", "USD")
     now = datetime.now(timezone.utc)
     create_transaction(db, user.id, wallet.id, "income", Decimal("900.00"), "Salario", occurred_at=now)
@@ -248,7 +251,61 @@ def test_get_savings_capacity_averages_income_and_expense_over_the_window(db):
 
     capacity = get_savings_capacity(db, user.id, months=3)
 
-    # Solo el mes actual tiene movimientos; los otros 2 del promedio quedan en cero.
+    # Solo el mes actual tiene movimientos, pero la cuenta ya existia en los otros 2 -
+    # se promedia sobre los 3 meses completos de la ventana.
     assert capacity["avg_monthly_income"] == Decimal("300.00")
     assert capacity["avg_monthly_expense"] == Decimal("100.00")
     assert capacity["avg_monthly_available"] == Decimal("200.00")
+    assert capacity["has_enough_history"] is True
+
+
+def test_get_savings_capacity_does_not_dilute_a_brand_new_account_over_months_it_never_existed(db):
+    """Bug real reportado por el usuario: una cuenta creada este mismo mes mostraba un
+    "disponible promedio" absurdamente negativo porque un gasto real de este unico mes
+    se dividia entre los 3 meses de la ventana - 2 de los cuales son anteriores a que
+    la cuenta existiera. El promedio de una cuenta nueva debe basarse solo en los meses
+    que realmente lleva existiendo, no en el largo fijo de la ventana."""
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")  # creada ahora mismo
+    wallet = create_wallet(db, user.id, "Cash", "USD")
+    now = datetime.now(timezone.utc)
+    create_transaction(db, user.id, wallet.id, "expense", Decimal("5510.01"), "Compra", occurred_at=now)
+
+    capacity = get_savings_capacity(db, user.id, months=3)
+
+    assert capacity["avg_monthly_expense"] == Decimal("5510.01")
+    assert capacity["avg_monthly_available"] == Decimal("-5510.01")
+    # Segundo pedido del usuario: el mes actual todavia esta en curso - una sola
+    # cifra parcial no es un "promedio" real, asi que el front no debe advertir
+    # nada con esto todavia.
+    assert capacity["has_enough_history"] is False
+
+
+def test_get_savings_capacity_still_not_enough_history_with_a_single_full_prior_month(db):
+    """Tercer pedido del usuario: 1 solo mes anterior completo (2 meses en total con el
+    actual) tampoco alcanza - un ingreso/gasto puntual de "esto es lo que ya tenia
+    ahorrado" cargado como transaccion (en vez de saldo inicial de billetera) todavia
+    se veria como "el promedio" con una sola muestra. Hacen falta 2 meses anteriores
+    completos, no 1."""
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    # Ultimo dia del mes calendario anterior - cae ahi sin importar que dia del mes es
+    # "hoy" (a diferencia de un timedelta fijo, que podria no cruzar el limite del mes).
+    last_day_of_previous_month = date.today().replace(day=1) - timedelta(days=1)
+    user.created_at = datetime.combine(last_day_of_previous_month, datetime.min.time(), tzinfo=timezone.utc)
+    db.commit()
+
+    capacity = get_savings_capacity(db, user.id, months=3)
+
+    assert capacity["has_enough_history"] is False
+
+
+def test_get_savings_capacity_has_enough_history_with_two_full_prior_months(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    # Ultimo dia de DOS meses calendario atras - 2 meses anteriores completos + el actual.
+    first_of_previous_month = date.today().replace(day=1) - timedelta(days=1)
+    last_day_two_months_ago = first_of_previous_month.replace(day=1) - timedelta(days=1)
+    user.created_at = datetime.combine(last_day_two_months_ago, datetime.min.time(), tzinfo=timezone.utc)
+    db.commit()
+
+    capacity = get_savings_capacity(db, user.id, months=3)
+
+    assert capacity["has_enough_history"] is True

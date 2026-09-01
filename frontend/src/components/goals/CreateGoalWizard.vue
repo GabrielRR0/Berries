@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { CreateGoalInput, GoalType, SavingsCapacity } from '../../services/goals/interfaces/goals.interface'
+import { SUPPORTED_CURRENCIES } from '../../utils/currency/supportedCurrencies'
+import { groupAmountThousands, ungroupAmountThousands } from '../../utils/formatters/formatAmountInput'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import { formatDate } from '../../utils/formatters/formatDate'
 import { GOAL_TYPE_TEMPLATES } from '../../utils/goals/goalTypeTemplates'
 import { monthsBetween } from '../../utils/goals/monthsBetween'
 import BaseButton from '../ui/BaseButton.vue'
+import BottomSheet from '../ui/BottomSheet.vue'
 import GoalProgressRing from './GoalProgressRing.vue'
 import GoalTypeIcon from './GoalTypeIcon.vue'
 
@@ -63,11 +66,42 @@ const monthlyAmountStr = ref(props.initialAmountIsMonthly ? (props.initialAmount
 // "Ya tengo $700 ahorrado (si vendo mi laptop)" - pedido explicito del usuario: un
 // headstart opcional hacia la meta, con un detalle libre de donde sale. Se manda como
 // initialAmount/initialAmountNote (ver goal_service.create_goal en el backend, que lo
-// guarda como el primer GoalCheckIn de la meta). Colapsado por default - "Ya tengo
-// algo ahorrado" es la excepcion, no el caso comun.
+// guarda como el primer GoalCheckIn de la meta). Vive en un BottomSheet aparte, no
+// inline en el paso 2 (pedido explicito del usuario, segunda vuelta: "tal vez que sea
+// una modal que aparezca desde abajo") - mismo componente que ya usa el resto de la
+// app (historial de pagos de deudas, resumen de ingresos/gastos, etc.), asi que el
+// estilo ya sale correcto tanto en telefono como en escritorio sin nada especial aca.
+// hasInitialAmount/initialAmountStr/initialAmountNote son el valor YA CONFIRMADO;
+// draftInitialAmountStr/draftInitialAmountNote son el borrador que se edita dentro
+// del sheet mientras esta abierto - "Cancelar" descarta el borrador sin tocar lo ya
+// confirmado, solo "Guardar" lo comitea.
 const hasInitialAmount = ref(false)
 const initialAmountStr = ref('')
 const initialAmountNote = ref('')
+
+const showInitialSavingsSheet = ref(false)
+const draftInitialAmountStr = ref('')
+const draftInitialAmountNote = ref('')
+
+const draftInitialAmountDisplayStr = computed({
+  get: () => groupAmountThousands(draftInitialAmountStr.value),
+  set: (value: string) => {
+    draftInitialAmountStr.value = ungroupAmountThousands(value)
+  },
+})
+
+function openInitialSavingsSheet() {
+  draftInitialAmountStr.value = initialAmountStr.value
+  draftInitialAmountNote.value = initialAmountNote.value
+  showInitialSavingsSheet.value = true
+}
+
+function confirmInitialSavings() {
+  initialAmountStr.value = draftInitialAmountStr.value
+  initialAmountNote.value = draftInitialAmountNote.value
+  hasInitialAmount.value = Number(draftInitialAmountStr.value) > 0
+  showInitialSavingsSheet.value = false
+}
 
 function clearInitialAmount() {
   hasInitialAmount.value = false
@@ -92,6 +126,31 @@ const activeAmountStr = computed({
     else totalAmountStr.value = value
   },
 })
+
+// Lo que el input MUESTRA (con comas de miles, ej. "1,300") - distinto del
+// string "crudo" (activeAmountStr, sin comas) que usa el resto del componente
+// para calcular. Pedido explicito del usuario: "1300" se veia feo sin
+// separador de miles, mismo criterio de coma que ya usa formatCurrency.ts
+// para USD en el resto de la app.
+const displayAmountStr = computed({
+  get: () => groupAmountThousands(activeAmountStr.value),
+  set: (value: string) => {
+    activeAmountStr.value = ungroupAmountThousands(value)
+  },
+})
+
+// El pill de fecha es un <input type="date"> invisible superpuesto sobre el
+// <span> visible (mismo patron que el pill de moneda) - pero en Chrome
+// moderno clickear CUALQUIER parte de un date input solo abre el calendario
+// si el click cae justo sobre el icono interno del picker, no en cualquier
+// punto de la caja. Como esa caja esta estirada e invisible sobre todo el
+// pill, la mayoria de los clicks no pegaban ahi - "no pasa nada" (bug real
+// reportado por el usuario). showPicker() lo abre a mano sin importar donde
+// se hizo click adentro del pill.
+function openDatePicker(event: Event) {
+  const input = event.currentTarget as HTMLInputElement
+  input.showPicker?.()
+}
 
 function selectType(type: GoalType, defaultTitle: string) {
   goalType.value = type
@@ -281,19 +340,18 @@ function onCreate() {
       <button type="button" class="wizard-back" @click="goBack" aria-label="Atrás">←</button>
 
       <div class="wizard-ring-wrap">
-        <GoalProgressRing :percent="0" :size="88">
+        <GoalProgressRing :percent="0" :size="56">
           <GoalTypeIcon :type="goalType" class="wizard-ring-icon" />
         </GoalProgressRing>
       </div>
 
       <div class="wizard-amount-input-wrap">
         <input
-          v-model="activeAmountStr"
-          type="number"
-          min="0"
-          step="0.01"
+          v-model="displayAmountStr"
+          type="text"
           inputmode="decimal"
           placeholder="0"
+          size="8"
           class="wizard-amount-input"
         />
         <span class="wizard-amount-currency">{{ currency }}</span>
@@ -314,52 +372,75 @@ function onCreate() {
       <div class="wizard-pills-row">
         <label class="wizard-pill">
           <span>📅 {{ targetDate ? formatDate(targetDate) : 'Fecha objetivo' }}</span>
-          <input v-model="targetDate" type="date" class="wizard-pill-input" required />
+          <input v-model="targetDate" type="date" class="wizard-pill-input" required @click="openDatePicker" />
         </label>
         <label class="wizard-pill">
           <span>{{ currency || 'Moneda' }}</span>
-          <input v-model="currency" type="text" class="wizard-pill-input" maxlength="4" />
+          <select v-model="currency" class="wizard-pill-input">
+            <option v-for="option in SUPPORTED_CURRENCIES" :key="option.code" :value="option.code">
+              {{ option.code }}
+            </option>
+          </select>
         </label>
       </div>
 
       <div class="initial-savings-block">
         <button
-          v-if="!hasInitialAmount"
+          v-if="initialAmountValue <= 0"
           type="button"
           class="initial-savings-toggle"
-          @click="hasInitialAmount = true"
+          @click="openInitialSavingsSheet"
         >
           + Ya tienes algo ahorrado para esto
         </button>
 
-        <div v-else class="initial-savings-fields">
-          <div class="initial-savings-header">
-            <span class="field-label">Ya tienes ahorrado</span>
+        <div v-else class="initial-savings-summary">
+          <span class="initial-savings-summary-text">Ya tienes ahorrado: {{ formatCurrency(initialAmountValue, currency) }}</span>
+          <div class="initial-savings-summary-actions">
+            <button type="button" class="initial-savings-edit" @click="openInitialSavingsSheet">Editar</button>
             <button type="button" class="initial-savings-remove" @click="clearInitialAmount">Quitar</button>
           </div>
-          <input
-            v-model="initialAmountStr"
-            type="number"
-            min="0"
-            step="0.01"
-            inputmode="decimal"
-            class="wizard-title-input"
-            :placeholder="`0.00 ${currency}`"
-          />
-          <textarea
-            v-model="initialAmountNote"
-            class="wizard-title-input initial-savings-note"
-            rows="2"
-            maxlength="500"
-            placeholder="Detalle (opcional). Ej.: si vendo mi laptop u otras pertenencias"
-          />
         </div>
       </div>
+
+      <!-- <Teleport to="body">: mismo motivo que en DebtCard.vue - un ancestro con
+           transform activo (los pasos del wizard lo tienen mientras dura el slide
+           entre pasos, ver .slide-left-*/.slide-right-* en style.css) redefine el
+           containing block de un position:fixed anidado adentro (el .sheet-scrim de
+           BottomSheet.vue). -->
+      <Teleport to="body">
+        <BottomSheet v-if="showInitialSavingsSheet" title="Ya tienes ahorrado" @close="showInitialSavingsSheet = false">
+          <div class="initial-savings-sheet-body">
+            <input
+              v-model="draftInitialAmountDisplayStr"
+              type="text"
+              inputmode="decimal"
+              class="wizard-title-input initial-savings-amount-input"
+              :placeholder="`0.00 ${currency}`"
+            />
+            <textarea
+              v-model="draftInitialAmountNote"
+              class="wizard-title-input initial-savings-note"
+              rows="3"
+              maxlength="500"
+              placeholder="¿De dónde sale? (opcional)"
+            />
+            <div class="initial-savings-sheet-actions">
+              <BaseButton variant="secondary" @click="showInitialSavingsSheet = false">Cancelar</BaseButton>
+              <BaseButton @click="confirmInitialSavings">Guardar</BaseButton>
+            </div>
+          </div>
+        </BottomSheet>
+      </Teleport>
 
       <p v-if="totalModeHintText" class="wizard-hint">{{ totalModeHintText }}</p>
       <p v-if="monthlyModeHintText" class="wizard-hint">{{ monthlyModeHintText }}</p>
 
-      <p v-if="savingsCapacity && impliedMonthlyContribution !== null" class="capacity-hint" :class="{ warning: exceedsAvailable }">
+      <p
+        v-if="savingsCapacity?.hasEnoughHistory && impliedMonthlyContribution !== null"
+        class="capacity-hint"
+        :class="{ warning: exceedsAvailable }"
+      >
         <template v-if="exceedsAvailable">
           Ese promedio es más de lo que sueles tener disponible por mes
           ({{ formatCurrency(savingsCapacity.avgMonthlyAvailable, currency) }}/mes en promedio) - vas a necesitar ahorrar más de lo
@@ -381,7 +462,7 @@ function onCreate() {
       <p class="wizard-subtitle">Verifica los detalles antes de crear</p>
 
       <div class="wizard-ring-wrap">
-        <GoalProgressRing :percent="0" :size="88">
+        <GoalProgressRing :percent="0" :size="56">
           <GoalTypeIcon :type="goalType" class="wizard-ring-icon" />
         </GoalProgressRing>
       </div>
@@ -426,7 +507,7 @@ function onCreate() {
 .goal-wizard {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 0.875rem;
 }
 
 .wizard-progress {
@@ -458,7 +539,7 @@ function onCreate() {
 .wizard-step {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .wizard-title {
@@ -561,8 +642,8 @@ function onCreate() {
 }
 
 .wizard-ring-icon {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1rem;
+  height: 1rem;
   color: var(--accent);
 }
 
@@ -574,7 +655,13 @@ function onCreate() {
 }
 
 .wizard-amount-input {
-  width: 9rem;
+  /* Sin ancho fijo - el atributo size="8" (ver template) lo dimensiona a su
+     contenido, para que el numero quede realmente centrado bajo el aro/icono
+     de arriba en vez de quedar pegado al borde derecho de una caja ancha con
+     hueco vacio a la izquierda (bug real reportado por el usuario). type="text"
+     (no "number"): un input number no puede mostrar comas de agrupamiento de
+     miles (otro pedido explicito del usuario) - inputmode="decimal" en el
+     template sigue trayendo el teclado numerico en el telefono igual. */
   min-width: 0;
   padding: 0.375rem 0;
   border: none;
@@ -584,23 +671,22 @@ function onCreate() {
   font: inherit;
   font-size: 1.75rem;
   font-weight: 700;
-  text-align: right;
+  text-align: center;
   transition: border-color var(--duration-fast) var(--ease-out);
-  /* Ocultar las flechitas nativas de incremento - no aportan nada util para un
-     monto y ensucian el input. */
-  appearance: textfield;
-  -moz-appearance: textfield;
-}
-
-.wizard-amount-input::-webkit-outer-spin-button,
-.wizard-amount-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
 }
 
 .wizard-amount-input:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+/* Pisa el aro de foco global (ver style.css: input:focus-visible{box-shadow:
+   var(--focus-ring)}) - pensado para inputs con caja/fondo visible; sobre este
+   input transparente sin bordes laterales se veia como un recuadro feo
+   saliendo de la nada (bug real reportado por el usuario). El cambio de color
+   del borde de abajo (arriba) ya alcanza como señal de foco. */
+.wizard-amount-input:focus-visible {
+  box-shadow: none;
 }
 
 .wizard-amount-currency {
@@ -709,41 +795,59 @@ function onCreate() {
   background: var(--accent-muted);
 }
 
-.initial-savings-fields {
+/* Resumen compacto de una linea una vez confirmado el monto (mismo criterio
+   que DebtCard.vue con su historial de pagos: un trigger/resumen chico en vez
+   de dejar el formulario entero siempre desplegado en el paso). El
+   formulario en si vive en el BottomSheet, ver mas abajo. */
+.initial-savings-summary {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.875rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--glass-border);
   background: var(--glass-bg);
 }
 
-.initial-savings-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.field-label {
-  font-size: 0.75rem;
+.initial-savings-summary-text {
+  min-width: 0;
+  font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+.initial-savings-summary-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.75rem;
+}
+
+.initial-savings-edit,
 .initial-savings-remove {
   border: none;
   background: transparent;
-  color: var(--text-muted);
   font: inherit;
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
-  transition: color var(--duration-fast) var(--ease-out);
+  transition: opacity var(--duration-fast) var(--ease-out);
 }
 
-.initial-savings-remove:hover {
+.initial-savings-edit {
   color: var(--accent);
+}
+
+.initial-savings-remove {
+  color: var(--text-muted);
+}
+
+.initial-savings-edit:hover,
+.initial-savings-remove:hover {
+  opacity: 0.8;
 }
 
 .initial-savings-note {
@@ -751,15 +855,32 @@ function onCreate() {
   font-family: inherit;
 }
 
+.initial-savings-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.initial-savings-sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.initial-savings-sheet-actions :deep(.base-button) {
+  width: 100%;
+}
+
 .wizard-hint,
 .capacity-hint {
-  padding: 0.625rem 0.75rem;
+  padding: 0.5rem 0.625rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-subtle);
   background: var(--bg-inset);
   color: var(--text-muted);
   font-size: 0.75rem;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .capacity-hint.warning {
