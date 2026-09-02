@@ -32,6 +32,18 @@ const props = withDefaults(
 const walletsStore = useWalletsStore()
 const currencyStore = useCurrencyStore()
 const { convert } = useCurrency()
+
+// Bug real reportado por el usuario ("si el cliente tiene... algun peso"):
+// si la moneda principal del usuario no esta entre las 3 "comunes" de arriba
+// (ej. COP, ARS), ningun pill quedaba marcado como activo - y ademas no
+// habia forma de volver a esa moneda una vez tocado otro pill (no estaba
+// ni siquiera ofrecida como opcion). Se antepone la moneda real del usuario
+// a la lista recibida por props si todavia no esta ahi, sin sacar ninguna de
+// las originales.
+const visibleCurrencies = computed(() => {
+  const current = currencyStore.displayCurrency
+  return props.currencies.includes(current) ? props.currencies : [current, ...props.currencies]
+})
 // Ya no es un hint automatico al cargar: ahora es el paso 1 del tour guiado
 // de Inicio, disparado desde el "?" del header (ver useOnboardingTour.ts) -
 // pedido explicito del usuario.
@@ -154,7 +166,7 @@ function toggleHidden() {
     <PillCurrencyToggle
       :model-value="currencyStore.displayCurrency"
       class="balance-currency-toggle"
-      :currencies="currencies"
+      :currencies="visibleCurrencies"
       @update:model-value="currencyStore.setDisplayCurrency($event)"
     />
   </div>

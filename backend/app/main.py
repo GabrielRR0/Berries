@@ -14,6 +14,7 @@ from app.core.middleware import (
 from app.core.rate_limit import limiter
 from app.routers.analytics.analytics_router import router as analytics_router
 from app.routers.auth.auth_router import router as auth_router
+from app.routers.cron.cron_router import router as cron_router
 from app.routers.currency.currency_router import router as currency_router
 from app.routers.debts.debts_router import router as debts_router
 from app.routers.goals.goals_router import router as goals_router
@@ -77,6 +78,7 @@ app.include_router(goals_router, prefix="/api/goals", tags=["goals"])
 app.include_router(analytics_router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(voice_entry_router, prefix="/api/voice-entry", tags=["voiceEntry"])
 app.include_router(receipt_scanner_router, prefix="/api/receipt-scanner", tags=["receiptScanner"])
+app.include_router(cron_router, prefix="/api/cron", tags=["cron"])
 
 
 @app.get("/api/health")

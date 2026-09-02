@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from app.models.currency.exchange_rate_model import ExchangeRate
 from app.models.transactions.transaction_model import Transaction
 from app.services.analytics.analytics_service import (
     get_category_breakdown,
@@ -9,6 +10,7 @@ from app.services.analytics.analytics_service import (
     get_period_summary,
 )
 from app.services.auth.auth_service import register_user
+from app.services.currency.currency_lookup import get_currency_by_code
 from app.services.transactions.transaction_service import create_transaction
 from app.services.wallets.transfer_service import execute_transfer
 from app.services.wallets.wallet_service import create_wallet
@@ -336,3 +338,118 @@ def test_category_monthly_trend_does_not_leak_other_users_transactions(db):
 
     assert len(trend.categories) == 1
     assert trend.categories[0].monthly_totals == [Decimal("10.00")]
+
+
+# --- conversión de moneda entre wallets (bug real reportado por el usuario, con
+# captura: un gasto de 5.560 VEF en una wallet en bolívares se mostraba como
+# "$5,560.00", como si fuera USD - Transaction no guarda su propia moneda, y antes se
+# sumaba el monto crudo de TODAS las wallets sin importar la suya) ------------------
+
+
+def test_period_summary_converts_non_default_currency_wallet_before_summing(db):
+    user = _user(db)  # default_currency queda en USD (default de register_user)
+    vef_wallet = _wallet(db, user.id, "Banco VES", "VEF")
+    # Fallback documentado: 1 USD = 36.5 VEF (ver test_currency_service.py) -> 3650 VEF
+    # equivalen a exactamente $100.
+    create_transaction(db, user.id, vef_wallet.id, "expense", Decimal("3650"), "Comida", occurred_at=_dt(2024, 7, 1))
+
+    summary = get_period_summary(db, user.id, "2024-07")
+
+    assert summary.total_expense == Decimal("100")
+
+
+def test_period_summary_does_not_blend_amounts_across_currencies(db):
+    """El bug tal cual se reportó: una wallet en USD y otra en VEF, cada una con un
+    gasto - el total no puede ser la suma cruda de los dos numeros (150), tiene que
+    convertir primero el de VEF."""
+    user = _user(db)
+    usd_wallet = _wallet(db, user.id, "Efectivo", "USD")
+    vef_wallet = _wallet(db, user.id, "Banco VES", "VEF")
+    create_transaction(db, user.id, usd_wallet.id, "expense", Decimal("50"), "Renta", occurred_at=_dt(2024, 7, 1))
+    create_transaction(db, user.id, vef_wallet.id, "expense", Decimal("3650"), "Comida", occurred_at=_dt(2024, 7, 2))
+
+    summary = get_period_summary(db, user.id, "2024-07")
+
+    assert summary.total_expense == Decimal("150")  # 50 USD + (3650 VEF -> 100 USD)
+
+
+def test_category_breakdown_converts_non_default_currency_wallet(db):
+    user = _user(db)
+    vef_wallet = _wallet(db, user.id, "Banco VES", "VEF")
+    create_transaction(db, user.id, vef_wallet.id, "expense", Decimal("3650"), "Comida", occurred_at=_dt(2024, 7, 1))
+
+    items = get_category_breakdown(db, user.id, "expense", "2024-07")
+
+    assert items[0].total == Decimal("100")
+
+
+def test_monthly_comparison_converts_non_default_currency_wallet(db):
+    user = _user(db)
+    vef_wallet = _wallet(db, user.id, "Banco VES", "VEF")
+    now = datetime.now(timezone.utc)
+    create_transaction(db, user.id, vef_wallet.id, "income", Decimal("3650"), "Salario", occurred_at=now)
+
+    items = get_monthly_comparison(db, user.id, 1)
+
+    assert items[0].total_income == Decimal("100")
+
+
+def test_category_monthly_trend_converts_non_default_currency_wallet(db):
+    user = _user(db)
+    vef_wallet = _wallet(db, user.id, "Banco VES", "VEF")
+    now = datetime.now(timezone.utc)
+    create_transaction(db, user.id, vef_wallet.id, "expense", Decimal("3650"), "Comida", occurred_at=now)
+
+    trend = get_category_monthly_trend(db, user.id, "expense", months=1)
+
+    assert trend.categories[0].monthly_totals == [Decimal("100")]
+
+
+def test_period_summary_uses_the_historical_rate_of_each_transactions_own_date(db):
+    """Segunda vuelta del mismo bug reportado por el usuario: un gasto viejo en una
+    moneda con inflación fuerte (VEF) no debe reconvertirse con la tasa de HOY - eso le
+    reescribiria el valor historico cada vez que la tasa se mueve. Se simulan dos tasas
+    VEF/USD distintas en dos fechas distintas (1 USD = 50 VEF hace meses, 1 USD = 200
+    VEF mas reciente) y un gasto fechado en el periodo VIEJO."""
+    user = _user(db)
+    vef_wallet = _wallet(db, user.id, "Banco VES", "VEF")
+    usd = get_currency_by_code(db, "USD")
+    vef = get_currency_by_code(db, "VEF")
+    db.add(
+        ExchangeRate(
+            base_currency_id=vef.id,
+            quote_currency_id=usd.id,
+            rate=Decimal("1") / Decimal("50"),
+            fetched_at=datetime(2024, 6, 1, tzinfo=timezone.utc),
+        )
+    )
+    db.add(
+        ExchangeRate(
+            base_currency_id=vef.id,
+            quote_currency_id=usd.id,
+            rate=Decimal("1") / Decimal("200"),
+            fetched_at=datetime(2024, 8, 1, tzinfo=timezone.utc),
+        )
+    )
+    db.commit()
+    # 500 VEF, fechado en julio (entre las dos tasas, mas cerca de la vieja) - con la
+    # tasa vieja (1 USD=50 VEF) son $10; con la nueva (1 USD=200 VEF) serian $2.50.
+    create_transaction(
+        db, user.id, vef_wallet.id, "expense", Decimal("500"), "Comida", occurred_at=_dt(2024, 7, 15)
+    )
+
+    summary = get_period_summary(db, user.id, "2024-07")
+
+    assert summary.total_expense == Decimal("10")
+
+
+def test_period_summary_uses_the_users_own_default_currency_as_target(db):
+    """Si el usuario elige VEF como moneda por defecto (no todos son USD-first), la
+    conversion tiene que apuntar ahi, no a USD siempre."""
+    user = register_user(db, "caracas@example.com", "clave12345", "Caro", default_currency="VEF")
+    usd_wallet = _wallet(db, user.id, "Efectivo", "USD")
+    create_transaction(db, user.id, usd_wallet.id, "expense", Decimal("100"), "Comida", occurred_at=_dt(2024, 7, 1))
+
+    summary = get_period_summary(db, user.id, "2024-07")
+
+    assert summary.total_expense == Decimal("3650")  # 100 USD -> VEF al fallback 36.5

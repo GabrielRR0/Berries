@@ -8,7 +8,18 @@ import DraftReviewCard from '../../transactions/DraftReviewCard.vue'
 import VoiceEntryButton from '../../voiceEntry/VoiceEntryButton.vue'
 import IncomeExpenseSummary from '../IncomeExpenseSummary.vue'
 
-const WALLET = { id: 'wallet-1', name: 'Efectivo', currency: 'USD', balance: 100, createdAt: '2026-08-01T00:00:00Z' }
+// El componente filtra "movimientos de este mes" contra la fecha real del
+// sistema (ver isThisMonth en IncomeExpenseSummary.vue), asi que los
+// fixtures no pueden ser fechas fijas - un mes hardcodeado (ej. "2026-08")
+// deja de ser "este mes" apenas cambia el calendario real y los tests
+// empiezan a fallar solos, sin que nadie haya tocado el codigo. Se
+// calculan relativas al momento en que corre el test.
+const now = new Date()
+function thisMonthDate(day: number): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T12:00:00Z`
+}
+
+const WALLET = { id: 'wallet-1', name: 'Efectivo', currency: 'USD', balance: 100, createdAt: thisMonthDate(1) }
 
 // Bottom sheet pedido explicito del usuario: tocar la box de Ingresos/Gastos
 // en Inicio abre el detalle filtrado de ese tipo, deslizandose desde abajo
@@ -23,10 +34,10 @@ const TRANSACTIONS = [
     amount: 500,
     category: 'Ingreso',
     description: null,
-    occurredAt: '2026-08-05T12:00:00Z',
+    occurredAt: thisMonthDate(5),
     source: 'manual',
     transferId: null,
-    createdAt: '2026-08-05T12:00:00Z',
+    createdAt: thisMonthDate(5),
   },
   {
     id: 'tx-expense-1',
@@ -35,10 +46,10 @@ const TRANSACTIONS = [
     amount: 40,
     category: 'Transporte',
     description: null,
-    occurredAt: '2026-08-07T12:00:00Z',
+    occurredAt: thisMonthDate(7),
     source: 'manual',
     transferId: null,
-    createdAt: '2026-08-07T12:00:00Z',
+    createdAt: thisMonthDate(7),
   },
 ]
 
@@ -142,10 +153,10 @@ describe('IncomeExpenseSummary', () => {
       amount: 200,
       category: 'Bono',
       description: null,
-      occurredAt: '2026-08-10T12:00:00Z',
+      occurredAt: thisMonthDate(10),
       source: 'manual',
       transferId: null,
-      createdAt: '2026-08-10T12:00:00Z',
+      createdAt: thisMonthDate(10),
     }
     vi.spyOn(transactionsService, 'createTransaction').mockResolvedValue(created)
 
@@ -189,7 +200,7 @@ describe('IncomeExpenseSummary', () => {
       parsedCategory: 'Ingreso',
       parsedDescription: null,
       status: 'pending',
-      createdAt: '2026-08-15T12:00:00Z',
+      createdAt: thisMonthDate(15),
     })
     await flushPromises()
 
@@ -213,7 +224,7 @@ describe('IncomeExpenseSummary', () => {
       parsedCategory: 'Ingreso',
       parsedDescription: null,
       status: 'pending',
-      createdAt: '2026-08-15T12:00:00Z',
+      createdAt: thisMonthDate(15),
     })
     await flushPromises()
 
@@ -230,10 +241,10 @@ describe('IncomeExpenseSummary', () => {
         amount: 50,
         category: 'Ingreso',
         description: null,
-        occurredAt: '2026-08-15T12:00:00Z',
+        occurredAt: thisMonthDate(15),
         source: 'voice',
         transferId: null,
-        createdAt: '2026-08-15T12:00:00Z',
+        createdAt: thisMonthDate(15),
       },
       'draft-1',
     )

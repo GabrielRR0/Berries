@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAnalytics } from '../../composables/analytics/useAnalytics'
 import type { AnalyticsCategoryType } from '../../services/analytics/interfaces/analytics.interface'
+import { useAuthStore } from '../../stores/auth.store'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
@@ -36,10 +37,18 @@ import MonthlyComparisonTable from './MonthlyComparisonTable.vue'
 // (3/6/12, ahora dentro de la tarjeta hero) mueve tanto el acumulado como
 // "Últimos N meses"; el toggle de Gastos/Ingresos mueve tanto la torta por
 // categoría como su tendencia.
-// El contrato de /api/analytics no manda moneda, asi que se usa 'USD' como
-// default, igual que BalanceCard.vue/IncomeExpenseSummary.vue.
+// Todos los montos que devuelve /api/analytics ya vienen convertidos a la
+// moneda por defecto del usuario (ver analytics_service.py::_WalletCurrencyConverter -
+// bug real reportado por el usuario: antes se sumaba el monto crudo de TODAS
+// las wallets sin importar su moneda, asi que un gasto en VEF se mostraba
+// como si fuera USD). displayCurrency lee esa MISMA moneda del usuario en vez
+// de hardcodear 'USD' en cada AnimatedCurrency/formatCurrency de esta
+// pantalla, para que la etiqueta coincida con lo que el backend realmente
+// calculo.
 const router = useRouter()
+const authStore = useAuthStore()
 const showHelpSheet = ref(false)
+const displayCurrency = computed(() => authStore.user?.defaultCurrency ?? 'USD')
 
 const {
   periodSummary,
@@ -81,7 +90,7 @@ const netDelta = computed(() => {
 const netDeltaLabel = computed(() => {
   if (!periodSummary.value) return ''
   const sign = netDelta.value > 0 ? '+' : ''
-  return `${sign}${formatCurrency(netDelta.value, 'USD')} vs mes anterior`
+  return `${sign}${formatCurrency(netDelta.value, displayCurrency.value)} vs mes anterior`
 })
 
 const categoryTrendTitle = computed(() =>
@@ -144,7 +153,7 @@ onMounted(() => {
 
           <Transition name="loading-fade" mode="out-in">
             <LoadingIndicator v-if="isLoadingMonthly" key="loading" label="Cargando ahorro acumulado..." />
-            <CumulativeSavingsChart v-else key="chart" :months="monthlyComparison" currency="USD" />
+            <CumulativeSavingsChart v-else key="chart" :months="monthlyComparison" :currency="displayCurrency" />
           </Transition>
         </div>
       </section>
@@ -164,7 +173,7 @@ onMounted(() => {
                 <span class="stat-label">Ingresos</span>
               </div>
               <p class="stat-value">
-                <AnimatedCurrency :value="periodSummary?.totalIncome ?? 0" currency="USD" direction="up" />
+                <AnimatedCurrency :value="periodSummary?.totalIncome ?? 0" :currency="displayCurrency" direction="up" />
               </p>
             </div>
 
@@ -178,7 +187,7 @@ onMounted(() => {
                 <span class="stat-label">Gastos</span>
               </div>
               <p class="stat-value expense">
-                <AnimatedCurrency :value="periodSummary?.totalExpense ?? 0" currency="USD" direction="down" />
+                <AnimatedCurrency :value="periodSummary?.totalExpense ?? 0" :currency="displayCurrency" direction="down" />
               </p>
             </div>
 
@@ -188,7 +197,7 @@ onMounted(() => {
                 <p class="stat-value" :class="{ expense: (periodSummary?.netSavings ?? 0) < 0 }">
                   <AnimatedCurrency
                     :value="periodSummary?.netSavings ?? 0"
-                    currency="USD"
+                    :currency="displayCurrency"
                     :direction="(periodSummary?.netSavings ?? 0) < 0 ? 'down' : 'up'"
                   />
                 </p>
@@ -240,7 +249,7 @@ onMounted(() => {
         <div class="glass-card">
           <Transition name="loading-fade" mode="out-in">
             <LoadingIndicator v-if="isLoadingCategoryTrend" key="loading" label="Cargando tendencia..." />
-            <CategoryMonthlyTrendChart v-else key="chart" :trend="categoryTrend" :type="categoryType" currency="USD" />
+            <CategoryMonthlyTrendChart v-else key="chart" :trend="categoryTrend" :type="categoryType" :currency="displayCurrency" />
           </Transition>
         </div>
       </section>
@@ -251,7 +260,7 @@ onMounted(() => {
         <div class="glass-card">
           <Transition name="loading-fade" mode="out-in">
             <LoadingIndicator v-if="isLoadingMonthly" key="loading" label="Cargando comparación..." />
-            <MonthlyComparisonTable v-else key="table" :months="monthlyComparison" />
+            <MonthlyComparisonTable v-else key="table" :months="monthlyComparison" :currency="displayCurrency" />
           </Transition>
         </div>
       </section>

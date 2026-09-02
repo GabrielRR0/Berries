@@ -16,6 +16,8 @@ os.environ.setdefault("JWT_SECRET", "test-secret-not-for-production")
 os.environ.setdefault("MASTER_ENCRYPTION_KEY", "2H-8GUYtz7lmoCEmjSgqIOzVbrOoRc6LMLNz31YPCwo=")
 os.environ.setdefault("FAKE_DATA_MODE", "false")
 
+from decimal import Decimal
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -60,6 +62,22 @@ def _reset_database():
         session.close()
     yield
     Base.metadata.drop_all(test_engine)
+
+
+@pytest.fixture(autouse=True)
+def _mock_vef_rate(monkeypatch):
+    """La tasa VEF real depende de un servicio externo sin key propia (dolarapi.com,
+    siempre alcanzable - ver venezuela_rate_client.py), a diferencia de
+    fetch_fiat_rates()/fetch_crypto_rates() que solo llaman de verdad una vez
+    configurada una key y por default caen a un fallback determinístico en tests. Sin
+    este mock, cualquier test que convierta VEF (aunque no lo pruebe a propósito)
+    terminaría haciendo una llamada de red real - lento, no determinístico, y roto sin
+    conexión (ej. en CI). Devuelve el mismo valor de respaldo documentado que el resto
+    de los tests ya esperaban de VEF. Los tests de venezuela_rate_client.py que SÍ
+    prueban el parseo real / el fallback ante error mockean httpx.get directamente,
+    parcheando la función en su propio módulo - no dependen de este mock global."""
+    monkeypatch.setattr("app.services.currency.rates.cache_refresh.fetch_vef_rate", lambda: Decimal("36.5"))
+    yield
 
 
 @pytest.fixture(autouse=True)

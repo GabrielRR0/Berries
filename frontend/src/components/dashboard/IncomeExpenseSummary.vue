@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { Draft, Transaction } from '../../services/transactions/interfaces/transactions.interface'
+import { useCurrency } from '../../composables/currency/useCurrency'
 import { useOnboardingTour } from '../../composables/onboarding/useOnboardingTour'
 import { useScrollIntoViewOnActive } from '../../composables/onboarding/useScrollIntoViewOnActive'
 import { useTransactionsStore } from '../../stores/transactions.store'
@@ -41,6 +42,7 @@ const pendingDrafts = ref<Draft[]>([])
 
 const currencyStore = useCurrencyStore()
 const walletsStore = useWalletsStore()
+const { convert } = useCurrency()
 // Paso 2 del tour guiado de Inicio (ver BalanceCard.vue/useOnboardingTour.ts) -
 // pedido explicito del usuario: al tocar "Continuar" en el paso del balance,
 // sigue esta box.
@@ -76,8 +78,57 @@ const monthTransactions = computed(() =>
 )
 const incomeTransactions = computed(() => monthTransactions.value.filter((t) => t.type === 'income'))
 const expenseTransactions = computed(() => monthTransactions.value.filter((t) => t.type === 'expense'))
-const income = computed(() => incomeTransactions.value.reduce((sum, t) => sum + t.amount, 0))
-const expenses = computed(() => expenseTransactions.value.reduce((sum, t) => sum + t.amount, 0))
+
+// Bug real reportado por el usuario, con captura: un gasto en una wallet en
+// VEF se sumaba tal cual (monto crudo) junto con gastos en wallets USD/EUR/
+// USDT, y el total se mostraba con la moneda de visualizacion actual como si
+// TODO hubiera estado en esa moneda - ej. "5.560 VEF de gasto" aparecia como
+// "$5,560.00". Una Transaction no trae su propia moneda (solo wallet_id), asi
+// que hay que resolverla por su wallet y convertir ANTES de sumar - mismo
+// criterio que BalanceCard.vue usa para el balance total, solo que agrupando
+// por moneda antes de convertir (una llamada por moneda distinta presente
+// este mes, no una por transaccion).
+function walletCurrency(walletId: string): string {
+  return walletsStore.wallets.find((wallet) => wallet.id === walletId)?.currency ?? currencyStore.displayCurrency
+}
+
+async function sumConverted(transactions: Transaction[]): Promise<number> {
+  const target = currencyStore.displayCurrency
+  const subtotalByCurrency = new Map<string, number>()
+  for (const transaction of transactions) {
+    const currency = walletCurrency(transaction.walletId)
+    subtotalByCurrency.set(currency, (subtotalByCurrency.get(currency) ?? 0) + transaction.amount)
+  }
+
+  let total = 0
+  for (const [currency, subtotal] of subtotalByCurrency) {
+    if (currency === target) {
+      total += subtotal
+      continue
+    }
+    try {
+      const result = await convert(subtotal, currency, target)
+      total += result.convertedAmount
+    } catch {
+      // Best-effort, mismo criterio que BalanceCard.vue: si la conversion de
+      // ese grupo de moneda falla, no cuenta en el total en vez de romper
+      // el resto del calculo.
+    }
+  }
+  return total
+}
+
+const income = ref(0)
+const expenses = ref(0)
+
+async function recomputeTotals() {
+  income.value = await sumConverted(incomeTransactions.value)
+  expenses.value = await sumConverted(expenseTransactions.value)
+}
+
+watch([incomeTransactions, expenseTransactions, () => currencyStore.displayCurrency, () => walletsStore.wallets], recomputeTotals, {
+  immediate: true,
+})
 
 const sheetTitle = computed(() => (activeSheet.value === 'income' ? 'Ingresos de este mes' : 'Gastos de este mes'))
 const sheetTransactions = computed(() =>

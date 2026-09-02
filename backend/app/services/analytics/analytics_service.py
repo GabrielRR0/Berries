@@ -9,18 +9,36 @@ distinto, ni siquiera categorías iguales dan el mismo texto), así que las suma
 agrupaciones que antes vivían en la query (func.sum/group_by) ahora se hacen en Python
 sobre las filas ya traídas y decodificadas por el ORM. Los filtros de user_id/type/
 fecha SÍ siguen resolviéndose en SQL (esas columnas quedaron sin encriptar a
-propósito, ver transaction_model.py)."""
+propósito, ver transaction_model.py).
+
+Conversión de moneda (bug real reportado por el usuario, con captura): `Transaction` no
+guarda su propia moneda (solo `wallet_id`) - antes esto sumaba `amount` crudo de TODAS
+las wallets del usuario sin importar su moneda, así que alguien con una wallet en VEF y
+otra en USD veía, por ejemplo, "5.560 VEF de gasto" mostrado como "$5,560.00" (como si
+fuera USD). Ahora cada fila se convierte a `User.default_currency` (la wallet.currency
+de origen, resuelta vía `_WalletCurrencyConverter`) antes de sumar/agrupar - todo
+`get_*` de este módulo devuelve montos ya en esa única moneda.
+
+Segunda vuelta del mismo bug, tambien reportada por el usuario: convertir con la tasa
+de HOY un gasto de hace varios meses en una moneda con inflación fuerte (ej. VEF)
+reescribe su valor histórico cada vez que la tasa se mueve (3.000 VEF de hace un mes
+valían más dólares que hoy). _WalletCurrencyConverter ahora resuelve la tasa vigente en
+la fecha de CADA transacción (transaction.occurred_at, vía
+currency_service.get_conversion_rate_at), no la tasa actual - así "Últimos 6 meses"/
+"Ahorro acumulado" no le cambian el pasado a un mes ya cerrado."""
 
 import re
 import uuid
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
+from app.models.auth.user_model import User
 from app.models.transactions.transaction_model import Transaction
+from app.models.wallets.wallet_model import Wallet
 from app.schemas.analytics.analytics_schemas import (
     CategoryBreakdownItem,
     CategoryMonthlyTrendItem,
@@ -29,8 +47,48 @@ from app.schemas.analytics.analytics_schemas import (
     PeriodSummaryResponse,
 )
 from app.services.analytics.errors import InvalidPeriodError
+from app.services.currency.currency_service import get_conversion_rate_at
 
 _OTHER_CATEGORY_LABEL = "Otros"
+
+
+class _WalletCurrencyConverter:
+    """Convierte el monto de una transacción a `target_currency`, resolviendo la
+    moneda de origen a partir de su wallet_id y la TASA vigente en la fecha de esa
+    transacción (nunca la tasa de hoy - ver docstring del módulo). Memoiza tanto el
+    mapa wallet->moneda como la tasa por (moneda, día) - una consulta de wallets + una
+    tasa por cada combinación distinta de moneda/día encontrada, nunca una tasa por
+    transacción individual - se crea UNA vez por llamada pública de este módulo y se
+    reusa en todas sus sumas/agrupaciones internas."""
+
+    def __init__(self, db: Session, user_id: uuid.UUID, target_currency: str) -> None:
+        self._db = db
+        self._target_currency = target_currency
+        self._rate_by_currency_and_day: dict[tuple[str, date], Decimal] = {}
+        wallets = db.scalars(
+            select(Wallet).options(joinedload(Wallet.currency_ref)).where(Wallet.user_id == user_id)
+        )
+        self._currency_by_wallet_id: dict[uuid.UUID, str] = {wallet.id: wallet.currency for wallet in wallets}
+
+    def amount_of(self, transaction: Transaction) -> Decimal:
+        # Una wallet borrada despues de crear la transaccion (si alguna vez fuera
+        # posible) cae a target_currency (tasa 1) en vez de reventar - mismo
+        # criterio "best-effort" que BalanceCard.vue en el frontend.
+        currency = self._currency_by_wallet_id.get(transaction.wallet_id, self._target_currency)
+        if currency == self._target_currency:
+            return transaction.amount
+
+        cache_key = (currency, transaction.occurred_at.date())
+        if cache_key not in self._rate_by_currency_and_day:
+            self._rate_by_currency_and_day[cache_key] = get_conversion_rate_at(
+                self._db, currency, self._target_currency, transaction.occurred_at
+            )
+        return transaction.amount * self._rate_by_currency_and_day[cache_key]
+
+
+def _default_currency(db: Session, user_id: uuid.UUID) -> str:
+    user = db.get(User, user_id)
+    return user.default_currency if user else "USD"
 
 _MONTH_PATTERN = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
@@ -89,30 +147,36 @@ def _transactions_in_range(db: Session, user_id: uuid.UUID, kind: str, start: da
     )
 
 
-def _sum_amount(db: Session, user_id: uuid.UUID, kind: str, start: datetime, end: datetime) -> Decimal:
+def _sum_amount(
+    db: Session, user_id: uuid.UUID, kind: str, start: datetime, end: datetime, converter: _WalletCurrencyConverter
+) -> Decimal:
     rows = _transactions_in_range(db, user_id, kind, start, end)
-    return sum((row.amount for row in rows), Decimal("0"))
+    return sum((converter.amount_of(row) for row in rows), Decimal("0"))
 
 
-def _net_savings_for_month(db: Session, user_id: uuid.UUID, month: str) -> Decimal:
+def _net_savings_for_month(
+    db: Session, user_id: uuid.UUID, month: str, converter: _WalletCurrencyConverter
+) -> Decimal:
     start, end = _month_bounds(month)
-    income = _sum_amount(db, user_id, "income", start, end)
-    expense = _sum_amount(db, user_id, "expense", start, end)
+    income = _sum_amount(db, user_id, "income", start, end, converter)
+    expense = _sum_amount(db, user_id, "expense", start, end, converter)
     return income - expense
 
 
 def get_period_summary(db: Session, user_id: uuid.UUID, month: str | None = None) -> PeriodSummaryResponse:
     """Totales de ingreso/gasto/ahorro neto del mes dado (o el actual), más el ahorro
-    neto del mes calendario inmediatamente anterior para el delta mes-a-mes."""
+    neto del mes calendario inmediatamente anterior para el delta mes-a-mes. Todos los
+    montos quedan convertidos a User.default_currency (ver _WalletCurrencyConverter)."""
     resolved_month = _resolve_month(month)
     start, end = _month_bounds(resolved_month)
+    converter = _WalletCurrencyConverter(db, user_id, _default_currency(db, user_id))
 
-    total_income = _sum_amount(db, user_id, "income", start, end)
-    total_expense = _sum_amount(db, user_id, "expense", start, end)
+    total_income = _sum_amount(db, user_id, "income", start, end, converter)
+    total_expense = _sum_amount(db, user_id, "expense", start, end, converter)
     net_savings = total_income - total_expense
 
     previous_month = _shift_month(resolved_month, -1)
-    previous_period_net_savings = _net_savings_for_month(db, user_id, previous_month)
+    previous_period_net_savings = _net_savings_for_month(db, user_id, previous_month, converter)
 
     return PeriodSummaryResponse(
         period=resolved_month,
@@ -132,12 +196,13 @@ def get_category_breakdown(
     división por cero)."""
     resolved_month = _resolve_month(month)
     start, end = _month_bounds(resolved_month)
+    converter = _WalletCurrencyConverter(db, user_id, _default_currency(db, user_id))
 
     rows = _transactions_in_range(db, user_id, kind, start, end)
 
     totals_by_category: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
     for row in rows:
-        totals_by_category[row.category] += row.amount
+        totals_by_category[row.category] += converter.amount_of(row)
 
     totals = list(totals_by_category.items())
     grand_total = sum((total for _, total in totals), Decimal("0"))
@@ -161,12 +226,13 @@ def get_monthly_comparison(db: Session, user_id: uuid.UUID, months: int = 6) -> 
     months = max(1, min(months, 24))
     current_month = _resolve_month(None)
     ordered_months = [_shift_month(current_month, -offset) for offset in range(months - 1, -1, -1)]
+    converter = _WalletCurrencyConverter(db, user_id, _default_currency(db, user_id))
 
     items = []
     for month in ordered_months:
         start, end = _month_bounds(month)
-        total_income = _sum_amount(db, user_id, "income", start, end)
-        total_expense = _sum_amount(db, user_id, "expense", start, end)
+        total_income = _sum_amount(db, user_id, "income", start, end, converter)
+        total_expense = _sum_amount(db, user_id, "expense", start, end, converter)
         items.append(
             MonthlyComparisonItem(
                 month=month,
@@ -191,6 +257,7 @@ def get_category_monthly_trend(
     months = max(1, min(months, 24))
     current_month = _resolve_month(None)
     ordered_months = [_shift_month(current_month, -offset) for offset in range(months - 1, -1, -1)]
+    converter = _WalletCurrencyConverter(db, user_id, _default_currency(db, user_id))
 
     totals_by_month: list[dict[str, Decimal]] = []
     grand_totals: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
@@ -200,8 +267,9 @@ def get_category_monthly_trend(
         rows = _transactions_in_range(db, user_id, kind, start, end)
         month_totals: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
         for row in rows:
-            month_totals[row.category] += row.amount
-            grand_totals[row.category] += row.amount
+            converted = converter.amount_of(row)
+            month_totals[row.category] += converted
+            grand_totals[row.category] += converted
         totals_by_month.append(month_totals)
 
     ranked_categories = sorted(grand_totals.items(), key=lambda entry: entry[1], reverse=True)

@@ -4,8 +4,15 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.models.currency.exchange_rate_model import ExchangeRate
+from app.services.auth.auth_service import register_user
 from app.services.currency.currency_lookup import get_currency_by_code
-from app.services.currency.currency_service import convert, get_conversion_rate
+from app.services.currency.currency_service import (
+    convert,
+    get_conversion_rate,
+    get_conversion_rate_at,
+    refresh_all_active_currencies,
+)
+from app.services.wallets.wallet_service import create_wallet
 
 
 def test_convert_same_currency_returns_amount_unchanged(db):
@@ -68,3 +75,134 @@ def test_get_fresh_rate_refreshes_when_stale(db):
 
     rows = list(db.scalars(select(ExchangeRate)))
     assert len(rows) == 2
+
+
+# --- get_conversion_rate_at (bug real reportado por el usuario: un gasto viejo en una
+# moneda con inflación fuerte no debe reconvertirse con la tasa de HOY - ver docstring
+# de analytics_service.py) ------------------------------------------------------------
+
+
+def test_get_conversion_rate_at_uses_the_rate_valid_on_that_date_not_the_newest_one(db):
+    usd = get_currency_by_code(db, "USD")
+    vef = get_currency_by_code(db, "VEF")
+    old_date = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    new_date = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    # get_rate_at(db, "VEF", "USD", ...) consulta base=VEF/quote=USD (mismo par que
+    # _rate_to_usd) - la fila guarda "1 VEF = rate USD". Hace meses, 1 USD = 50 VEF (1
+    # VEF = 1/50 USD); mas tarde (por inflación), 1 USD = 200 VEF (1 VEF = 1/200 USD).
+    db.add(
+        ExchangeRate(
+            base_currency_id=vef.id, quote_currency_id=usd.id, rate=Decimal("1") / Decimal("50"), fetched_at=old_date
+        )
+    )
+    db.add(
+        ExchangeRate(
+            base_currency_id=vef.id, quote_currency_id=usd.id, rate=Decimal("1") / Decimal("200"), fetched_at=new_date
+        )
+    )
+    db.commit()
+
+    # Un gasto de 500 VEF ocurrido ENTRE las dos fechas (mas cerca de la vieja) debe usar
+    # la tasa vieja (1/50), no la nueva (1/200) - aunque la nueva ya exista en la tabla.
+    at = datetime(2026, 6, 15, tzinfo=timezone.utc)
+    rate = get_conversion_rate_at(db, "VEF", "USD", at)
+
+    assert rate == Decimal("1") / Decimal("50")
+
+
+def test_get_conversion_rate_at_does_not_let_a_later_rate_leak_into_the_past(db):
+    """El mismo escenario de arriba, pero mirando el resultado final convertido (no solo
+    la tasa cruda) - 500 VEF con la tasa vieja (1 USD=50 VEF) son $10; con la nueva (1
+    USD=200 VEF) serian $2.50. Confirma que analytics_service.py (que llama a esto)
+    nunca reescribe un mes ya cerrado."""
+    usd = get_currency_by_code(db, "USD")
+    vef = get_currency_by_code(db, "VEF")
+    db.add(
+        ExchangeRate(
+            base_currency_id=vef.id,
+            quote_currency_id=usd.id,
+            rate=Decimal("1") / Decimal("50"),
+            fetched_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        )
+    )
+    db.add(
+        ExchangeRate(
+            base_currency_id=vef.id,
+            quote_currency_id=usd.id,
+            rate=Decimal("1") / Decimal("200"),
+            fetched_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+        )
+    )
+    db.commit()
+
+    rate = get_conversion_rate_at(db, "VEF", "USD", datetime(2026, 6, 15, tzinfo=timezone.utc))
+
+    assert Decimal("500") * rate == Decimal("10")
+
+
+def test_get_conversion_rate_at_same_currency_is_one(db):
+    assert get_conversion_rate_at(db, "USD", "USD", datetime(2020, 1, 1, tzinfo=timezone.utc)) == Decimal("1")
+
+
+def test_get_conversion_rate_at_falls_back_to_fresh_rate_without_any_history(db):
+    """Si el par nunca se consultó antes de esa fecha (primera vez que se usa esta
+    moneda en la app), no hay mejor dato que la tasa disponible ahora."""
+    rate = get_conversion_rate_at(db, "USD", "VEF", datetime(2020, 1, 1, tzinfo=timezone.utc))
+
+    assert rate == Decimal("36.5")  # fallback documentado, ver test_convert_cross_currency_uses_fallback_rates
+
+
+# --- refresh_all_active_currencies (cron diario de Vercel, ver cron_router.py) -------
+
+
+def test_refresh_all_active_currencies_only_refreshes_currencies_actually_in_use(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    create_wallet(db, user.id, "Efectivo", "VEF")
+
+    refreshed = refresh_all_active_currencies(db)
+
+    assert refreshed == ["VEF"]
+    rows = list(db.scalars(select(ExchangeRate)))
+    fetched_pairs = {(row.base_currency_id, row.quote_currency_id) for row in rows}
+    vef = get_currency_by_code(db, "VEF")
+    usd = get_currency_by_code(db, "USD")
+    # Ambas direcciones (VEF->USD y USD->VEF): get_conversion_rate pivotea siempre por
+    # USD y cachea cada dirección como su propia fila (ver _rate_to_usd/_rate_from_usd).
+    assert (vef.id, usd.id) in fetched_pairs
+    assert (usd.id, vef.id) in fetched_pairs
+    # Ninguna otra moneda soportada (EUR, ARS, COP, USDT...) estaba en uso - no debe
+    # haber gastado una llamada de red/fila de cache para ellas.
+    assert len(rows) == 2
+
+
+def test_refresh_all_active_currencies_excludes_usd_itself(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    create_wallet(db, user.id, "Efectivo", "USD")
+
+    refreshed = refresh_all_active_currencies(db)
+
+    assert refreshed == []
+    assert list(db.scalars(select(ExchangeRate))) == []
+
+
+def test_refresh_all_active_currencies_includes_a_users_default_currency_even_without_a_wallet(db):
+    # Cuenta recien registrada con moneda principal COP pero que todavia no creo
+    # ninguna wallet - igual necesita su tasa disponible (ej. para mostrar montos en
+    # COP en cuanto cree su primer movimiento).
+    register_user(db, "ana@example.com", "clave12345", "Ana", default_currency="COP")
+
+    refreshed = refresh_all_active_currencies(db)
+
+    assert refreshed == ["COP"]
+
+
+def test_refresh_all_active_currencies_deduplicates_and_sorts_currencies(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana", default_currency="VEF")
+    # Dos wallets distintas en la misma moneda no deben pedir la tasa dos veces.
+    create_wallet(db, user.id, "Efectivo", "VEF")
+    create_wallet(db, user.id, "Binance", "VEF")
+    create_wallet(db, user.id, "Ahorros", "EUR")
+
+    refreshed = refresh_all_active_currencies(db)
+
+    assert refreshed == ["EUR", "VEF"]

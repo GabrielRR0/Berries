@@ -28,6 +28,38 @@ const description = ref('')
 const submitting = ref(false)
 const errorMessage = ref('')
 
+// Fecha del movimiento - pedido explicito del usuario ("ayer olvidé registrar un
+// gasto... no me sale ningún input para la fecha"): antes este form no tenia forma de
+// elegir la fecha (siempre quedaba "ahora"), aunque createTransaction() YA aceptaba un
+// occurredAt opcional (usado desde tests/otros flujos) - solo faltaba el input. Arranca
+// en HOY (formato YYYY-MM-DD en hora LOCAL, no UTC - un toISOString().slice(0,10)
+// corriente puede quedar en el dia anterior/siguiente cerca de medianoche segun el
+// huso horario). max=hoy: no tiene sentido registrar un movimiento "del futuro".
+function todayInputValue(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const todayValue = todayInputValue()
+const occurredAtDate = ref(todayValue)
+
+// Combina la fecha elegida con la hora ACTUAL (no medianoche ni mediodia fijo) - si el
+// usuario no toca el campo (se queda en "hoy"), esto da el mismo resultado que no mandar
+// occurredAt en absoluto (el backend igual default-ea a "ahora").
+function buildOccurredAt(): string {
+  const [year, month, day] = occurredAtDate.value.split('-').map(Number)
+  const now = new Date()
+  return new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString()
+}
+
+function openDatePicker(event: Event) {
+  const input = event.currentTarget as HTMLInputElement
+  input.showPicker?.()
+}
+
 const selectedWallet = computed(() => walletsStore.wallets.find((wallet) => wallet.id === walletId.value) ?? null)
 
 // "Usé todo lo que tenía" en un click - pedido explicito del usuario, mismo criterio
@@ -54,6 +86,7 @@ async function onSubmit() {
       amount: amount.value as number,
       category: category.value.trim(),
       description: description.value.trim() || undefined,
+      occurredAt: buildOccurredAt(),
     })
     emit('created', transaction)
   } catch (error) {
@@ -113,6 +146,11 @@ async function onSubmit() {
       <p v-if="exceedsBalance" class="balance-warning" role="alert">
         Supera el saldo de esta billetera ({{ formatCurrency(selectedWallet?.balance ?? 0, selectedWallet?.currency ?? '') }}).
       </p>
+
+      <label class="field">
+        <span class="field-label">Fecha</span>
+        <input v-model="occurredAtDate" type="date" :max="todayValue" required @click="openDatePicker" />
+      </label>
 
       <CategoryField v-model="category" :kind="type" />
 

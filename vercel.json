@@ -10,5 +10,6 @@
   "rewrites": [
     { "source": "/api(/.*)?", "destination": { "type": "service", "service": "backend" } },
     { "source": "/(.*)", "destination": { "type": "service", "service": "frontend" } }
-  ]
+  ],
+  "crons": [{ "path": "/api/cron/refresh-daily", "schedule": "30 13 * * *" }]
 }

@@ -60,3 +60,29 @@ def test_convert_requires_auth(client):
     response = client.get("/api/currency/convert", params={"amount": "100", "from": "USD", "to": "VEF"})
 
     assert response.status_code == 401
+
+
+def test_convert_accepts_negative_amount(client):
+    """Bug real encontrado en vivo: BalanceCard.vue convierte el BALANCE de cada
+    wallet a la moneda de visualizacion, y una wallet puede estar en negativo
+    (mas gastado que ingresado) - antes esto devolvia 422 y el balance total
+    quedaba mal calculado (la wallet en negativo se salteaba silenciosamente)."""
+    token = _register(client)
+
+    response = client.get(
+        "/api/currency/convert", params={"amount": "-100", "from": "USD", "to": "VEF"}, headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 200
+    assert float(response.json()["converted_amount"]) < 0
+
+
+def test_convert_accepts_zero_amount(client):
+    token = _register(client)
+
+    response = client.get(
+        "/api/currency/convert", params={"amount": "0", "from": "USD", "to": "VEF"}, headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 200
+    assert float(response.json()["converted_amount"]) == 0.0

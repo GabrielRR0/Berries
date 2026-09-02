@@ -7,8 +7,12 @@ from app.config import settings
 # Tasas de respaldo (aproximadas, relativas a USD) — placeholder mientras no haya un
 # OPEN_EXCHANGE_RATES_APP_ID real configurado. Mantiene la conversión de moneda
 # funcional y demostrable hoy sin depender de una key real.
+#
+# VEF (bolívar) NO vive acá - pedido explícito del usuario: para EUR/COP/ARS prefiere
+# esta fuente "más internacional" (requiere conseguir una key propia), pero para
+# bolívares específicamente prefiere no tramitar ninguna key - ver
+# venezuela_rate_client.py (dolarapi.com, gratis y sin registro).
 _FALLBACK_FIAT_RATES: dict[str, Decimal] = {
-    "VEF": Decimal("36.5"),
     "EUR": Decimal("0.92"),
     "COP": Decimal("4000"),
     "ARS": Decimal("1000"),
@@ -16,7 +20,9 @@ _FALLBACK_FIAT_RATES: dict[str, Decimal] = {
 
 
 def fetch_fiat_rates() -> dict[str, Decimal]:
-    """Tasas fiat (VEF, EUR, ...) relativas a 1 USD."""
+    """Tasas fiat (EUR, COP, ARS...) relativas a 1 USD, vía Open Exchange Rates. VEF
+    tiene su propio cliente (venezuela_rate_client.fetch_vef_rate) - nunca se resuelve
+    acá, ver el comentario de _FALLBACK_FIAT_RATES arriba."""
     if not settings.open_exchange_rates_app_id:
         return dict(_FALLBACK_FIAT_RATES)
 

@@ -53,7 +53,7 @@ Ver `docs/` (en progreso) y el historial de decisiones documentado en cada domin
 1. **SQLAlchemy + Alembic** (los hermanos van directo con `supabase-py` sin ORM) — un libro mayor financiero con transferencias, cuotas y deudas se beneficia de modelado relacional real y migraciones versionadas.
 2. **El frontend nunca habla directo con Supabase** — a diferencia de `s-rank` (que sí lo hace para Realtime), en Berries toda la comunicación pasa por el backend.
 3. **Vue Router + Pinia** (los hermanos los evitan) — Berries es una app multi-pantalla real con navegación por tabs y bastante estado compartido.
-4. **Vercel Cron Jobs** — única excepción documentada a la regla "cero workers persistentes" del portafolio, usada solo para el escaneo diario de vencimientos/recordatorios (dominio `notifications`, construido de último a propósito).
+4. **Vercel Cron Jobs** — única excepción documentada a la regla "cero workers persistentes" del portafolio. Usada hoy para el refresco diario de tasas de cambio (`GET /api/cron/refresh-daily`, ver `app/routers/cron/cron_router.py` — evita que una moneda con inflación fuerte como VEF quede con una tasa vieja si nadie visita la app un día entero); planeada también para el escaneo diario de vencimientos/recordatorios (dominio `notifications`, construido de último a propósito). El `schedule` de `vercel.json` se declara siempre en UTC (Vercel no permite indicar zona horaria) — `"30 13 * * *"` es 9:30am hora de Venezuela (UTC-4), a propósito.
 
 Identidad visual: paleta negro/rojo, dark-only (ver `docs/design-reference/README.md`).
 
