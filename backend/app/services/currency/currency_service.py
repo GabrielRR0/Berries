@@ -53,6 +53,16 @@ def get_conversion_rate_at(db: Session, from_currency: str, to_currency: str, at
     return rate_to_usd * rate_from_usd
 
 
+def convert_at(db: Session, amount: Decimal, from_currency: str, to_currency: str, at: datetime) -> Decimal:
+    """Igual que convert, pero con la tasa vigente en `at` (una fecha pasada) - ver
+    get_conversion_rate_at. Usado por transaction_service.py para congelar el valor de
+    referencia en USD de una transacción backdateada con SU propia tasa histórica, no
+    la de hoy."""
+    if from_currency == to_currency:
+        return amount
+    return amount * get_conversion_rate_at(db, from_currency, to_currency, at)
+
+
 def refresh_all_active_currencies(db: Session) -> list[str]:
     """Refresca (o confirma vigente, según currency_cache_ttl_hours) la tasa USD<->X de
     cada moneda que la app realmente usa hoy - las que tiene alguna wallet o el

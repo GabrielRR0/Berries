@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useWalletsStore } from '../../stores/wallets.store'
-import { createTransaction } from '../../services/transactions/transactions.service'
+import { createTransaction, updateTransaction } from '../../services/transactions/transactions.service'
 import type { Transaction, TransactionType } from '../../services/transactions/interfaces/transactions.interface'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import BaseButton from '../ui/BaseButton.vue'
@@ -10,21 +10,31 @@ import CategoryField from './CategoryField.vue'
 
 // Registro manual de un movimiento. Transactions no tiene un Pinia store
 // propio (a diferencia de wallets) - es estado local por pantalla, asi que
-// este form llama directo al service y emite la transaction creada para que
-// TransactionsMain.vue la agregue a su lista local sin re-pedir todo.
+// este form llama directo al service y emite la transaction creada/editada para
+// que TransactionsMain.vue la agregue/actualice en su lista local sin re-pedir todo.
 // initialType: quien monta el form ya puede saber que tipo quiere (ej. la
 // box de "Ingresos"/"Gastos" en Inicio, ver IncomeExpenseSummary.vue) - el
 // toggle sigue editable, esto solo define con que arranca seleccionado.
-const props = withDefaults(defineProps<{ initialType?: TransactionType }>(), { initialType: 'expense' })
-const emit = defineEmits<{ created: [transaction: Transaction]; cancel: [] }>()
+//
+// editingTransaction: pedido explicito del usuario ("se debe poder editar los
+// movimientos... montos, fecha de pago, description, wallet_id, category") - el MISMO
+// form sirve para crear y editar (todos los campos ya existen), solo cambia con que
+// valores arranca precargado y a que endpoint manda el submit. null/undefined = modo
+// creacion (comportamiento de siempre).
+const props = withDefaults(
+  defineProps<{ initialType?: TransactionType; editingTransaction?: Transaction | null }>(),
+  { initialType: 'expense', editingTransaction: null },
+)
+const emit = defineEmits<{ created: [transaction: Transaction]; updated: [transaction: Transaction]; cancel: [] }>()
 
 const walletsStore = useWalletsStore()
+const isEditing = computed(() => props.editingTransaction != null)
 
-const walletId = ref('')
-const type = ref<TransactionType>(props.initialType)
-const amount = ref<number | null>(null)
-const category = ref('')
-const description = ref('')
+const walletId = ref(props.editingTransaction?.walletId ?? '')
+const type = ref<TransactionType>(props.editingTransaction?.type ?? props.initialType)
+const amount = ref<number | null>(props.editingTransaction?.amount ?? null)
+const category = ref(props.editingTransaction?.category ?? '')
+const description = ref(props.editingTransaction?.description ?? '')
 const submitting = ref(false)
 const errorMessage = ref('')
 
@@ -34,7 +44,8 @@ const errorMessage = ref('')
 // occurredAt opcional (usado desde tests/otros flujos) - solo faltaba el input. Arranca
 // en HOY (formato YYYY-MM-DD en hora LOCAL, no UTC - un toISOString().slice(0,10)
 // corriente puede quedar en el dia anterior/siguiente cerca de medianoche segun el
-// huso horario). max=hoy: no tiene sentido registrar un movimiento "del futuro".
+// huso horario). max=hoy: no tiene sentido registrar un movimiento "del futuro" (ni
+// siquiera editando uno viejo).
 function todayInputValue(): string {
   const now = new Date()
   const year = now.getFullYear()
@@ -43,8 +54,19 @@ function todayInputValue(): string {
   return `${year}-${month}-${day}`
 }
 
+// Editando: arranca en la fecha PROPIA del movimiento (en LOCAL, mismo criterio que
+// todayInputValue - un toISOString().slice(0,10) crudo puede correrse un dia segun el
+// huso horario), no en "hoy".
+function localDateInputValue(iso: string): string {
+  const date = new Date(iso)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 const todayValue = todayInputValue()
-const occurredAtDate = ref(todayValue)
+const occurredAtDate = ref(props.editingTransaction ? localDateInputValue(props.editingTransaction.occurredAt) : todayValue)
 
 // Combina la fecha elegida con la hora ACTUAL (no medianoche ni mediodia fijo) - si el
 // usuario no toca el campo (se queda en "hoy"), esto da el mismo resultado que no mandar
@@ -80,17 +102,28 @@ async function onSubmit() {
   errorMessage.value = ''
   submitting.value = true
   try {
-    const transaction = await createTransaction({
+    const fields = {
       walletId: walletId.value,
       type: type.value,
       amount: amount.value as number,
       category: category.value.trim(),
       description: description.value.trim() || undefined,
       occurredAt: buildOccurredAt(),
-    })
-    emit('created', transaction)
+    }
+    if (props.editingTransaction) {
+      const transaction = await updateTransaction(props.editingTransaction.id, fields)
+      emit('updated', transaction)
+    } else {
+      const transaction = await createTransaction(fields)
+      emit('created', transaction)
+    }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'No se pudo registrar el movimiento.'
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : props.editingTransaction
+          ? 'No se pudo editar el movimiento.'
+          : 'No se pudo registrar el movimiento.'
   } finally {
     submitting.value = false
   }
@@ -99,7 +132,7 @@ async function onSubmit() {
 
 <template>
   <BaseCard class="transaction-form">
-    <h2 class="form-title">Nuevo movimiento</h2>
+    <h2 class="form-title">{{ isEditing ? 'Editar movimiento' : 'Nuevo movimiento' }}</h2>
 
     <form class="form-body" @submit.prevent="onSubmit">
       <div class="type-toggle" role="tablist">
@@ -166,7 +199,7 @@ async function onSubmit() {
           Cancelar
         </BaseButton>
         <BaseButton type="submit" size="sm" :disabled="submitting">
-          {{ submitting ? 'Guardando...' : 'Guardar' }}
+          {{ submitting ? 'Guardando...' : isEditing ? 'Guardar cambios' : 'Guardar' }}
         </BaseButton>
       </div>
     </form>

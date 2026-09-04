@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useCurrency } from '../../composables/currency/useCurrency'
 import { useCurrencyStore } from '../../stores/currency.store'
 import { useTransactionsStore } from '../../stores/transactions.store'
 import { useWalletsStore } from '../../stores/wallets.store'
@@ -38,10 +39,15 @@ const router = useRouter()
 const walletsStore = useWalletsStore()
 const transactionsStore = useTransactionsStore()
 const currencyStore = useCurrencyStore()
+const { convert } = useCurrency()
 
 const drafts = ref<Draft[]>([])
 const loadError = ref<string | null>(null)
 const showCreateSheet = ref(false)
+// Pedido explicito del usuario: poder editar un movimiento ya creado. null = el sheet
+// esta en modo creacion (comportamiento de siempre) - ver onEditTransaction/
+// closeCreateSheet mas abajo.
+const editingTransaction = ref<Transaction | null>(null)
 const showHelpSheet = ref(false)
 const showFilterSheet = ref(false)
 const searchQuery = ref('')
@@ -84,11 +90,61 @@ const monthTransactions = computed(() =>
     (t) => isInMonth(t.occurredAt, activeMonth.value.year, activeMonth.value.month) && t.source !== 'transfer',
   ),
 )
-const monthIncome = computed(() =>
-  monthTransactions.value.filter((t) => t.type === 'income').reduce((sum, t) => sum + t.amount, 0),
-)
-const monthExpenses = computed(() =>
-  monthTransactions.value.filter((t) => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0),
+
+// Bug real reportado por el usuario, con captura (mismo bug que ya se habia
+// arreglado en IncomeExpenseSummary.vue de Inicio, pero en este archivo
+// aparte - Movimientos tiene su propio calculo, nunca paso por ese fix): un
+// gasto en una wallet en VEF se sumaba tal cual (monto crudo) junto con
+// gastos en wallets USD/EUR/USDT, y el total se mostraba con la moneda de
+// visualizacion actual como si TODO hubiera estado en esa moneda - ej.
+// "31.187 VEF de gasto" aparecia como "31.187,00 €". Una Transaction no trae
+// su propia moneda (solo wallet_id), asi que hay que resolverla por su
+// wallet y convertir ANTES de sumar - agrupando por moneda presente este mes
+// (una llamada por moneda distinta, no una por transaccion).
+function walletCurrency(walletId: string): string {
+  return walletsStore.wallets.find((wallet) => wallet.id === walletId)?.currency ?? currencyStore.displayCurrency
+}
+
+async function sumConverted(transactions: Transaction[]): Promise<number> {
+  const target = currencyStore.displayCurrency
+  const subtotalByCurrency = new Map<string, number>()
+  for (const transaction of transactions) {
+    const currency = walletCurrency(transaction.walletId)
+    subtotalByCurrency.set(currency, (subtotalByCurrency.get(currency) ?? 0) + transaction.amount)
+  }
+
+  let total = 0
+  for (const [currency, subtotal] of subtotalByCurrency) {
+    if (currency === target) {
+      total += subtotal
+      continue
+    }
+    try {
+      const result = await convert(subtotal, currency, target)
+      total += result.convertedAmount
+    } catch {
+      // Best-effort, mismo criterio que BalanceCard.vue/IncomeExpenseSummary.vue: si
+      // la conversion de ese grupo de moneda falla, no cuenta en el total en vez de
+      // romper el resto del calculo.
+    }
+  }
+  return total
+}
+
+const monthIncome = ref(0)
+const monthExpenses = ref(0)
+
+async function recomputeMonthTotals() {
+  const income = monthTransactions.value.filter((t) => t.type === 'income')
+  const expenses = monthTransactions.value.filter((t) => t.type === 'expense')
+  monthIncome.value = await sumConverted(income)
+  monthExpenses.value = await sumConverted(expenses)
+}
+
+watch(
+  [monthTransactions, () => currencyStore.displayCurrency, () => walletsStore.wallets],
+  recomputeMonthTotals,
+  { immediate: true },
 )
 
 // Chips de categoria dinamicos: Berry no tiene una taxonomia fija (ver
@@ -145,7 +201,27 @@ function onFilterApply(next: TransactionsFilterState) {
 
 function onTransactionCreated(transaction: Transaction) {
   transactionsStore.recordCreated(transaction)
+  closeCreateSheet()
+}
+
+// Edicion de un movimiento existente - pedido explicito del usuario. El MISMO sheet/
+// form de creacion sirve para editar (ver TransactionForm.vue): "Editar" en
+// TransactionList.vue precarga editingTransaction y abre el sheet; al guardar u
+// cancelar, se limpia de nuevo para que "+ Nuevo movimiento" no arranque con datos
+// viejos.
+function onEditTransaction(transaction: Transaction) {
+  editingTransaction.value = transaction
+  showCreateSheet.value = true
+}
+
+function onTransactionUpdated(transaction: Transaction) {
+  transactionsStore.recordUpdated(transaction)
+  closeCreateSheet()
+}
+
+function closeCreateSheet() {
   showCreateSheet.value = false
+  editingTransaction.value = null
 }
 
 async function onDeleteTransaction(transactionId: string) {
@@ -267,6 +343,7 @@ function goBack() {
               :transactions="filteredTransactions"
               :wallets="walletsStore.wallets"
               @delete="onDeleteTransaction"
+              @edit="onEditTransaction"
             />
           </Transition>
         </section>
@@ -281,8 +358,17 @@ function goBack() {
       </p>
     </BottomSheet>
 
-    <BottomSheet v-if="showCreateSheet" title="Registrar movimiento" @close="showCreateSheet = false">
-      <TransactionForm @created="onTransactionCreated" @cancel="showCreateSheet = false" />
+    <BottomSheet
+      v-if="showCreateSheet"
+      :title="editingTransaction ? 'Editar movimiento' : 'Registrar movimiento'"
+      @close="closeCreateSheet"
+    >
+      <TransactionForm
+        :editing-transaction="editingTransaction"
+        @created="onTransactionCreated"
+        @updated="onTransactionUpdated"
+        @cancel="closeCreateSheet"
+      />
     </BottomSheet>
 
     <TransactionsFilterSheet

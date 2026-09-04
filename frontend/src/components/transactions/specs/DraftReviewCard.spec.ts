@@ -134,6 +134,7 @@ describe('DraftReviewCard', () => {
       occurredAt: '2026-08-28T00:00:00Z',
       source: 'voice',
       transferId: null,
+      referenceAmountUsd: null,
       createdAt: '2026-08-28T00:00:00Z',
     })
 

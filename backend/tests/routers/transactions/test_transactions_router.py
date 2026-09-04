@@ -80,6 +80,84 @@ def test_create_income_transaction_increases_wallet_balance(client):
     assert Decimal(wallets_after[0]["balance"]) == Decimal("500.00")
 
 
+def test_update_transaction_changes_fields_and_recomputes_wallet_balance(client, db):
+    token = _register(client)
+    wallet = _create_wallet(client, token)
+    _fund_wallet(db, wallet["id"], "100.00")
+    transaction = client.post(
+        "/api/transactions",
+        json={"wallet_id": wallet["id"], "type": "expense", "amount": "30.00", "category": "Mercado"},
+        headers=_auth_headers(token),
+    ).json()
+
+    response = client.patch(
+        f"/api/transactions/{transaction['id']}",
+        json={
+            "wallet_id": wallet["id"],
+            "type": "expense",
+            "amount": "45.00",
+            "category": "Transporte",
+            "description": "Taxi",
+            "occurred_at": "2026-01-15T12:00:00Z",
+        },
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert Decimal(body["amount"]) == Decimal("45.00")
+    assert body["category"] == "Transporte"
+    assert body["description"] == "Taxi"
+    wallets_after = client.get("/api/wallets", headers=_auth_headers(token)).json()
+    assert Decimal(wallets_after[0]["balance"]) == Decimal("55.00")  # 100 - 45, no 100 - 30 - 45
+
+
+def test_update_transaction_rejects_editing_a_transfer_leg(client, db):
+    token = _register(client)
+    cash = _create_wallet(client, token, "Cash")
+    _fund_wallet(db, cash["id"], "100.00")
+    bank = _create_wallet(client, token, "Banco")
+    client.post(
+        "/api/wallets/transfer",
+        json={"from_wallet_id": cash["id"], "to_wallet_id": bank["id"], "amount": "40.00"},
+        headers=_auth_headers(token),
+    )
+    leg = next(
+        t for t in client.get("/api/transactions", headers=_auth_headers(token)).json() if t["wallet_id"] == cash["id"]
+    )
+
+    response = client.patch(
+        f"/api/transactions/{leg['id']}",
+        json={
+            "wallet_id": cash["id"],
+            "type": "expense",
+            "amount": "50.00",
+            "category": "Mercado",
+            "occurred_at": leg["occurred_at"],
+        },
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 400
+
+
+def test_update_transaction_requires_auth(client):
+    token = _register(client)
+    wallet = _create_wallet(client, token)
+    transaction = client.post(
+        "/api/transactions",
+        json={"wallet_id": wallet["id"], "type": "expense", "amount": "30.00", "category": "Mercado"},
+        headers=_auth_headers(token),
+    ).json()
+
+    response = client.patch(
+        f"/api/transactions/{transaction['id']}",
+        json={"wallet_id": wallet["id"], "type": "expense", "amount": "30.00", "category": "Mercado", "occurred_at": "2026-01-15T12:00:00Z"},
+    )
+
+    assert response.status_code == 401
+
+
 def test_delete_transaction_reverses_wallet_balance(client):
     token = _register(client)
     wallet = _create_wallet(client, token)

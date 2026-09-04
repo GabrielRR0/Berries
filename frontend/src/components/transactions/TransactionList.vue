@@ -18,7 +18,12 @@ import IconBadge from '../ui/IconBadge.vue'
 const props = withDefaults(defineProps<{ transactions: Transaction[]; wallets: Wallet[]; fallbackCurrency?: string }>(), {
   fallbackCurrency: 'USD',
 })
-const emit = defineEmits<{ delete: [transactionId: string] }>()
+// "edit": pedido explicito del usuario ("se debe poder editar los movimientos...
+// montos, fecha de pago, description, wallet_id, category") - nunca para una pata de
+// transferencia (ver el v-if del boton en el template: el backend las rechaza, ver
+// update_transaction, editarlas de a una dejaria el ledger de la transferencia
+// inconsistente).
+const emit = defineEmits<{ delete: [transactionId: string]; edit: [transaction: Transaction] }>()
 
 const confirmingDeleteId = ref<string | null>(null)
 
@@ -28,6 +33,17 @@ function currencyFor(transaction: Transaction): string {
 
 function walletName(walletId: string): string {
   return props.wallets.find((wallet) => wallet.id === walletId)?.name ?? 'billetera eliminada'
+}
+
+// Valor de referencia en USD, CONGELADO al momento de crear la transaccion (ver
+// reference_amount_usd/create_transaction del backend) - pedido explicito del
+// usuario: para un gasto en una moneda nacional con inflacion fuerte (VEF, COP,
+// ARS...) quiere ver "cuanto era eso ese dia" de forma fija, no recalculada con la
+// tasa de HOY cada vez que se abre la lista. null cuando la wallet ya esta en USD (el
+// monto principal YA es la referencia, mostrar el mismo numero dos veces no aporta).
+function referenceLabel(transaction: Transaction): string | null {
+  if (transaction.referenceAmountUsd === null) return null
+  return `≈ ${formatCurrency(transaction.referenceAmountUsd, 'USD')} al momento`
 }
 
 interface TransferListItem {
@@ -182,10 +198,13 @@ function confirmDelete(id: string) {
           <p v-if="item.transaction.description" class="transaction-description">{{ item.transaction.description }}</p>
         </div>
 
-        <p class="transaction-amount" :class="{ expense: item.transaction.type === 'expense' && !isTransfer(item.transaction) }">
-          <template v-if="!isTransfer(item.transaction)">{{ item.transaction.type === 'expense' ? '-' : '+' }}</template
-          >{{ formatCurrency(item.transaction.amount, currencyFor(item.transaction)) }}
-        </p>
+        <div class="transaction-amount-group">
+          <p class="transaction-amount" :class="{ expense: item.transaction.type === 'expense' && !isTransfer(item.transaction) }">
+            <template v-if="!isTransfer(item.transaction)">{{ item.transaction.type === 'expense' ? '-' : '+' }}</template
+            >{{ formatCurrency(item.transaction.amount, currencyFor(item.transaction)) }}
+          </p>
+          <p v-if="referenceLabel(item.transaction)" class="transaction-reference">{{ referenceLabel(item.transaction) }}</p>
+        </div>
       </div>
 
       <!-- Alto fijo (.transaction-footer) - pedido explicito del usuario:
@@ -215,6 +234,18 @@ function confirmDelete(id: string) {
             </div>
           </div>
           <div v-else class="transaction-actions">
+            <!-- Nunca para una pata de transferencia (transferId no nulo, ni siquiera
+                 la comisión con source="manual") - el backend la rechaza igual (ver
+                 update_transaction), editarla de a una dejaria el ledger de la
+                 transferencia inconsistente. -->
+            <button
+              v-if="item.kind === 'single' && item.transaction.transferId === null"
+              type="button"
+              class="transaction-edit-trigger"
+              @click="emit('edit', item.transaction)"
+            >
+              Editar
+            </button>
             <button type="button" class="transaction-delete-trigger" @click="requestDelete(listItemId(item))">
               Eliminar
             </button>
@@ -327,11 +358,28 @@ function confirmDelete(id: string) {
   white-space: nowrap;
 }
 
-.transaction-amount {
+.transaction-amount-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
   flex-shrink: 0;
+}
+
+.transaction-amount {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-h);
+}
+
+/* Valor congelado en USD al momento de la transaccion (ver reference_amount_usd del
+   backend) - pedido explicito del usuario: para un gasto en una moneda nacional
+   (VEF, COP, ARS...) quiere ver a simple vista cuanto era eso ese dia, sin abrir el
+   detalle. Solo aparece cuando la wallet no estaba ya en USD (ver referenceLabel). */
+.transaction-reference {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .transaction-amount.expense {
@@ -365,6 +413,29 @@ function confirmDelete(id: string) {
 
 .transaction-actions {
   justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.transaction-edit-trigger {
+  padding: 0.25rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.transaction-edit-trigger:hover {
+  color: var(--text-h);
+}
+
+.transaction-edit-trigger:active {
+  transform: scale(0.94);
 }
 
 .transaction-delete-trigger {

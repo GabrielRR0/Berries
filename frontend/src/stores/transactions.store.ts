@@ -92,5 +92,18 @@ export const useTransactionsStore = defineStore('transactions', () => {
     useWalletsStore().fetchWallets({ force: true })
   }
 
-  return { transactions, isLoading, error, fetchTransactions, removeTransaction, recordCreated }
+  // Mismo criterio que recordCreated: TransactionForm.vue (en modo edicion) ya hizo la
+  // llamada de red (updateTransaction) - esto solo sincroniza la cache local con el
+  // resultado y fuerza el refresh de wallets (el balance de la wallet vieja Y/O la
+  // nueva pudo haber cambiado, ver update_transaction del backend). Pedido explicito
+  // del usuario: poder editar un movimiento ya creado.
+  function recordUpdated(transaction: Transaction): void {
+    transactions.value = transactions.value.map((existing) =>
+      existing.id === transaction.id ? transaction : existing,
+    )
+    lastFetchedAt = Date.now()
+    useWalletsStore().fetchWallets({ force: true })
+  }
+
+  return { transactions, isLoading, error, fetchTransactions, removeTransaction, recordCreated, recordUpdated }
 })

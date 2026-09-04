@@ -16,6 +16,7 @@ const MANUAL_EXPENSE = {
   occurredAt: '2026-08-05T12:00:00Z',
   source: 'manual',
   transferId: null,
+  referenceAmountUsd: null,
   createdAt: '2026-08-05T12:00:00Z',
 }
 
@@ -29,6 +30,7 @@ const TRANSFER_FROM_LEG = {
   occurredAt: '2026-08-06T12:00:00Z',
   source: 'transfer',
   transferId: 'transfer-1',
+  referenceAmountUsd: null,
   createdAt: '2026-08-06T12:00:00Z',
 }
 
@@ -42,6 +44,7 @@ const TRANSFER_TO_LEG = {
   occurredAt: '2026-08-06T12:00:00Z',
   source: 'transfer',
   transferId: 'transfer-1',
+  referenceAmountUsd: null,
   createdAt: '2026-08-06T12:00:00Z',
 }
 
@@ -55,6 +58,7 @@ const TRANSFER_FEE_LEG = {
   occurredAt: '2026-08-06T12:00:00Z',
   source: 'manual',
   transferId: 'transfer-1',
+  referenceAmountUsd: null,
   createdAt: '2026-08-06T12:00:00Z',
 }
 
@@ -76,12 +80,56 @@ describe('TransactionList', () => {
     expect(wrapper.emitted('delete')).toEqual([['tx-1']])
   })
 
+  // "Editar" - pedido explicito del usuario ("se debe poder editar los
+  // movimientos... montos, fecha de pago, description, wallet_id, category").
+  it('emite "edit" con la transaction al tocar Editar en un movimiento manual', async () => {
+    const wrapper = mount(TransactionList, { props: { transactions: [MANUAL_EXPENSE], wallets: WALLETS } })
+
+    await wrapper.find('.transaction-edit-trigger').trigger('click')
+
+    expect(wrapper.emitted('edit')).toEqual([[MANUAL_EXPENSE]])
+  })
+
+  it('no muestra "Editar" para una transferencia fusionada', () => {
+    const wrapper = mount(TransactionList, {
+      props: { transactions: [TRANSFER_FROM_LEG, TRANSFER_TO_LEG, TRANSFER_FEE_LEG], wallets: WALLETS },
+    })
+
+    expect(wrapper.find('.transaction-edit-trigger').exists()).toBe(false)
+  })
+
+  it('no muestra "Editar" para una pata de transferencia mostrada suelta (ej. la comisión sin sus otras patas presentes)', () => {
+    // Sin fromLeg/toLeg en la lista, la comisión se muestra "suelta" (kind: 'single')
+    // en vez de fusionada - igual no debe ofrecer Editar (transferId no es null).
+    const wrapper = mount(TransactionList, { props: { transactions: [TRANSFER_FEE_LEG], wallets: WALLETS } })
+
+    expect(wrapper.find('.transaction-edit-trigger').exists()).toBe(false)
+    expect(wrapper.find('.transaction-delete-trigger').exists()).toBe(true)
+  })
+
   it('un gasto manual muestra signo "-" y el icono en rojo', () => {
     const wrapper = mount(TransactionList, { props: { transactions: [MANUAL_EXPENSE], wallets: WALLETS } })
 
     expect(wrapper.find('.transaction-amount').text()).toContain('-')
     expect(wrapper.find('.transaction-amount').classes()).toContain('expense')
     expect(wrapper.find('.icon-badge').classes()).toContain('expense')
+  })
+
+  // reference_amount_usd (ver create_transaction del backend) - pedido explicito del
+  // usuario: para un gasto en una moneda nacional (VEF, COP, ARS...) quiere ver a
+  // simple vista cuanto era eso en dolares el dia que ocurrio, de forma fija.
+  it('muestra el valor de referencia en USD cuando la wallet no esta en USD', () => {
+    const expenseInVef = { ...MANUAL_EXPENSE, referenceAmountUsd: 5.1 }
+    const wrapper = mount(TransactionList, { props: { transactions: [expenseInVef], wallets: WALLETS } })
+
+    expect(wrapper.find('.transaction-reference').exists()).toBe(true)
+    expect(wrapper.find('.transaction-reference').text()).toContain('$5.10')
+  })
+
+  it('no muestra ningun valor de referencia cuando la wallet ya esta en USD', () => {
+    const wrapper = mount(TransactionList, { props: { transactions: [MANUAL_EXPENSE], wallets: WALLETS } })
+
+    expect(wrapper.find('.transaction-reference').exists()).toBe(false)
   })
 
   // Si un filtro externo (busqueda, categoria) deja visible solo UNA pata de

@@ -355,7 +355,12 @@ def test_period_summary_converts_non_default_currency_wallet_before_summing(db):
 
     summary = get_period_summary(db, user.id, "2024-07")
 
-    assert summary.total_expense == Decimal("100")
+    # round(...,2): la tasa VEF->USD se guarda en una columna Numeric(24,10) - crear la
+    # transaction ya inserta esa fila (ver reference_amount_usd/create_transaction), y
+    # releerla de vuelta acá pierde precisión mucho más allá del centavo (invisible en
+    # cualquier UI real, pero rompe una igualdad exacta de Decimal). Comparar a la
+    # precisión real que se muestra (centavos) en vez de bit-a-bit.
+    assert round(summary.total_expense, 2) == Decimal("100")
 
 
 def test_period_summary_does_not_blend_amounts_across_currencies(db):
@@ -370,7 +375,8 @@ def test_period_summary_does_not_blend_amounts_across_currencies(db):
 
     summary = get_period_summary(db, user.id, "2024-07")
 
-    assert summary.total_expense == Decimal("150")  # 50 USD + (3650 VEF -> 100 USD)
+    # round(...,2): ver comentario del test anterior (precisión de Numeric(24,10)).
+    assert round(summary.total_expense, 2) == Decimal("150")  # 50 USD + (3650 VEF -> 100 USD)
 
 
 def test_category_breakdown_converts_non_default_currency_wallet(db):
@@ -380,7 +386,8 @@ def test_category_breakdown_converts_non_default_currency_wallet(db):
 
     items = get_category_breakdown(db, user.id, "expense", "2024-07")
 
-    assert items[0].total == Decimal("100")
+    # round(...,2): ver comentario en test_period_summary_converts_non_default_currency_wallet_before_summing.
+    assert round(items[0].total, 2) == Decimal("100")
 
 
 def test_monthly_comparison_converts_non_default_currency_wallet(db):
@@ -391,7 +398,8 @@ def test_monthly_comparison_converts_non_default_currency_wallet(db):
 
     items = get_monthly_comparison(db, user.id, 1)
 
-    assert items[0].total_income == Decimal("100")
+    # round(...,2): ver comentario en test_period_summary_converts_non_default_currency_wallet_before_summing.
+    assert round(items[0].total_income, 2) == Decimal("100")
 
 
 def test_category_monthly_trend_converts_non_default_currency_wallet(db):
@@ -402,7 +410,8 @@ def test_category_monthly_trend_converts_non_default_currency_wallet(db):
 
     trend = get_category_monthly_trend(db, user.id, "expense", months=1)
 
-    assert trend.categories[0].monthly_totals == [Decimal("100")]
+    # round(...,2): ver comentario en test_period_summary_converts_non_default_currency_wallet_before_summing.
+    assert [round(total, 2) for total in trend.categories[0].monthly_totals] == [Decimal("100")]
 
 
 def test_period_summary_uses_the_historical_rate_of_each_transactions_own_date(db):

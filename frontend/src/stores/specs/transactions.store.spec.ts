@@ -21,6 +21,7 @@ const TX_A = {
   occurredAt: '2026-08-01T00:00:00Z',
   source: 'manual',
   transferId: null,
+  referenceAmountUsd: null,
   createdAt: '2026-08-01T00:00:00Z',
 }
 const TX_B = {
@@ -33,6 +34,7 @@ const TX_B = {
   occurredAt: '2026-08-02T00:00:00Z',
   source: 'manual',
   transferId: null,
+  referenceAmountUsd: null,
   createdAt: '2026-08-02T00:00:00Z',
 }
 
@@ -141,6 +143,23 @@ describe('transactions.store', () => {
       store.recordCreated(TX_A)
 
       expect(store.transactions).toEqual([TX_A])
+      expect(fetchWalletsSpy).toHaveBeenCalledWith({ force: true })
+    })
+  })
+
+  // Pedido explicito del usuario: poder editar un movimiento ya creado.
+  describe('recordUpdated', () => {
+    it('reemplaza el movimiento editado en la cache (por id) y fuerza un refresh de wallets', async () => {
+      vi.mocked(listTransactions).mockResolvedValue([TX_A, TX_B])
+      const walletsStore = useWalletsStore()
+      const fetchWalletsSpy = vi.spyOn(walletsStore, 'fetchWallets').mockResolvedValue()
+      const store = useTransactionsStore()
+      await store.fetchTransactions()
+
+      const edited = { ...TX_A, amount: 999, category: 'Bono' }
+      store.recordUpdated(edited)
+
+      expect(store.transactions).toEqual([edited, TX_B])
       expect(fetchWalletsSpy).toHaveBeenCalledWith({ force: true })
     })
   })

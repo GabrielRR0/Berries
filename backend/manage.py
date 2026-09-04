@@ -8,6 +8,7 @@ Comandos:
     python manage.py migrate:rollback         # alembic downgrade -1
     python manage.py make:migration "mensaje" # alembic revision --autogenerate -m "mensaje"
     python manage.py seed:demo [--reset]      # crea/reseedea el usuario demo con datos falsos
+    python manage.py backfill:reference-amounts  # rellena reference_amount_usd de transactions viejas
 """
 
 import argparse
@@ -74,6 +75,22 @@ def cmd_seed_demo(args: argparse.Namespace) -> None:
         db.close()
 
 
+def cmd_backfill_reference_amounts(_args: argparse.Namespace) -> None:
+    # Pedido explícito del usuario, con captura real: en Movimientos vio transactions
+    # viejas en VEF (creadas antes de que reference_amount_usd existiera) sin ningún
+    # valor de referencia. Corre sobre TODO el sistema (no un usuario en particular) -
+    # ver backfill_reference_amounts en transaction_service.py.
+    from app.core.database import SessionLocal
+    from app.services.transactions.transaction_service import backfill_reference_amounts
+
+    db = SessionLocal()
+    try:
+        updated = backfill_reference_amounts(db)
+        print(f"{updated} transacciones actualizadas con su valor de referencia en USD.")
+    finally:
+        db.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Comandos de administración del backend de Berry")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -90,6 +107,10 @@ def main() -> None:
     seed_demo = subparsers.add_parser("seed:demo", help="Crea (o reseedea) el usuario demo con datos falsos")
     seed_demo.add_argument("--reset", action="store_true", help="Borra el usuario demo existente antes de crearlo")
     seed_demo.set_defaults(func=cmd_seed_demo)
+
+    subparsers.add_parser(
+        "backfill:reference-amounts", help="Rellena reference_amount_usd de transactions creadas antes de este campo"
+    ).set_defaults(func=cmd_backfill_reference_amounts)
 
     args = parser.parse_args()
     args.func(args)

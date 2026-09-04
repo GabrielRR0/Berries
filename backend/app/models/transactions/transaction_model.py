@@ -29,6 +29,15 @@ class Transaction(Base):
     # las filas ya traidas (occurred_at/type/wallet_id siguen sin encriptar justamente
     # para poder seguir filtrando esos por SQL).
     amount: Mapped[Decimal] = mapped_column(EncryptedDecimal, nullable=False)
+    # Valor congelado en USD al momento de crear la transacción (ver create_transaction)
+    # - pedido explícito del usuario: para una wallet en una moneda nacional con
+    # inflación fuerte (VEF, COP, ARS...), quiere un registro FIJO de "cuánto era eso
+    # ese día", que nunca cambie aunque la tasa de cambio se siga moviendo después (a
+    # diferencia de get_conversion_rate_at en analytics_service.py, que recalcula la
+    # conversión en cada consulta - útil para resúmenes, pero no es un registro
+    # inmutable). NULL cuando la wallet ya estaba en USD (el propio "amount" ya es la
+    # referencia, guardar el mismo valor dos veces no aporta nada).
+    reference_amount_usd: Mapped[Decimal | None] = mapped_column(EncryptedDecimal, nullable=True)
     category: Mapped[str] = mapped_column(EncryptedString, nullable=False)
     description: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
     # Cuándo ocurrió la transacción (settable por el usuario), no cuándo se registró.

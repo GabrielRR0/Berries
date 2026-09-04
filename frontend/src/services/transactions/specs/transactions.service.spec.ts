@@ -9,6 +9,7 @@ import {
   discardDraft,
   listDrafts,
   listTransactions,
+  updateTransaction,
 } from '../transactions.service'
 
 function mockResponse(body: unknown, init: { ok?: boolean; status?: number } = {}): Response {
@@ -29,6 +30,7 @@ const TRANSACTION_WIRE = {
   occurred_at: '2026-08-01T12:00:00Z',
   source: 'manual',
   transfer_id: null,
+  reference_amount_usd: null,
   created_at: '2026-08-01T12:00:01Z',
 }
 
@@ -42,6 +44,7 @@ const TRANSACTION_MAPPED = {
   occurredAt: '2026-08-01T12:00:00Z',
   source: 'manual',
   transferId: null,
+  referenceAmountUsd: null,
   createdAt: '2026-08-01T12:00:01Z',
 }
 
@@ -131,6 +134,20 @@ describe('transactions.service', () => {
       expect(result).toEqual(TRANSACTION_MAPPED)
     })
 
+    // reference_amount_usd es un Decimal de Pydantic (number o string segun
+    // serializacion) - mismo bug real de esta sesion que "amount"/"parsed_amount": sin
+    // Number(...), un string tipo "12.04" queda como string en vez de number, y
+    // undefined (wire sin el campo) se pasaba como NaN en vez de null.
+    it('convierte reference_amount_usd de string a number cuando la wallet no esta en USD', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({ ...TRANSACTION_WIRE, reference_amount_usd: '12.04' }, { status: 201 }),
+      )
+
+      const result = await createTransaction({ walletId: 'wallet-1', type: 'expense', amount: 4082, category: 'Mercado' })
+
+      expect(result.referenceAmountUsd).toBe(12.04)
+    })
+
     it('lanza TransactionsApiError en 400 de validacion', async () => {
       vi.mocked(fetch).mockResolvedValue(mockResponse({ detail: 'Monto invalido.' }, { ok: false, status: 400 }))
 
@@ -139,6 +156,82 @@ describe('transactions.service', () => {
         type: 'expense',
         amount: -1,
         category: 'comida',
+      }).catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(TransactionsApiError)
+      expect((error as TransactionsApiError).status).toBe(400)
+    })
+  })
+
+  // Pedido explicito del usuario: "se debe poder editar los movimientos... montos,
+  // fecha de pago, description, wallet_id, category todo lo necesario".
+  describe('updateTransaction', () => {
+    it('manda PATCH con todos los campos en snake_case, description null si no se da', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse(TRANSACTION_WIRE))
+
+      await updateTransaction('tx-1', {
+        walletId: 'wallet-1',
+        type: 'expense',
+        amount: 45,
+        category: 'Transporte',
+        occurredAt: '2026-01-15T12:00:00Z',
+      })
+
+      const [url, init] = vi.mocked(fetch).mock.calls[0]
+      expect(url).toBe('/api/transactions/tx-1')
+      expect(init!.method).toBe('PATCH')
+      expect(init!.headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer jwt-token' })
+      expect(JSON.parse(init!.body as string)).toEqual({
+        wallet_id: 'wallet-1',
+        type: 'expense',
+        amount: 45,
+        category: 'Transporte',
+        description: null,
+        occurred_at: '2026-01-15T12:00:00Z',
+      })
+    })
+
+    it('incluye description cuando se da', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse(TRANSACTION_WIRE))
+
+      await updateTransaction('tx-1', {
+        walletId: 'wallet-1',
+        type: 'expense',
+        amount: 45,
+        category: 'Transporte',
+        description: 'Taxi',
+        occurredAt: '2026-01-15T12:00:00Z',
+      })
+
+      const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+      expect(body.description).toBe('Taxi')
+    })
+
+    it('mapea la respuesta a camelCase', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse(TRANSACTION_WIRE))
+
+      const result = await updateTransaction('tx-1', {
+        walletId: 'wallet-1',
+        type: 'expense',
+        amount: 45,
+        category: 'Transporte',
+        occurredAt: '2026-01-15T12:00:00Z',
+      })
+
+      expect(result).toEqual(TRANSACTION_MAPPED)
+    })
+
+    it('lanza TransactionsApiError en 400 (ej. intentar editar una pata de transferencia)', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({ detail: 'No se puede editar una transferencia' }, { ok: false, status: 400 }),
+      )
+
+      const error: unknown = await updateTransaction('tx-1', {
+        walletId: 'wallet-1',
+        type: 'expense',
+        amount: 45,
+        category: 'Transporte',
+        occurredAt: '2026-01-15T12:00:00Z',
       }).catch((e: unknown) => e)
 
       expect(error).toBeInstanceOf(TransactionsApiError)

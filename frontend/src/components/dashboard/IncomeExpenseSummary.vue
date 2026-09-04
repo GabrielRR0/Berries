@@ -32,6 +32,10 @@ const activeSheet = ref<'income' | 'expense' | null>(null)
 // pedido explicito del usuario ("crear ingresos o gastos depende de cual le
 // de click"). Se resetea a false cada vez que se abre/cierra el sheet.
 const showAddForm = ref(false)
+// Pedido explicito del usuario: poder editar un movimiento ya creado, tambien desde
+// este sheet (mismo TransactionForm.vue que Movimientos). null = el form esta en modo
+// creacion - ver onEditTransaction/closeAddForm mas abajo.
+const editingTransaction = ref<Transaction | null>(null)
 // Borradores creados por voz/OCR desde este sheet (mismo botones que
 // Movimientos - pedido explicito del usuario). No son fetch del servidor
 // como en TransactionsMain.vue: solo lo que se capture en esta sesion, asi
@@ -143,12 +147,17 @@ onMounted(() => {
 
 function openSheet(type: 'income' | 'expense') {
   activeSheet.value = type
-  showAddForm.value = false
+  closeAddForm()
 }
 
 function closeSheet() {
   activeSheet.value = null
+  closeAddForm()
+}
+
+function closeAddForm() {
   showAddForm.value = false
+  editingTransaction.value = null
 }
 
 async function onDeleteTransaction(transactionId: string) {
@@ -161,7 +170,17 @@ async function onDeleteTransaction(transactionId: string) {
 
 function onTransactionCreated(transaction: Transaction) {
   transactionsStore.recordCreated(transaction)
-  showAddForm.value = false
+  closeAddForm()
+}
+
+function onEditTransaction(transaction: Transaction) {
+  editingTransaction.value = transaction
+  showAddForm.value = true
+}
+
+function onTransactionUpdated(transaction: Transaction) {
+  transactionsStore.recordUpdated(transaction)
+  closeAddForm()
 }
 
 function onDraftCreated(draft: Draft) {
@@ -255,7 +274,7 @@ function onDraftDiscarded(draftId: string) {
           v-if="!showAddForm"
           type="button"
           class="sheet-add-trigger"
-          @click="showAddForm = true"
+          @click="editingTransaction = null; showAddForm = true"
         >
           + Agregar {{ activeSheet === 'income' ? 'ingreso' : 'gasto' }}
         </button>
@@ -269,8 +288,10 @@ function onDraftDiscarded(draftId: string) {
         v-if="showAddForm"
         class="sheet-add-form"
         :initial-type="activeSheet"
+        :editing-transaction="editingTransaction"
         @created="onTransactionCreated"
-        @cancel="showAddForm = false"
+        @updated="onTransactionUpdated"
+        @cancel="closeAddForm"
       />
 
       <div v-if="pendingDrafts.length > 0" class="sheet-drafts">
@@ -287,7 +308,13 @@ function onDraftDiscarded(draftId: string) {
       <p v-if="sheetTransactions.length === 0" class="sheet-empty">
         No tienes {{ activeSheet === 'income' ? 'ingresos' : 'gastos' }} registrados este mes.
       </p>
-      <TransactionList v-else :transactions="sheetTransactions" :wallets="walletsStore.wallets" @delete="onDeleteTransaction" />
+      <TransactionList
+        v-else
+        :transactions="sheetTransactions"
+        :wallets="walletsStore.wallets"
+        @delete="onDeleteTransaction"
+        @edit="onEditTransaction"
+      />
     </BottomSheet>
   </div>
 </template>

@@ -37,6 +37,7 @@ const TRANSACTIONS = [
     occurredAt: thisMonthDate(5),
     source: 'manual',
     transferId: null,
+    referenceAmountUsd: null,
     createdAt: thisMonthDate(5),
   },
   {
@@ -49,6 +50,7 @@ const TRANSACTIONS = [
     occurredAt: thisMonthDate(7),
     source: 'manual',
     transferId: null,
+    referenceAmountUsd: null,
     createdAt: thisMonthDate(7),
   },
 ]
@@ -156,6 +158,7 @@ describe('IncomeExpenseSummary', () => {
       occurredAt: thisMonthDate(10),
       source: 'manual',
       transferId: null,
+      referenceAmountUsd: null,
       createdAt: thisMonthDate(10),
     }
     vi.spyOn(transactionsService, 'createTransaction').mockResolvedValue(created)
@@ -244,6 +247,7 @@ describe('IncomeExpenseSummary', () => {
         occurredAt: thisMonthDate(15),
         source: 'voice',
         transferId: null,
+        referenceAmountUsd: null,
         createdAt: thisMonthDate(15),
       },
       'draft-1',

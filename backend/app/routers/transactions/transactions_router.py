@@ -11,6 +11,7 @@ from app.schemas.transactions.transaction_schemas import (
     DraftResponse,
     TransactionCreateRequest,
     TransactionResponse,
+    TransactionUpdateRequest,
 )
 from app.services.transactions.drafts.draft_review_service import confirm_draft, discard_draft, list_drafts_for_user
 from app.services.transactions.errors import DraftNotFoundError, TransactionValidationError
@@ -18,6 +19,7 @@ from app.services.transactions.transaction_service import (
     create_transaction,
     delete_transaction,
     list_transactions_for_user,
+    update_transaction,
 )
 
 router = APIRouter()
@@ -59,6 +61,30 @@ async def list_mine(
         db, current_user.id, wallet_id=wallet_id, category=category, date_from=date_from, date_to=date_to
     )
     return [TransactionResponse.model_validate(t) for t in transactions]
+
+
+@router.patch("/{transaction_id}", response_model=TransactionResponse)
+async def update(
+    transaction_id: uuid.UUID,
+    payload: TransactionUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> TransactionResponse:
+    try:
+        transaction = update_transaction(
+            db,
+            transaction_id,
+            current_user.id,
+            payload.wallet_id,
+            payload.type,
+            payload.amount,
+            payload.category,
+            payload.description,
+            payload.occurred_at,
+        )
+    except TransactionValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return TransactionResponse.model_validate(transaction)
 
 
 @router.delete("/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)

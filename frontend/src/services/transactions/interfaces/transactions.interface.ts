@@ -11,6 +11,13 @@ export interface Transaction {
   walletId: string
   type: TransactionType
   amount: number
+  // Valor congelado en USD al momento de crear la transacción (ver
+  // create_transaction del backend) - null si la wallet ya estaba en USD, o si la
+  // conversión falló en su momento. Pedido explícito del usuario: para una wallet en
+  // una moneda nacional con inflación fuerte (VEF, COP, ARS...) quiere un registro FIJO
+  // de "cuánto era eso ese día", que nunca cambie con el paso del tiempo - a diferencia
+  // de convertir "amount" en vivo con la tasa de HOY (ver TransactionList.vue).
+  referenceAmountUsd: number | null
   category: string
   description: string | null
   occurredAt: string
@@ -30,6 +37,15 @@ export interface CreateTransactionParams {
   description?: string
   occurredAt?: string
   source?: string
+}
+
+export interface UpdateTransactionParams {
+  walletId: string
+  type: TransactionType
+  amount: number
+  category: string
+  description?: string
+  occurredAt: string
 }
 
 export interface ListTransactionsParams {

@@ -12,6 +12,7 @@ import type {
   ListTransactionsParams,
   Transaction,
   TransactionType,
+  UpdateTransactionParams,
 } from './interfaces/transactions.interface'
 
 // "amount"/"parsed_amount" son Decimal de Pydantic (number o string segun
@@ -22,6 +23,7 @@ interface TransactionWire {
   wallet_id: string
   type: string
   amount: number | string
+  reference_amount_usd: number | string | null
   category: string
   description: string | null
   occurred_at: string
@@ -61,6 +63,7 @@ function mapTransaction(wire: TransactionWire): Transaction {
     walletId: wire.wallet_id,
     type: wire.type as TransactionType,
     amount: Number(wire.amount),
+    referenceAmountUsd: wire.reference_amount_usd === null ? null : Number(wire.reference_amount_usd),
     category: wire.category,
     description: wire.description,
     occurredAt: wire.occurred_at,
@@ -115,6 +118,37 @@ export async function createTransaction(params: CreateTransactionParams): Promis
   if (!response.ok) {
     throw new TransactionsApiError(
       await parseErrorMessage(response, 'No se pudo registrar el movimiento.'),
+      response.status,
+    )
+  }
+
+  return mapTransaction((await response.json()) as TransactionWire)
+}
+
+// Pedido explicito del usuario: "se debe poder editar los movimientos... montos,
+// fecha de pago, description, wallet_id, category todo lo necesario". A diferencia de
+// createTransaction, manda TODOS los campos siempre (no un PATCH parcial) - el form de
+// edicion (ver TransactionForm.vue) siempre arranca con los valores actuales ya
+// cargados, asi que no hay ambiguedad entre "no se mando" y "se quiso vaciar".
+export async function updateTransaction(transactionId: string, params: UpdateTransactionParams): Promise<Transaction> {
+  const payload = {
+    wallet_id: params.walletId,
+    type: params.type,
+    amount: params.amount,
+    category: params.category,
+    description: params.description ?? null,
+    occurred_at: params.occurredAt,
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/transactions/${transactionId}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    throw new TransactionsApiError(
+      await parseErrorMessage(response, 'No se pudo editar el movimiento.'),
       response.status,
     )
   }
