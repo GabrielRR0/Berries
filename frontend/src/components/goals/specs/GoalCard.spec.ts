@@ -192,12 +192,35 @@ describe('GoalCard', () => {
     expect(wrapper.emitted('addContribution')).toBeFalsy()
   })
 
-  it('emite "abandon" al elegir Abandonar desde el menu', async () => {
+  // Idea de la sesion de brainstorm de UI: "Abandonar" ahora pide
+  // confirmacion en 2 pasos, igual que "Eliminar" - antes disparaba el
+  // evento directo desde el menu sin ningun paso intermedio.
+  it('abandonar desde el menu pide confirmacion primero, sin emitir "abandon"', async () => {
     const wrapper = mountCard({ goal: GOAL })
 
     await clickMenuItem(wrapper, 'Abandonar')
 
+    expect(wrapper.emitted('abandon')).toBeFalsy()
+    expect(wrapper.find('.goal-confirm-text').text()).toBe('¿Abandonar meta?')
+  })
+
+  it('emite "abandon" solo despues de confirmar', async () => {
+    const wrapper = mountCard({ goal: GOAL })
+
+    await clickMenuItem(wrapper, 'Abandonar')
+    await wrapper.find('.goal-confirm-delete').trigger('click')
+
     expect(wrapper.emitted('abandon')).toBeTruthy()
+  })
+
+  it('cancelar el abandono no emite "abandon"', async () => {
+    const wrapper = mountCard({ goal: GOAL })
+
+    await clickMenuItem(wrapper, 'Abandonar')
+    await wrapper.find('.goal-confirm-cancel').trigger('click')
+
+    expect(wrapper.find('.goal-confirm').exists()).toBe(false)
+    expect(wrapper.emitted('abandon')).toBeFalsy()
   })
 
   it('emite "edit" al elegir Editar desde el menu', async () => {

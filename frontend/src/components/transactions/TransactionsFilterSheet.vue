@@ -30,11 +30,6 @@ defineEmits<{ apply: [filter: TransactionsFilterState]; close: [] }>()
 
 <template>
   <BottomSheet title="Filtros" @close="$emit('close')">
-    <TransactionsFilterPanel
-      :model-value="modelValue"
-      :categories="categories"
-      @apply="$emit('apply', $event)"
-      @close="$emit('close')"
-    />
+    <TransactionsFilterPanel :model-value="modelValue" :categories="categories" @apply="$emit('apply', $event)" />
   </BottomSheet>
 </template>

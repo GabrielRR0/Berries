@@ -17,17 +17,16 @@ import BalanceTrendBackdrop from './BalanceTrendBackdrop.vue'
 // tarjeta - ver plan de Berry) en vez de propagar el error hacia arriba.
 const props = withDefaults(
   defineProps<{
-    previousMonthDeltaPercent?: number
     currencies?: string[]
   }>(),
   {
-    // Sin variacion mes-a-mes real todavia: no hay endpoint de analitica
-    // para esto en esta pasada (solo currency/wallets/transactions), asi que
-    // queda en 0 hasta que exista.
-    previousMonthDeltaPercent: 0,
     currencies: () => ['USD', 'EUR', 'USDT'],
   },
 )
+
+// Clave separada del resto del storage de la app (sin prefijo compartido
+// todavia) - solo persiste esta preferencia puntual.
+const BALANCE_HIDDEN_STORAGE_KEY = 'berry.balanceHidden'
 
 const walletsStore = useWalletsStore()
 const currencyStore = useCurrencyStore()
@@ -49,7 +48,7 @@ const visibleCurrencies = computed(() => {
 // pedido explicito del usuario.
 const { currentStep, stepPosition, isFirstStep, isLastStep, next, back, close } = useOnboardingTour()
 
-const balanceHidden = ref(false)
+const balanceHidden = ref(localStorage.getItem(BALANCE_HIDDEN_STORAGE_KEY) === 'true')
 const totalBalance = ref(0)
 const eyeButtonRef = ref<HTMLElement | null>(null)
 
@@ -88,14 +87,9 @@ onMounted(async () => {
 watch(() => currencyStore.displayCurrency, recomputeTotal)
 watch(() => walletsStore.wallets, recomputeTotal)
 
-const deltaLabel = computed(() => {
-  const value = props.previousMonthDeltaPercent
-  const sign = value > 0 ? '+' : ''
-  return `${sign}${value.toFixed(1)}% vs mes pasado`
-})
-
 function toggleHidden() {
   balanceHidden.value = !balanceHidden.value
+  localStorage.setItem(BALANCE_HIDDEN_STORAGE_KEY, String(balanceHidden.value))
 }
 </script>
 
@@ -160,7 +154,6 @@ function toggleHidden() {
           compact-suffix
         />
       </p>
-      <p class="balance-delta">{{ deltaLabel }}</p>
     </div>
 
     <PillCurrencyToggle
@@ -268,15 +261,6 @@ function toggleHidden() {
   .balance-amount {
     font-size: clamp(3.5rem, 2.4rem + 1.8vw, 4.5rem);
   }
-}
-
-/* Punto intermedio entre el numero y el signo de moneda (pedido explicito
-   del usuario): ni tan grande como el monto (se comería toda la fila en
-   tablet/telefono con codigos de 3-4 letras como USDT), ni tan chico que se
-   pierda que es una unidad. */
-.balance-delta {
-  font-size: 0.8125rem;
-  color: var(--text-muted);
 }
 
 .balance-currency-toggle {

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { computed, reactive } from 'vue'
 import type { CreateDebtInput, DebtDirection } from '../../services/debts/interfaces/debts.interface'
+import { SUPPORTED_CURRENCIES } from '../../utils/currency/supportedCurrencies'
+import { groupAmountThousands, ungroupAmountThousands } from '../../utils/formatters/formatAmountInput'
 import BaseButton from '../ui/BaseButton.vue'
 
 // Formulario de alta de deuda (usado por DebtsMain.vue). Cuotas son
@@ -23,12 +25,23 @@ const form = reactive({
   frequencyDays: '',
 })
 
+// Idea de la sesion de brainstorm de UI: "1300" se veia feo sin separador de
+// miles, mismo criterio ya usado en CreateGoalWizard.vue - el input real
+// muestra la version agrupada ("1,300"), form.totalAmount se queda "crudo"
+// (sin comas) para el resto del componente.
+const totalAmountDisplay = computed({
+  get: () => groupAmountThousands(form.totalAmount),
+  set: (value: string) => {
+    form.totalAmount = ungroupAmountThousands(value)
+  },
+})
+
 function onSubmit() {
   const input: CreateDebtInput = {
     counterpartyName: form.counterpartyName.trim(),
     direction: form.direction,
     totalAmount: Number(form.totalAmount),
-    currency: form.currency.trim().toUpperCase(),
+    currency: form.currency,
   }
   if (form.description.trim()) input.description = form.description.trim()
   if (form.installmentCount) input.installmentCount = Number(form.installmentCount)
@@ -57,12 +70,16 @@ function onSubmit() {
     <div class="field-row">
       <label class="field">
         <span class="field-label">Monto total</span>
-        <input v-model="form.totalAmount" type="number" min="0" step="0.01" required placeholder="0.00" />
+        <input v-model="totalAmountDisplay" type="text" inputmode="decimal" required placeholder="0.00" />
       </label>
 
       <label class="field">
         <span class="field-label">Moneda</span>
-        <input v-model="form.currency" type="text" required placeholder="USD" maxlength="4" />
+        <select v-model="form.currency">
+          <option v-for="option in SUPPORTED_CURRENCIES" :key="option.code" :value="option.code">
+            {{ option.code }}
+          </option>
+        </select>
       </label>
     </div>
 

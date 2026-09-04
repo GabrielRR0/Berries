@@ -19,6 +19,49 @@ function mountSettings() {
   return mount(SettingsMenuMain, { global: { stubs: { RouterLink: true } } })
 }
 
+// Idea de la sesion de brainstorm de UI: esta era la unica pantalla
+// secundaria sin titulo visible ni "?" de ayuda (rompia el patron de
+// SectionHeader que ya siguen Metas/Deudas/Movimientos), y su lista de
+// enlaces no tenia iconos.
+describe('SettingsMenuMain - header e iconos', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    push.mockReset()
+  })
+
+  it('muestra el titulo "Menú" y navega al dashboard al volver', async () => {
+    const wrapper = mountSettings()
+
+    expect(wrapper.find('.section-header-title').text()).toBe('Menú')
+
+    await wrapper.find('button[aria-label="Volver"]').trigger('click')
+
+    expect(push).toHaveBeenCalledWith({ name: 'dashboard' })
+  })
+
+  it('el "?" abre la explicacion de la pantalla', async () => {
+    const wrapper = mountSettings()
+
+    await wrapper.find('button[aria-label="¿Qué es esta sección?"]').trigger('click')
+
+    expect(wrapper.text()).toContain('¿Qué es Menú?')
+  })
+
+  it('cada item del menu tiene un icono propio', () => {
+    // Sin stubear RouterLink aca (a diferencia de mountSettings()): el stub
+    // global descarta el contenido de sus slots, asi que nunca dejaria ver
+    // si el icono realmente se renderiza adentro.
+    setActivePinia(createPinia())
+    const wrapper = mount(SettingsMenuMain)
+
+    const items = wrapper.findAll('.menu-item')
+    expect(items).toHaveLength(5)
+    for (const item of items) {
+      expect(item.find('.icon-badge svg').exists()).toBe(true)
+    }
+  })
+})
+
 describe('SettingsMenuMain - eliminar cuenta', () => {
   beforeEach(() => {
     setActivePinia(createPinia())

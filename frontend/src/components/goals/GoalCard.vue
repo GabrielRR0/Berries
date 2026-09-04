@@ -50,16 +50,29 @@ const exceedsAvailable = computed(() => {
   return props.goal.suggestedMonthlyContribution > props.savingsCapacity.avgMonthlyAvailable
 })
 
-const confirmingDelete = ref(false)
+// Idea de la sesion de brainstorm de UI: "Abandonar" disparaba el evento
+// directo desde el menu sin ningun paso intermedio, mientras "Eliminar" ya
+// tenia la confirmacion de 2 pasos completa (footer de altura fija + pulso
+// rojo) - inconsistente para dos acciones igual de "pesadas". Se generaliza
+// el mismo footer para ambas en vez de duplicar el bloque entero.
+const pendingAction = ref<'delete' | 'abandon' | null>(null)
+const pendingActionText = computed(() =>
+  pendingAction.value === 'abandon' ? '¿Abandonar meta?' : '¿Eliminar meta?',
+)
 function requestDelete() {
-  confirmingDelete.value = true
+  pendingAction.value = 'delete'
 }
-function cancelDelete() {
-  confirmingDelete.value = false
+function requestAbandon() {
+  pendingAction.value = 'abandon'
 }
-function confirmDelete() {
-  confirmingDelete.value = false
-  emit('remove')
+function cancelPendingAction() {
+  pendingAction.value = null
+}
+function confirmPendingAction() {
+  const action = pendingAction.value
+  pendingAction.value = null
+  if (action === 'delete') emit('remove')
+  else if (action === 'abandon') emit('abandon')
 }
 
 // Reveal inline chico (mismo criterio que el confirm de borrado) en vez de
@@ -135,7 +148,7 @@ function onMenuEdit() {
 }
 function onMenuAbandon() {
   showMenu.value = false
-  emit('abandon')
+  requestAbandon()
 }
 function onMenuDelete() {
   showMenu.value = false
@@ -144,7 +157,7 @@ function onMenuDelete() {
 </script>
 
 <template>
-  <BaseCard class="goal-card" :padded="false" :class="{ 'is-confirming-delete': confirmingDelete }">
+  <BaseCard class="goal-card" :padded="false" :class="{ 'is-confirming-action': pendingAction !== null }">
     <div class="goal-top-row">
       <p v-if="goal.status === 'active'" class="goal-days-remaining">Faltan {{ daysRemaining }} días</p>
 
@@ -245,14 +258,14 @@ function onMenuDelete() {
 
     <GoalCheckInHistory v-if="showHistory" :goal-id="goal.id" :currency="goal.currency" class="goal-history-panel" />
 
-    <!-- Alto fijo mientras esta activo (mismo criterio que antes): confirmar el
-         borrado nunca mueve nada fuera de la card. -->
+    <!-- Alto fijo mientras esta activo (mismo criterio que antes): confirmar
+         borrado o abandono nunca mueve nada fuera de la card. -->
     <Transition name="confirm-reveal">
-      <div v-if="confirmingDelete" class="goal-confirm" role="alert">
-        <span class="goal-confirm-text">¿Eliminar meta?</span>
+      <div v-if="pendingAction !== null" class="goal-confirm" role="alert">
+        <span class="goal-confirm-text">{{ pendingActionText }}</span>
         <div class="goal-confirm-actions">
-          <button type="button" class="goal-confirm-cancel" @click="cancelDelete">Cancelar</button>
-          <button type="button" class="goal-confirm-delete" @click="confirmDelete">Confirmar</button>
+          <button type="button" class="goal-confirm-cancel" @click="cancelPendingAction">Cancelar</button>
+          <button type="button" class="goal-confirm-delete" @click="confirmPendingAction">Confirmar</button>
         </div>
       </div>
     </Transition>
@@ -603,9 +616,9 @@ function onMenuDelete() {
   margin-top: 0.75rem;
 }
 
-/* Pulso rojo de una sola vez al pedir confirmacion - mismo criterio que
-   DebtCard.vue/WalletCard.vue. */
-.goal-card.is-confirming-delete {
+/* Pulso rojo de una sola vez al pedir confirmacion (eliminar o abandonar) -
+   mismo criterio que DebtCard.vue/WalletCard.vue. */
+.goal-card.is-confirming-action {
   border-color: var(--accent-border);
   animation: goal-danger-pulse 700ms var(--ease-out);
 }
@@ -623,7 +636,7 @@ function onMenuDelete() {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .goal-card.is-confirming-delete {
+  .goal-card.is-confirming-action {
     animation: none;
   }
 }

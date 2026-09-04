@@ -12,6 +12,7 @@ import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import PillToggle from '../ui/PillToggle.vue'
 import GoalCard from './GoalCard.vue'
 import GoalCheckInPrompt from './GoalCheckInPrompt.vue'
+import GoalTypeIcon from './GoalTypeIcon.vue'
 
 // Pantalla "Metas" (/metas) - ahorro con objetivo, pedido explicito del
 // usuario ("quiero comprar un TV de aqui a tres meses, debo reunir 80$ al
@@ -168,6 +169,7 @@ onMounted(() => {
       </TransitionGroup>
 
       <BaseCard v-else-if="!isLoading" class="goals-empty">
+        <span class="goals-empty-icon" aria-hidden="true"><GoalTypeIcon type="custom" /></span>
         <p class="goals-empty-title">Aún no tienes metas de ahorro</p>
         <p class="goals-empty-text">Usa el botón "+" para crear la primera.</p>
       </BaseCard>
@@ -296,6 +298,28 @@ onMounted(() => {
   margin-top: 1rem;
   text-align: center;
   color: var(--text-muted);
+}
+
+/* Idea de la sesion de brainstorm de UI: antes era solo texto - se siente
+   menos vacio con un icono grande, reutilizando GoalTypeIcon.vue (variante
+   "custom", el mismo "+" que ya se usa en el paso 1 del wizard) en vez de
+   inventar una ilustracion nueva. */
+.goals-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 0.75rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  color: var(--accent);
+}
+
+.goals-empty-icon svg {
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .goals-empty-title {

@@ -16,7 +16,7 @@ import type {
 } from './interfaces/TransactionsFilterSheet.interface'
 
 const props = defineProps<{ modelValue: TransactionsFilterState; categories: string[] }>()
-const emit = defineEmits<{ apply: [filter: TransactionsFilterState]; close: [] }>()
+const emit = defineEmits<{ apply: [filter: TransactionsFilterState] }>()
 
 const TYPE_OPTIONS = [
   { value: 'all', label: 'Todos' },
@@ -32,8 +32,13 @@ const PERIOD_OPTIONS = [
   { value: '30', label: '30 días' },
 ]
 
-// Copia local: los cambios de tipo/periodo/categoria solo se aplican al
-// tocar "Filtrar", no en cada tap.
+// Idea de la sesion de brainstorm de UI: antes Tipo/Periodo/Categoria solo
+// se aplicaban al tocar "Filtrar", mientras el buscador de texto (
+// TransactionsMain.vue) ya filtraba en vivo - una inconsistencia real entre
+// dos formas de filtrar la misma lista. Ahora los tres aplican en vivo, cada
+// tap emite "apply" de inmediato (igual criterio que el buscador), sin
+// boton "Filtrar" ni cierre automatico del sheet en mobile - el usuario
+// cierra el sheet cuando quiere, no como efecto secundario de filtrar.
 const draftType = ref<TransactionTypeFilter>(props.modelValue.type)
 const draftPeriod = ref<TransactionPeriodFilter>(props.modelValue.period)
 const draftCategory = ref<string | null>(props.modelValue.category)
@@ -59,26 +64,30 @@ const visibleCategories = computed(() => {
   return props.categories.filter((category) => category.toLowerCase().includes(query))
 })
 
+function applyDraft() {
+  emit('apply', { type: draftType.value, period: draftPeriod.value, category: draftCategory.value })
+}
+
 function onTypeChange(value: string) {
   draftType.value = value as TransactionTypeFilter
+  applyDraft()
 }
 
 function onPeriodChange(value: string) {
   draftPeriod.value = value as TransactionPeriodFilter
+  applyDraft()
 }
 
 function selectCategory(category: string | null) {
   draftCategory.value = draftCategory.value === category ? null : category
+  applyDraft()
 }
 
 function onClear() {
+  draftType.value = DEFAULT_TRANSACTIONS_FILTER.type
+  draftPeriod.value = DEFAULT_TRANSACTIONS_FILTER.period
+  draftCategory.value = DEFAULT_TRANSACTIONS_FILTER.category
   emit('apply', { ...DEFAULT_TRANSACTIONS_FILTER })
-  emit('close')
-}
-
-function onApply() {
-  emit('apply', { type: draftType.value, period: draftPeriod.value, category: draftCategory.value })
-  emit('close')
 }
 </script>
 
@@ -122,7 +131,6 @@ function onApply() {
 
     <div class="filter-actions">
       <BaseButton type="button" variant="secondary" size="sm" @click="onClear">Limpiar</BaseButton>
-      <BaseButton type="button" size="sm" @click="onApply">Filtrar</BaseButton>
     </div>
   </div>
 </template>

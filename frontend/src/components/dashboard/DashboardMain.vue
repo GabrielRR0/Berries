@@ -20,7 +20,7 @@ const walletsStore = useWalletsStore()
 const router = useRouter()
 const { close: closeTour } = useOnboardingTour()
 
-function onAddWalletClick() {
+function goToWallets() {
   router.push({ name: 'cuentas' })
 }
 
@@ -51,7 +51,7 @@ onUnmounted(closeTour)
             <h2 class="wallets-title">Mis balances</h2>
             <!-- Manda a /cuentas (WalletsMain.vue) - ahi vive la creacion real
                  de wallets, ver componentes bajo components/wallets/. -->
-            <button type="button" class="wallets-fab" aria-label="Agregar billetera" @click="onAddWalletClick">
+            <button type="button" class="wallets-fab" aria-label="Agregar billetera" @click="goToWallets">
               <!-- SVG en vez del glyph de texto "+" - un caracter de texto no
                    queda perfectamente centrado dentro de un circulo flex
                    (la metrica de la fuente no coincide con el centro visual
@@ -70,7 +70,16 @@ onUnmounted(closeTour)
           </BaseCard>
 
           <ul v-else class="wallets-preview-list">
-            <li v-for="wallet in walletsStore.wallets" :key="wallet.id" class="wallets-preview-item">
+            <li
+              v-for="wallet in walletsStore.wallets"
+              :key="wallet.id"
+              class="wallets-preview-item"
+              role="button"
+              tabindex="0"
+              @click="goToWallets"
+              @keydown.enter="goToWallets"
+              @keydown.space.prevent="goToWallets"
+            >
               <!-- Icono - oculto por default (display:none mas abajo),
                    visible solo en escritorio: mismo icono de "Cuentas" ya
                    usado en QuickActionsGrid.vue/WalletCard.vue, sin inventar
@@ -331,10 +340,18 @@ onUnmounted(closeTour)
   background: var(--glass-bg);
   backdrop-filter: blur(var(--blur-sm));
   -webkit-backdrop-filter: blur(var(--blur-sm));
+  cursor: pointer;
   transition:
     border-color var(--duration-base) var(--ease-out),
     transform var(--duration-fast) var(--ease-out),
     box-shadow var(--duration-fast) var(--ease-out);
+}
+
+/* Feedback tactil en mobile/tablet (sin :hover disponible ahi) - mismo
+   criterio que .new-wallet-trigger:active en WalletsMain.vue, ahora que la
+   fila navega a /cuentas en vez de ser puramente decorativa. */
+.wallets-preview-item:active {
+  transform: scale(0.98);
 }
 
 /* No usa BaseCard.vue (duplica su look de cristal a mano, igual que
