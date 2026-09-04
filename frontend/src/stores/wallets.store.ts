@@ -1,7 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { createWallet, deleteWallet, listWallets, transferBetweenWallets } from '../services/wallets/wallets.service'
-import type { TransferParams, Wallet } from '../services/wallets/interfaces/wallets.interface'
+import {
+  createWallet,
+  deleteWallet,
+  listWallets,
+  transferBetweenWallets,
+  updateTransfer as updateTransferRequest,
+} from '../services/wallets/wallets.service'
+import type { TransferParams, TransferUpdateParams, Wallet } from '../services/wallets/interfaces/wallets.interface'
 import { useTransactionsStore } from './transactions.store'
 
 // Estado global/cross-cutting de wallets (lista de cuentas del usuario) -
@@ -102,5 +108,19 @@ export const useWalletsStore = defineStore('wallets', () => {
     }
   }
 
-  return { wallets, isLoading, error, fetchWallets, addWallet, removeWallet, transfer }
+  // Edicion de una transferencia ya existente (monto/comision/fecha) - pedido
+  // explicito del usuario. Mismo criterio de refresco que transfer(): fuerza
+  // wallets+transactions en vez de parchear localmente.
+  async function updateTransfer(transferId: string, params: TransferUpdateParams): Promise<void> {
+    error.value = null
+    try {
+      await updateTransferRequest(transferId, params)
+      await Promise.all([fetchWallets({ force: true }), useTransactionsStore().fetchTransactions({ force: true })])
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'No se pudo editar la transferencia.'
+      throw err
+    }
+  }
+
+  return { wallets, isLoading, error, fetchWallets, addWallet, removeWallet, transfer, updateTransfer }
 })

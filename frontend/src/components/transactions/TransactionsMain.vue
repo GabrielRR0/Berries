@@ -7,6 +7,7 @@ import { useTransactionsStore } from '../../stores/transactions.store'
 import { useWalletsStore } from '../../stores/wallets.store'
 import { listDrafts } from '../../services/transactions/transactions.service'
 import type { Draft, Transaction } from '../../services/transactions/interfaces/transactions.interface'
+import type { TransferEditTarget } from '../../services/wallets/interfaces/wallets.interface'
 import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
 import ReceiptUpload from '../receiptScanner/ReceiptUpload.vue'
@@ -15,6 +16,7 @@ import BottomSheet from '../ui/BottomSheet.vue'
 import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import MonthPager from '../ui/MonthPager.vue'
 import VoiceEntryButton from '../voiceEntry/VoiceEntryButton.vue'
+import TransferForm from '../wallets/TransferForm.vue'
 import DraftReviewCard from './DraftReviewCard.vue'
 import MonthSummaryCards from './MonthSummaryCards.vue'
 import TransactionForm from './TransactionForm.vue'
@@ -48,6 +50,14 @@ const showCreateSheet = ref(false)
 // esta en modo creacion (comportamiento de siempre) - ver onEditTransaction/
 // closeCreateSheet mas abajo.
 const editingTransaction = ref<Transaction | null>(null)
+// Edicion de una transferencia (monto/comision/fecha) - pedido explicito del
+// usuario. Sheet propio, separado del de arriba: TransferForm.vue no
+// comparte campos con TransactionForm.vue (billeteras origen/destino,
+// comision, monto convertido) y la creacion de transferencias sigue
+// viviendo en Cuentas (WalletsMain.vue) - esto solo cubre editar una ya
+// existente, ver TransactionList.vue ("Editar" en una transferencia
+// fusionada).
+const editingTransfer = ref<TransferEditTarget | null>(null)
 const showHelpSheet = ref(false)
 const showFilterSheet = ref(false)
 const searchQuery = ref('')
@@ -224,6 +234,14 @@ function closeCreateSheet() {
   editingTransaction.value = null
 }
 
+function onEditTransfer(target: TransferEditTarget) {
+  editingTransfer.value = target
+}
+
+function closeTransferEditSheet() {
+  editingTransfer.value = null
+}
+
 async function onDeleteTransaction(transactionId: string) {
   try {
     await transactionsStore.removeTransaction(transactionId)
@@ -344,6 +362,7 @@ function goBack() {
               :wallets="walletsStore.wallets"
               @delete="onDeleteTransaction"
               @edit="onEditTransaction"
+              @edit-transfer="onEditTransfer"
             />
           </Transition>
         </section>
@@ -369,6 +388,10 @@ function goBack() {
         @updated="onTransactionUpdated"
         @cancel="closeCreateSheet"
       />
+    </BottomSheet>
+
+    <BottomSheet v-if="editingTransfer" title="Editar transferencia" @close="closeTransferEditSheet">
+      <TransferForm :editing-transfer="editingTransfer" @updated="closeTransferEditSheet" @cancel="closeTransferEditSheet" />
     </BottomSheet>
 
     <TransactionsFilterSheet

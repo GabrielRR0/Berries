@@ -5,7 +5,7 @@
 // camelCase. Sin un cliente API compartido: el JWT se lee directo de
 // useAuthStore().token en cada llamada (ver plan de Berry).
 import { useAuthStore } from '../../stores/auth.store'
-import type { TransferParams, TransferResult, Wallet } from './interfaces/wallets.interface'
+import type { TransferParams, TransferResult, TransferUpdateParams, Wallet } from './interfaces/wallets.interface'
 
 // Forma "sobre el cable": "balance" es un Decimal de Pydantic, que puede
 // serializarse como number o como string segun el caso - se acepta ambos y
@@ -108,6 +108,7 @@ export async function transferBetweenWallets(params: TransferParams): Promise<Tr
   }
   if (params.fee !== undefined) payload.fee = params.fee
   if (params.convertedAmount !== undefined) payload.converted_amount = params.convertedAmount
+  if (params.occurredAt !== undefined) payload.occurred_at = params.occurredAt
 
   const response = await fetch(`${API_BASE_URL}/api/wallets/transfer`, {
     method: 'POST',
@@ -118,6 +119,31 @@ export async function transferBetweenWallets(params: TransferParams): Promise<Tr
   if (!response.ok) {
     throw new WalletsApiError(
       await parseErrorMessage(response, 'No se pudo completar la transferencia.'),
+      response.status,
+    )
+  }
+
+  const wire = (await response.json()) as TransferResultWire
+  return { fromWallet: mapWallet(wire.from_wallet), toWallet: mapWallet(wire.to_wallet) }
+}
+
+export async function updateTransfer(transferId: string, params: TransferUpdateParams): Promise<TransferResult> {
+  const payload: Record<string, unknown> = {
+    amount: params.amount,
+    occurred_at: params.occurredAt,
+    fee: params.fee ?? 0,
+  }
+  if (params.convertedAmount !== undefined) payload.converted_amount = params.convertedAmount
+
+  const response = await fetch(`${API_BASE_URL}/api/wallets/transfer/${transferId}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    throw new WalletsApiError(
+      await parseErrorMessage(response, 'No se pudo editar la transferencia.'),
       response.status,
     )
   }

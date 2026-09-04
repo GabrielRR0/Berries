@@ -90,67 +90,79 @@ async function onDeleteAccount() {
         </div>
       </BaseCard>
 
-      <nav class="menu-list" aria-label="Menú de ajustes">
-        <RouterLink to="/calculadora" class="menu-item">
-          <IconBadge size="sm">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="6" y="3" width="12" height="18" rx="2" />
-              <path d="M9 8h6M9 12h6M9 16h6" stroke-linecap="round" />
-            </svg>
-          </IconBadge>
-          <span class="menu-item-label">Calculadora</span>
-          <span class="menu-item-arrow" aria-hidden="true">›</span>
-        </RouterLink>
+      <!-- Idea de la sesion de brainstorm de UI: antes era una sola lista
+           plana de 5 enlaces sin jerarquia - se agrupa por tipo (datos
+           financieros vs. herramientas) para que se sienta menos "bolsa de
+           links" al escanearla. -->
+      <div class="menu-section">
+        <p class="menu-section-label">Tus finanzas</p>
+        <nav class="menu-list" aria-label="Tus finanzas">
+          <RouterLink to="/deudas" class="menu-item">
+            <IconBadge size="sm">
+              <!-- Recibo/pagare - distinto del icono de Cuentas (tambien
+                   basado en un rectangulo) para que se distingan al escanear
+                   la lista. -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 3h12v16l-2-1.5L14 19l-2-1.5L10 19l-2-1.5L6 19V3Z" stroke-linejoin="round" />
+                <path d="M9 8h6M9 12h6" stroke-linecap="round" />
+              </svg>
+            </IconBadge>
+            <span class="menu-item-label">Deudas</span>
+            <span class="menu-item-arrow" aria-hidden="true">›</span>
+          </RouterLink>
 
-        <RouterLink to="/deudas" class="menu-item">
-          <IconBadge size="sm">
-            <!-- Recibo/pagare - distinto del icono de Cuentas (tambien
-                 basado en un rectangulo) para que se distingan al escanear
-                 la lista. -->
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 3h12v16l-2-1.5L14 19l-2-1.5L10 19l-2-1.5L6 19V3Z" stroke-linejoin="round" />
-              <path d="M9 8h6M9 12h6" stroke-linecap="round" />
-            </svg>
-          </IconBadge>
-          <span class="menu-item-label">Deudas</span>
-          <span class="menu-item-arrow" aria-hidden="true">›</span>
-        </RouterLink>
+          <RouterLink to="/metas" class="menu-item">
+            <IconBadge size="sm">
+              <!-- Mismo bullseye que QuickActionsGrid.vue usa para Metas -
+                   misma seccion, mismo simbolo. -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="8.5" />
+                <circle cx="12" cy="12" r="4.5" />
+                <circle cx="12" cy="12" r="0.5" fill="currentColor" />
+              </svg>
+            </IconBadge>
+            <span class="menu-item-label">Metas</span>
+            <span class="menu-item-arrow" aria-hidden="true">›</span>
+          </RouterLink>
+        </nav>
+      </div>
 
-        <RouterLink to="/metas" class="menu-item">
-          <IconBadge size="sm">
-            <!-- Mismo bullseye que QuickActionsGrid.vue usa para Metas -
-                 misma seccion, mismo simbolo. -->
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="8.5" />
-              <circle cx="12" cy="12" r="4.5" />
-              <circle cx="12" cy="12" r="0.5" fill="currentColor" />
-            </svg>
-          </IconBadge>
-          <span class="menu-item-label">Metas</span>
-          <span class="menu-item-arrow" aria-hidden="true">›</span>
-        </RouterLink>
+      <div class="menu-section">
+        <p class="menu-section-label">Herramientas</p>
+        <nav class="menu-list" aria-label="Herramientas">
+          <RouterLink to="/calculadora" class="menu-item">
+            <IconBadge size="sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="6" y="3" width="12" height="18" rx="2" />
+                <path d="M9 8h6M9 12h6M9 16h6" stroke-linecap="round" />
+              </svg>
+            </IconBadge>
+            <span class="menu-item-label">Calculadora</span>
+            <span class="menu-item-arrow" aria-hidden="true">›</span>
+          </RouterLink>
 
-        <RouterLink to="/categorias" class="menu-item">
-          <IconBadge size="sm">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M3 11V5a2 2 0 0 1 2-2h6l10 10-8 8L3 11Z" stroke-linejoin="round" />
-              <circle cx="8" cy="8" r="1.25" fill="currentColor" stroke="none" />
-            </svg>
-          </IconBadge>
-          <span class="menu-item-label">Categorías</span>
-          <span class="menu-item-arrow" aria-hidden="true">›</span>
-        </RouterLink>
+          <RouterLink to="/categorias" class="menu-item">
+            <IconBadge size="sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 11V5a2 2 0 0 1 2-2h6l10 10-8 8L3 11Z" stroke-linejoin="round" />
+                <circle cx="8" cy="8" r="1.25" fill="currentColor" stroke="none" />
+              </svg>
+            </IconBadge>
+            <span class="menu-item-label">Categorías</span>
+            <span class="menu-item-arrow" aria-hidden="true">›</span>
+          </RouterLink>
 
-        <RouterLink to="/analitica" class="menu-item">
-          <IconBadge size="sm">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M4 20V10M10 20V4M16 20v-7M4 20h16" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-          </IconBadge>
-          <span class="menu-item-label">Análisis</span>
-          <span class="menu-item-arrow" aria-hidden="true">›</span>
-        </RouterLink>
-      </nav>
+          <RouterLink to="/analitica" class="menu-item">
+            <IconBadge size="sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 20V10M10 20V4M16 20v-7M4 20h16" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </IconBadge>
+            <span class="menu-item-label">Análisis</span>
+            <span class="menu-item-arrow" aria-hidden="true">›</span>
+          </RouterLink>
+        </nav>
+      </div>
 
       <BaseButton variant="secondary" class="logout-button" @click="onLogout">Cerrar sesión</BaseButton>
 
@@ -248,6 +260,24 @@ async function onDeleteAccount() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Mismo criterio visual que .danger-zone-label mas abajo (mayuscula chica,
+   letter-spacing, color muted) - un solo estilo de "etiqueta de grupo" en
+   toda la pantalla. */
+.menu-section-label {
+  padding-left: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .menu-list {

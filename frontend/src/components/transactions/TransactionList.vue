@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { Transaction } from '../../services/transactions/interfaces/transactions.interface'
-import type { Wallet } from '../../services/wallets/interfaces/wallets.interface'
+import type { TransferEditTarget, Wallet } from '../../services/wallets/interfaces/wallets.interface'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import { formatDate } from '../../utils/formatters/formatDate'
 import IconBadge from '../ui/IconBadge.vue'
@@ -15,15 +15,28 @@ import IconBadge from '../ui/IconBadge.vue'
 // movimiento (no en la de currencyStore) - una transaction no trae su propia
 // moneda, solo wallet_id, asi que se resuelve buscando la wallet en la lista
 // dada por props (fallbackCurrency cubre el caso de una wallet ya borrada).
-const props = withDefaults(defineProps<{ transactions: Transaction[]; wallets: Wallet[]; fallbackCurrency?: string }>(), {
-  fallbackCurrency: 'USD',
-})
+// "readonly": idea de la sesion de brainstorm de UI - una vista previa corta
+// (ej. "Ultimos movimientos" en Inicio) no deberia ofrecer Editar/Eliminar
+// inline (son acciones destructivas/de detalle que ya viven en su lugar
+// completo, Movimientos) - solo oculta el footer de acciones, el resto de la
+// fila (icono, categoria, fecha, monto, referencia) se ve identico.
+const props = withDefaults(
+  defineProps<{ transactions: Transaction[]; wallets: Wallet[]; fallbackCurrency?: string; readonly?: boolean }>(),
+  { fallbackCurrency: 'USD', readonly: false },
+)
 // "edit": pedido explicito del usuario ("se debe poder editar los movimientos...
-// montos, fecha de pago, description, wallet_id, category") - nunca para una pata de
-// transferencia (ver el v-if del boton en el template: el backend las rechaza, ver
-// update_transaction, editarlas de a una dejaria el ledger de la transferencia
-// inconsistente).
-const emit = defineEmits<{ delete: [transactionId: string]; edit: [transaction: Transaction] }>()
+// montos, fecha de pago, description, wallet_id, category") - nunca sobre UNA pata
+// suelta de transferencia (ver el v-if del boton en el template: update_transaction
+// las rechaza, editarlas de a una dejaria el ledger de la transferencia
+// inconsistente). Una transferencia FUSIONADA (ambas patas presentes, kind:'transfer')
+// SI se puede editar como unidad completa - "editTransfer" (pedido explicito del
+// usuario: "que se pueda editar esto [la fecha] y también los montos"), via
+// update_transfer/TransferForm.vue, nunca "edit".
+const emit = defineEmits<{
+  delete: [transactionId: string]
+  edit: [transaction: Transaction]
+  editTransfer: [target: TransferEditTarget]
+}>()
 
 const confirmingDeleteId = ref<string | null>(null)
 
@@ -129,6 +142,23 @@ function transferSecondaryText(item: TransferListItem): string {
   return item.feeLeg ? `${fromText} transferidos` : `${fromText} transferidos, sin comisión`
 }
 
+// Arma el TransferEditTarget que espera TransferForm.vue a partir de las
+// patas ya fusionadas (fromLeg/toLeg/feeLeg) - convertedAmount solo tiene
+// sentido si las monedas difieren, mismo criterio que transferSecondaryText.
+function transferEditTarget(item: TransferListItem): TransferEditTarget {
+  const fromCurrency = currencyFor(item.fromLeg)
+  const toCurrency = currencyFor(item.toLeg)
+  return {
+    transferId: item.transferId,
+    fromWalletId: item.fromLeg.walletId,
+    toWalletId: item.toLeg.walletId,
+    amount: item.fromLeg.amount,
+    fee: item.feeLeg?.amount ?? 0,
+    convertedAmount: toCurrency !== fromCurrency ? item.toLeg.amount : null,
+    occurredAt: item.occurredAt,
+  }
+}
+
 function requestDelete(id: string) {
   confirmingDeleteId.value = id
 }
@@ -216,7 +246,7 @@ function confirmDelete(id: string) {
            mueve afuera de la card). El pulso rojo de .is-confirming-delete
            (ver mas abajo) sigue siendo la señal "llamativa" de zona de
            peligro, sin depender de que el bloque crezca. -->
-      <div class="transaction-footer">
+      <div v-if="!props.readonly" class="transaction-footer">
         <Transition name="confirm-reveal">
           <div v-if="confirmingDeleteId === listItemId(item)" class="transaction-confirm" role="alert">
             <span class="transaction-confirm-text">
@@ -234,12 +264,22 @@ function confirmDelete(id: string) {
             </div>
           </div>
           <div v-else class="transaction-actions">
-            <!-- Nunca para una pata de transferencia (transferId no nulo, ni siquiera
-                 la comisión con source="manual") - el backend la rechaza igual (ver
-                 update_transaction), editarla de a una dejaria el ledger de la
-                 transferencia inconsistente. -->
+            <!-- Nunca sobre UNA pata suelta de transferencia (transferId no nulo, ni
+                 siquiera la comisión con source="manual") - el backend la rechaza igual
+                 (ver update_transaction), editarla de a una dejaria el ledger de la
+                 transferencia inconsistente. Una transferencia FUSIONADA (kind:'transfer',
+                 ambas patas presentes) SI se puede editar como unidad completa - pedido
+                 explicito del usuario, ver update_transfer/TransferForm.vue. -->
             <button
-              v-if="item.kind === 'single' && item.transaction.transferId === null"
+              v-if="item.kind === 'transfer'"
+              type="button"
+              class="transaction-edit-trigger"
+              @click="emit('editTransfer', transferEditTarget(item))"
+            >
+              Editar
+            </button>
+            <button
+              v-else-if="item.kind === 'single' && item.transaction.transferId === null"
               type="button"
               class="transaction-edit-trigger"
               @click="emit('edit', item.transaction)"

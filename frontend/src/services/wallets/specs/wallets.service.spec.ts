@@ -1,7 +1,14 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from '../../../stores/auth.store'
-import { WalletsApiError, createWallet, deleteWallet, listWallets, transferBetweenWallets } from '../wallets.service'
+import {
+  WalletsApiError,
+  createWallet,
+  deleteWallet,
+  listWallets,
+  transferBetweenWallets,
+  updateTransfer,
+} from '../wallets.service'
 
 function mockResponse(body: unknown, init: { ok?: boolean; status?: number } = {}): Response {
   return {
@@ -165,6 +172,86 @@ describe('wallets.service', () => {
       expect(error).toBeInstanceOf(WalletsApiError)
       expect((error as WalletsApiError).status).toBe(400)
       expect((error as WalletsApiError).message).toBe('Fondos insuficientes.')
+    })
+
+    // Pedido explicito del usuario: poder backdatear una transferencia.
+    it('incluye occurred_at cuando se da', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse({ from_wallet: WALLET_WIRE, to_wallet: WALLET_WIRE }))
+
+      await transferBetweenWallets({
+        fromWalletId: 'w1',
+        toWalletId: 'w2',
+        amount: 50,
+        occurredAt: '2026-01-15T12:00:00.000Z',
+      })
+
+      const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+      expect(body).toEqual({
+        from_wallet_id: 'w1',
+        to_wallet_id: 'w2',
+        amount: 50,
+        occurred_at: '2026-01-15T12:00:00.000Z',
+      })
+    })
+  })
+
+  // Edicion de una transferencia existente - pedido explicito del usuario
+  // ("que se pueda editar esto [la fecha] y también los montos").
+  describe('updateTransfer', () => {
+    it('manda PATCH a /api/wallets/transfer/{id} con amount/occurred_at/fee(0 por defecto)', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse({ from_wallet: WALLET_WIRE, to_wallet: WALLET_WIRE }))
+
+      await updateTransfer('transfer-1', { amount: 60, occurredAt: '2026-02-01T09:00:00.000Z' })
+
+      const [url, init] = vi.mocked(fetch).mock.calls[0]
+      expect(url).toBe('/api/wallets/transfer/transfer-1')
+      expect(init!.method).toBe('PATCH')
+      expect(init!.headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer jwt-token' })
+      expect(JSON.parse(init!.body as string)).toEqual({
+        amount: 60,
+        occurred_at: '2026-02-01T09:00:00.000Z',
+        fee: 0,
+      })
+    })
+
+    it('incluye converted_amount y el fee dado cuando se pasan', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse({ from_wallet: WALLET_WIRE, to_wallet: WALLET_WIRE }))
+
+      await updateTransfer('transfer-1', {
+        amount: 20,
+        occurredAt: '2026-02-01T09:00:00.000Z',
+        fee: 3,
+        convertedAmount: 700,
+      })
+
+      const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+      expect(body).toEqual({
+        amount: 20,
+        occurred_at: '2026-02-01T09:00:00.000Z',
+        fee: 3,
+        converted_amount: 700,
+      })
+    })
+
+    it('mapea from_wallet/to_wallet a camelCase', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse({ from_wallet: WALLET_WIRE, to_wallet: WALLET_WIRE }))
+
+      const result = await updateTransfer('transfer-1', { amount: 60, occurredAt: '2026-02-01T09:00:00.000Z' })
+
+      expect(result).toEqual({ fromWallet: WALLET_MAPPED, toWallet: WALLET_MAPPED })
+    })
+
+    it('lanza WalletsApiError con el status y detail del backend', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse({ detail: 'Transferencia no encontrada.' }, { ok: false, status: 404 }))
+
+      const error: unknown = await updateTransfer('transfer-x', {
+        amount: 60,
+        occurredAt: '2026-02-01T09:00:00.000Z',
+      }).catch((e: unknown) => e)
+
+      expect(error).toBeInstanceOf(WalletsApiError)
+      expect((error as WalletsApiError).status).toBe(404)
+      expect((error as WalletsApiError).message).toBe('Transferencia no encontrada.')
     })
   })
 })

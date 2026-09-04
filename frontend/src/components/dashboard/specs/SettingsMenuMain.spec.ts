@@ -47,6 +47,13 @@ describe('SettingsMenuMain - header e iconos', () => {
     expect(wrapper.text()).toContain('¿Qué es Menú?')
   })
 
+  it('agrupa los enlaces en "Tus finanzas" y "Herramientas"', () => {
+    const wrapper = mountSettings()
+
+    const labels = wrapper.findAll('.menu-section-label').map((el) => el.text())
+    expect(labels).toEqual(['Tus finanzas', 'Herramientas'])
+  })
+
   it('cada item del menu tiene un icono propio', () => {
     // Sin stubear RouterLink aca (a diferencia de mountSettings()): el stub
     // global descarta el contenido de sus slots, asi que nunca dejaria ver

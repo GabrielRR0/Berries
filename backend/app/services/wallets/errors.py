@@ -8,3 +8,7 @@ class InsufficientBalanceError(Exception):
 
 class CurrencyMismatchError(Exception):
     pass
+
+
+class TransferNotFoundError(Exception):
+    pass

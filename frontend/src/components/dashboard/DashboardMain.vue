@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { onUnmounted } from 'vue'
+import { computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useOnboardingTour } from '../../composables/onboarding/useOnboardingTour'
+import { useTransactionsStore } from '../../stores/transactions.store'
 import { useWalletsStore } from '../../stores/wallets.store'
 import PageShell from '../layout/PageShell.vue'
 import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
 import BaseCard from '../ui/BaseCard.vue'
+import LoadingIndicator from '../ui/LoadingIndicator.vue'
+import TransactionList from '../transactions/TransactionList.vue'
 import BalanceCard from './BalanceCard.vue'
 import IncomeExpenseSummary from './IncomeExpenseSummary.vue'
 import QuickActionsGrid from './QuickActionsGrid.vue'
@@ -17,6 +20,20 @@ import QuickActionsGrid from './QuickActionsGrid.vue'
 // TopHeader/BottomTabBar ya no se montan aca - viven una sola vez en
 // App.vue, ver el comentario de PageShell.vue.
 const walletsStore = useWalletsStore()
+// Idea de la sesion de brainstorm de UI: antes la unica forma de ver
+// movimientos desde Inicio era abrir el sheet de Ingresos/Gastos (varios
+// taps). Misma logica de "solo leer, no volver a pedir" que la seccion de
+// wallets de arriba - IncomeExpenseSummary.vue (hijo de esta misma pantalla)
+// ya hace fetchTransactions() en su propio onMounted, esto solo lee la
+// cache compartida (transactions.store.ts).
+const transactionsStore = useTransactionsStore()
+const RECENT_TRANSACTIONS_LIMIT = 5
+const recentTransactions = computed(() =>
+  [...transactionsStore.transactions]
+    .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+    .slice(0, RECENT_TRANSACTIONS_LIMIT),
+)
+
 const router = useRouter()
 const { close: closeTour } = useOnboardingTour()
 
@@ -46,6 +63,32 @@ onUnmounted(closeTour)
       <div class="dashboard-col dashboard-col-secondary">
         <IncomeExpenseSummary class="dashboard-section" />
 
+        <section class="dashboard-section recent-section">
+          <div class="recent-header">
+            <h2 class="recent-title">Últimos movimientos</h2>
+            <RouterLink to="/movimientos" class="recent-view-all">Ver todos →</RouterLink>
+          </div>
+
+          <Transition name="loading-fade" mode="out-in">
+            <LoadingIndicator
+              v-if="transactionsStore.isLoading && transactionsStore.transactions.length === 0"
+              key="loading"
+              label="Cargando movimientos..."
+            />
+            <BaseCard v-else-if="recentTransactions.length === 0" key="empty" class="recent-empty">
+              <p class="recent-empty-text">Todavía no registraste ningún movimiento.</p>
+            </BaseCard>
+
+            <TransactionList
+              v-else
+              key="list"
+              :transactions="recentTransactions"
+              :wallets="walletsStore.wallets"
+              readonly
+            />
+          </Transition>
+        </section>
+
         <section class="dashboard-section wallets-section">
           <div class="wallets-header">
             <h2 class="wallets-title">Mis balances</h2>
@@ -62,41 +105,49 @@ onUnmounted(closeTour)
             </button>
           </div>
 
-          <BaseCard v-if="walletsStore.wallets.length === 0" class="wallets-empty">
-            <p class="wallets-empty-title">Todavía no tienes billeteras</p>
-            <p class="wallets-empty-text">
-              Crea tu primera billetera para empezar a llevar tus cuentas en distintas monedas.
-            </p>
-          </BaseCard>
+          <Transition name="loading-fade" mode="out-in">
+            <LoadingIndicator
+              v-if="walletsStore.isLoading && walletsStore.wallets.length === 0"
+              key="loading"
+              label="Cargando billeteras..."
+            />
 
-          <ul v-else class="wallets-preview-list">
-            <li
-              v-for="wallet in walletsStore.wallets"
-              :key="wallet.id"
-              class="wallets-preview-item"
-              role="button"
-              tabindex="0"
-              @click="goToWallets"
-              @keydown.enter="goToWallets"
-              @keydown.space.prevent="goToWallets"
-            >
-              <!-- Icono - oculto por default (display:none mas abajo),
-                   visible solo en escritorio: mismo icono de "Cuentas" ya
-                   usado en QuickActionsGrid.vue/WalletCard.vue, sin inventar
-                   uno nuevo. -->
-              <span class="wallets-preview-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="6" width="18" height="13" rx="2" />
-                  <path d="M3 10h18" />
-                  <path d="M16 15h2" stroke-linecap="round" />
-                </svg>
-              </span>
-              <span class="wallets-preview-name">{{ wallet.name }}</span>
-              <span class="wallets-preview-balance">
-                <AnimatedCurrency :value="wallet.balance" :currency="wallet.currency" />
-              </span>
-            </li>
-          </ul>
+            <BaseCard v-else-if="walletsStore.wallets.length === 0" key="empty" class="wallets-empty">
+              <p class="wallets-empty-title">Todavía no tienes billeteras</p>
+              <p class="wallets-empty-text">
+                Crea tu primera billetera para empezar a llevar tus cuentas en distintas monedas.
+              </p>
+            </BaseCard>
+
+            <ul v-else key="list" class="wallets-preview-list">
+              <li
+                v-for="wallet in walletsStore.wallets"
+                :key="wallet.id"
+                class="wallets-preview-item"
+                role="button"
+                tabindex="0"
+                @click="goToWallets"
+                @keydown.enter="goToWallets"
+                @keydown.space.prevent="goToWallets"
+              >
+                <!-- Icono - oculto por default (display:none mas abajo),
+                     visible solo en escritorio: mismo icono de "Cuentas" ya
+                     usado en QuickActionsGrid.vue/WalletCard.vue, sin inventar
+                     uno nuevo. -->
+                <span class="wallets-preview-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="6" width="18" height="13" rx="2" />
+                    <path d="M3 10h18" />
+                    <path d="M16 15h2" stroke-linecap="round" />
+                  </svg>
+                </span>
+                <span class="wallets-preview-name">{{ wallet.name }}</span>
+                <span class="wallets-preview-balance">
+                  <AnimatedCurrency :value="wallet.balance" :currency="wallet.currency" />
+                </span>
+              </li>
+            </ul>
+          </Transition>
         </section>
       </div>
     </div>
@@ -200,6 +251,7 @@ onUnmounted(closeTour)
     font-size: 1.75rem;
   }
 
+  .recent-title,
   .wallets-title {
     font-size: 1.375rem;
   }
@@ -256,10 +308,48 @@ onUnmounted(closeTour)
     animation-delay: 100ms;
   }
 
-  .wallets-section {
+  .recent-section {
     animation: content-enter var(--duration-base) var(--ease-out) backwards;
     animation-delay: 150ms;
   }
+
+  .wallets-section {
+    animation: content-enter var(--duration-base) var(--ease-out) backwards;
+    animation-delay: 200ms;
+  }
+}
+
+.recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.recent-title {
+  font-size: 1.125rem;
+}
+
+.recent-view-all {
+  flex-shrink: 0;
+  color: var(--accent);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.recent-view-all:hover {
+  opacity: 0.85;
+}
+
+.recent-empty {
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.recent-empty-text {
+  font-size: 0.8125rem;
 }
 
 .wallets-header {

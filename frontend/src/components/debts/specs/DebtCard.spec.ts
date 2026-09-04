@@ -94,6 +94,23 @@ describe('DebtCard', () => {
     expect(wrapper.text()).not.toContain('Resta')
   })
 
+  // Idea de la sesion de brainstorm de UI: antes el progreso de pago era solo
+  // texto ("Resta $X") - se reutiliza GoalProgressRing.vue (ya generico, sin
+  // conocimiento de "metas") para un indicador visual de "% pagado".
+  it('sin pagos registrados no muestra el anillo de progreso', () => {
+    const wrapper = mount(DebtCard, { props: { debt: DEBT } })
+
+    expect(wrapper.find('.debt-progress-ring').exists()).toBe(false)
+  })
+
+  it('con pagos registrados muestra el anillo de progreso con el % pagado', () => {
+    const debtWithPayments = { ...DEBT, amountPaid: 25, remainingAmount: 25 }
+    const wrapper = mount(DebtCard, { props: { debt: debtWithPayments } })
+
+    expect(wrapper.find('.debt-progress-ring').exists()).toBe(true)
+    expect(wrapper.find('.debt-progress-percent').text()).toBe('50%')
+  })
+
   it('con pagos registrados muestra un resumen compacto (no el listado directo) y cuanto resta', () => {
     const debtWithPayments = {
       ...DEBT,

@@ -17,6 +17,33 @@ describe('BalanceCard', () => {
     vi.restoreAllMocks()
   })
 
+  // Idea de la sesion de brainstorm de UI: sin esto, el monto grande
+  // mostraba "$0.00" REAL (no un placeholder) mientras las wallets todavia
+  // cargaban - en una conexion lenta se podia leer como el balance real.
+  // Se controla la resolucion del fetch a mano (en vez de mockResolvedValue,
+  // que ya resuelve solo) para poder verificar el estado de carga sin una
+  // carrera de microtasks contra el propio fetch.
+  it('muestra un indicador de carga mientras cargan las wallets, y el monto real despues', async () => {
+    let resolveFetch!: (wallets: []) => void
+    vi.mocked(walletsService.listWallets).mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve
+      }),
+    )
+
+    const wrapper = mount(BalanceCard)
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.loading-indicator').exists()).toBe(true)
+    expect(wrapper.find('.balance-amount').exists()).toBe(false)
+
+    resolveFetch([])
+    await flushPromises()
+
+    expect(wrapper.find('.loading-indicator').exists()).toBe(false)
+    expect(wrapper.find('.balance-amount').exists()).toBe(true)
+  })
+
   // Bug real reportado por el usuario: no habia endpoint de analitica para
   // el "+X% vs mes pasado" y el valor quedaba hardcodeado en 0 - mostraba un
   // dato falso siempre. Se saca la linea hasta tener un calculo real.

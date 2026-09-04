@@ -168,6 +168,117 @@ def test_transfer_rejects_wallet_belonging_to_another_user(client, db):
     assert response.status_code == 404
 
 
+def test_transfer_accepts_an_explicit_occurred_at(client, db):
+    token = _register(client)
+    cash_id = _create_wallet(client, token, "Cash", "USD").json()["id"]
+    bank_id = _create_wallet(client, token, "Banco", "USD").json()["id"]
+    _fund_wallet(db, cash_id, "100.00")
+
+    response = client.post(
+        "/api/wallets/transfer",
+        json={
+            "from_wallet_id": cash_id,
+            "to_wallet_id": bank_id,
+            "amount": "40.00",
+            "occurred_at": "2026-01-15T12:00:00Z",
+        },
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    transactions = client.get("/api/transactions", headers=_auth_headers(token)).json()
+    assert all(t["occurred_at"].startswith("2026-01-15T12:00:00") for t in transactions)
+
+
+def _transfer_id_of(client, token):
+    transactions = client.get("/api/transactions", headers=_auth_headers(token)).json()
+    expense_leg = next(t for t in transactions if t["type"] == "expense" and t["category"] == "Transferencia")
+    return expense_leg["transfer_id"]
+
+
+def test_update_transfer_changes_amount_and_date(client, db):
+    token = _register(client)
+    cash_id = _create_wallet(client, token, "Cash", "USD").json()["id"]
+    bank_id = _create_wallet(client, token, "Banco", "USD").json()["id"]
+    _fund_wallet(db, cash_id, "100.00")
+    client.post(
+        "/api/wallets/transfer",
+        json={"from_wallet_id": cash_id, "to_wallet_id": bank_id, "amount": "40.00"},
+        headers=_auth_headers(token),
+    )
+    transfer_id = _transfer_id_of(client, token)
+
+    response = client.patch(
+        f"/api/wallets/transfer/{transfer_id}",
+        json={"amount": "60.00", "occurred_at": "2026-02-01T09:00:00Z"},
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert Decimal(body["from_wallet"]["balance"]) == Decimal("40.00")
+    assert Decimal(body["to_wallet"]["balance"]) == Decimal("60.00")
+
+    transactions = client.get("/api/transactions", headers=_auth_headers(token)).json()
+    assert all(Decimal(t["amount"]) == Decimal("60.00") for t in transactions)
+    assert all(t["occurred_at"].startswith("2026-02-01T09:00:00") for t in transactions)
+
+
+def test_update_transfer_rejects_insufficient_balance(client, db):
+    token = _register(client)
+    cash_id = _create_wallet(client, token, "Cash", "USD").json()["id"]
+    bank_id = _create_wallet(client, token, "Banco", "USD").json()["id"]
+    _fund_wallet(db, cash_id, "50.00")
+    client.post(
+        "/api/wallets/transfer",
+        json={"from_wallet_id": cash_id, "to_wallet_id": bank_id, "amount": "10.00"},
+        headers=_auth_headers(token),
+    )
+    transfer_id = _transfer_id_of(client, token)
+
+    response = client.patch(
+        f"/api/wallets/transfer/{transfer_id}",
+        json={"amount": "1000.00", "occurred_at": "2026-02-01T09:00:00Z"},
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 400
+
+
+def test_update_transfer_returns_404_for_an_unknown_transfer_id(client):
+    token = _register(client)
+
+    response = client.patch(
+        f"/api/wallets/transfer/{uuid.uuid4()}",
+        json={"amount": "10.00", "occurred_at": "2026-02-01T09:00:00Z"},
+        headers=_auth_headers(token),
+    )
+
+    assert response.status_code == 404
+
+
+def test_update_transfer_returns_404_for_another_users_transfer(client, db):
+    token_a = _register(client, "a@example.com")
+    token_b = _register(client, "b@example.com")
+    cash_id = _create_wallet(client, token_a, "Cash", "USD").json()["id"]
+    bank_id = _create_wallet(client, token_a, "Banco", "USD").json()["id"]
+    _fund_wallet(db, cash_id, "100.00")
+    client.post(
+        "/api/wallets/transfer",
+        json={"from_wallet_id": cash_id, "to_wallet_id": bank_id, "amount": "10.00"},
+        headers=_auth_headers(token_a),
+    )
+    transfer_id = _transfer_id_of(client, token_a)
+
+    response = client.patch(
+        f"/api/wallets/transfer/{transfer_id}",
+        json={"amount": "20.00", "occurred_at": "2026-02-01T09:00:00Z"},
+        headers=_auth_headers(token_b),
+    )
+
+    assert response.status_code == 404
+
+
 def test_wallet_endpoints_require_auth(client):
     response = client.get("/api/wallets")
 

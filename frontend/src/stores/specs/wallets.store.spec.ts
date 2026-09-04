@@ -5,6 +5,7 @@ import {
   deleteWallet,
   listWallets,
   transferBetweenWallets,
+  updateTransfer,
 } from '../../services/wallets/wallets.service'
 import { useTransactionsStore } from '../transactions.store'
 import { useWalletsStore } from '../wallets.store'
@@ -19,6 +20,7 @@ vi.mock('../../services/wallets/wallets.service', async () => {
     listWallets: vi.fn(),
     deleteWallet: vi.fn(),
     transferBetweenWallets: vi.fn(),
+    updateTransfer: vi.fn(),
   }
 })
 
@@ -32,6 +34,7 @@ describe('wallets.store', () => {
     vi.mocked(listWallets).mockReset()
     vi.mocked(deleteWallet).mockReset()
     vi.mocked(transferBetweenWallets).mockReset()
+    vi.mocked(updateTransfer).mockReset()
   })
 
   it('arranca con la lista vacia, sin cargar y sin error', () => {
@@ -184,6 +187,36 @@ describe('wallets.store', () => {
 
       expect(listWallets).not.toHaveBeenCalled()
       expect(store.error).toBe('Fondos insuficientes.')
+    })
+  })
+
+  // Edicion de una transferencia existente - pedido explicito del usuario
+  // ("que se pueda editar esto [la fecha] y también los montos").
+  describe('updateTransfer', () => {
+    it('vuelve a pedir billeteras y movimientos tras editar exitosamente', async () => {
+      vi.mocked(updateTransfer).mockResolvedValue({ fromWallet: WALLET_A, toWallet: WALLET_B })
+      vi.mocked(listWallets).mockResolvedValue([WALLET_A, WALLET_B])
+      const store = useWalletsStore()
+      const fetchTransactionsSpy = vi.spyOn(useTransactionsStore(), 'fetchTransactions').mockResolvedValue()
+
+      await store.updateTransfer('transfer-1', { amount: 60, occurredAt: '2026-02-01T09:00:00Z' })
+
+      expect(updateTransfer).toHaveBeenCalledWith('transfer-1', { amount: 60, occurredAt: '2026-02-01T09:00:00Z' })
+      expect(listWallets).toHaveBeenCalled()
+      expect(fetchTransactionsSpy).toHaveBeenCalledWith({ force: true })
+      expect(store.wallets).toEqual([WALLET_A, WALLET_B])
+    })
+
+    it('propaga el error sin refrescar la lista si la edicion falla', async () => {
+      vi.mocked(updateTransfer).mockRejectedValue(new Error('Saldo insuficiente.'))
+      const store = useWalletsStore()
+
+      await expect(
+        store.updateTransfer('transfer-1', { amount: 999, occurredAt: '2026-02-01T09:00:00Z' }),
+      ).rejects.toThrow('Saldo insuficiente.')
+
+      expect(listWallets).not.toHaveBeenCalled()
+      expect(store.error).toBe('Saldo insuficiente.')
     })
   })
 })

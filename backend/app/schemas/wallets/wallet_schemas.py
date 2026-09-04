@@ -30,6 +30,16 @@ class TransferRequest(BaseModel):
     fee: Decimal = Field(default=Decimal("0"), ge=0)
     # Requerido solo cuando ambos wallets tienen moneda distinta — validado en el service.
     converted_amount: Decimal | None = Field(default=None, gt=0)
+    # None = "ahora" (ver execute_transfer) - pedido explicito del usuario: poder
+    # backdatear una transferencia igual que un movimiento manual.
+    occurred_at: datetime | None = None
+
+
+class TransferUpdateRequest(BaseModel):
+    amount: Decimal = Field(gt=0)
+    occurred_at: datetime
+    fee: Decimal = Field(default=Decimal("0"), ge=0)
+    converted_amount: Decimal | None = Field(default=None, gt=0)
 
 
 class TransferResponse(BaseModel):

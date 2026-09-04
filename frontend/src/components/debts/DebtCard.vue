@@ -6,6 +6,12 @@ import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseCard from '../ui/BaseCard.vue'
 import BottomSheet from '../ui/BottomSheet.vue'
+// Reutilizado de Metas (idea de la sesion de brainstorm de UI): es generico
+// a proposito (no sabe nada de "tipos de meta", ver su propio comentario),
+// asi que sirve igual aca para "% pagado" - antes Deudas era la unica
+// seccion con progreso solo en texto ("Resta $X"), sin ningun indicador
+// visual como el que ya tiene Metas.
+import GoalProgressRing from '../goals/GoalProgressRing.vue'
 import DebtPaymentHistory from './DebtPaymentHistory.vue'
 import InstallmentSchedule from './InstallmentSchedule.vue'
 
@@ -39,6 +45,11 @@ const emit = defineEmits<{
 const isOwedByUser = computed(() => props.debt.direction === 'owed_by_user')
 const directionLabel = computed(() => (isOwedByUser.value ? 'Tú debes' : 'Te deben'))
 
+const paidPercent = computed(() => {
+  if (props.debt.totalAmount <= 0) return 0
+  return Math.min(100, Math.round((props.debt.amountPaid / props.debt.totalAmount) * 100))
+})
+
 // El historial vive en un sheet aparte, no inline en la card - pedido explicito
 // del usuario ("cuando hayan muchos pagos se veria poco profesional" mostrarlos
 // todos directo en la box). La card solo muestra un resumen compacto.
@@ -69,16 +80,22 @@ function confirmDelete() {
       </div>
 
       <div class="debt-amount-col">
-        <p class="debt-amount" :class="{ owed: isOwedByUser }">
-          <AnimatedCurrency
-            :value="debt.totalAmount"
-            :currency="debt.currency"
-            :direction="isOwedByUser ? 'down' : 'up'"
-          />
-        </p>
-        <p v-if="debt.amountPaid > 0" class="debt-remaining">
-          Resta {{ formatCurrency(debt.remainingAmount, debt.currency) }}
-        </p>
+        <GoalProgressRing v-if="debt.amountPaid > 0" :percent="paidPercent" :size="36" class="debt-progress-ring">
+          <span class="debt-progress-percent">{{ paidPercent }}%</span>
+        </GoalProgressRing>
+
+        <div class="debt-amount-stack">
+          <p class="debt-amount" :class="{ owed: isOwedByUser }">
+            <AnimatedCurrency
+              :value="debt.totalAmount"
+              :currency="debt.currency"
+              :direction="isOwedByUser ? 'down' : 'up'"
+            />
+          </p>
+          <p v-if="debt.amountPaid > 0" class="debt-remaining">
+            Resta {{ formatCurrency(debt.remainingAmount, debt.currency) }}
+          </p>
+        </div>
       </div>
     </div>
 
@@ -189,6 +206,21 @@ function confirmDelete() {
 
 .debt-amount-col {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.debt-progress-ring {
+  color: var(--text-h);
+}
+
+.debt-progress-percent {
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
+.debt-amount-stack {
   display: flex;
   flex-direction: column;
   align-items: flex-end;

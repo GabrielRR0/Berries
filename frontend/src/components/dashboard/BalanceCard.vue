@@ -7,6 +7,7 @@ import { useCurrencyStore } from '../../stores/currency.store'
 import { useWalletsStore } from '../../stores/wallets.store'
 import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
 import CoachMarkTooltip from '../ui/CoachMarkTooltip.vue'
+import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import PillCurrencyToggle from '../ui/PillCurrencyToggle.vue'
 import BalanceTrendBackdrop from './BalanceTrendBackdrop.vue'
 
@@ -49,6 +50,14 @@ const visibleCurrencies = computed(() => {
 const { currentStep, stepPosition, isFirstStep, isLastStep, next, back, close } = useOnboardingTour()
 
 const balanceHidden = ref(localStorage.getItem(BALANCE_HIDDEN_STORAGE_KEY) === 'true')
+
+// Idea de la sesion de brainstorm de UI: sin esto, el monto grande mostraba
+// "$0.00" real (no un placeholder) mientras las wallets todavia cargaban -
+// en una conexion lenta, un usuario podia leer eso como su balance real.
+// Solo cuenta como "cargando" el momento ANTES de tener el primer dato (no
+// cada recarga posterior, ej. al cambiar de moneda) - mismo criterio que
+// WalletsMain.vue/TransactionsMain.vue.
+const isInitialLoading = computed(() => walletsStore.isLoading && walletsStore.wallets.length === 0)
 const totalBalance = ref(0)
 const eyeButtonRef = ref<HTMLElement | null>(null)
 
@@ -144,7 +153,8 @@ function toggleHidden() {
     </div>
 
     <div class="balance-summary">
-      <p class="balance-amount">
+      <LoadingIndicator v-if="isInitialLoading" class="balance-loading" size="1.5rem" />
+      <p v-else class="balance-amount">
         <span v-if="balanceHidden">••••••</span>
         <AnimatedCurrency
           v-else
@@ -261,6 +271,14 @@ function toggleHidden() {
   .balance-amount {
     font-size: clamp(3.5rem, 2.4rem + 1.8vw, 4.5rem);
   }
+}
+
+/* LoadingIndicator centra su contenido por default (pensado para ocupar una
+   seccion entera) - aca reemplaza solo el monto, alineado a la izquierda
+   como el resto de la card (align-items:flex-start de .balance-card). */
+.balance-loading {
+  justify-content: flex-start;
+  padding: 0.5rem 0;
 }
 
 .balance-currency-toggle {

@@ -90,12 +90,53 @@ describe('TransactionList', () => {
     expect(wrapper.emitted('edit')).toEqual([[MANUAL_EXPENSE]])
   })
 
-  it('no muestra "Editar" para una transferencia fusionada', () => {
+  // Idea/pedido explicito del usuario ("que se pueda editar esto [la fecha]
+  // y también los montos" en transferencias): una transferencia FUSIONADA
+  // (ambas patas presentes) ahora SI se puede editar como unidad completa,
+  // a diferencia de una pata suelta (ver el test de mas abajo).
+  it('emite "editTransfer" con los datos de la transferencia al tocar Editar en una transferencia fusionada', async () => {
     const wrapper = mount(TransactionList, {
       props: { transactions: [TRANSFER_FROM_LEG, TRANSFER_TO_LEG, TRANSFER_FEE_LEG], wallets: WALLETS },
     })
 
-    expect(wrapper.find('.transaction-edit-trigger').exists()).toBe(false)
+    await wrapper.find('.transaction-edit-trigger').trigger('click')
+
+    expect(wrapper.emitted('edit')).toBeFalsy()
+    expect(wrapper.emitted('editTransfer')).toEqual([
+      [
+        {
+          transferId: 'transfer-1',
+          fromWalletId: 'wallet-1',
+          toWalletId: 'wallet-2',
+          amount: 40,
+          fee: 2,
+          convertedAmount: null,
+          occurredAt: '2026-08-06T12:00:00Z',
+        },
+      ],
+    ])
+  })
+
+  it('sin comision, "editTransfer" lleva fee=0', async () => {
+    const wrapper = mount(TransactionList, {
+      props: { transactions: [TRANSFER_FROM_LEG, TRANSFER_TO_LEG], wallets: WALLETS },
+    })
+
+    await wrapper.find('.transaction-edit-trigger').trigger('click')
+
+    expect(wrapper.emitted('editTransfer')![0]![0]).toMatchObject({ fee: 0 })
+  })
+
+  it('con monedas distintas, "editTransfer" lleva el monto de la pata destino como convertedAmount', async () => {
+    const vefWallet = { id: 'wallet-2', name: 'Binance', currency: 'VEF', balance: 0, createdAt: '2026-08-01T00:00:00Z' }
+    const toLegVef = { ...TRANSFER_TO_LEG, amount: 365 }
+    const wrapper = mount(TransactionList, {
+      props: { transactions: [TRANSFER_FROM_LEG, toLegVef], wallets: [WALLET_FACEBANK, vefWallet] },
+    })
+
+    await wrapper.find('.transaction-edit-trigger').trigger('click')
+
+    expect(wrapper.emitted('editTransfer')![0]![0]).toMatchObject({ amount: 40, convertedAmount: 365 })
   })
 
   it('no muestra "Editar" para una pata de transferencia mostrada suelta (ej. la comisión sin sus otras patas presentes)', () => {
@@ -199,6 +240,29 @@ describe('TransactionList', () => {
 
       await wrapper.find('.transaction-confirm-delete').trigger('click')
       expect(wrapper.emitted('delete')).toEqual([['tx-2']])
+    })
+  })
+
+  // Idea de la sesion de brainstorm de UI: una vista previa corta (ej.
+  // "Ultimos movimientos" en Inicio) no deberia ofrecer Editar/Eliminar
+  // inline - solo el resto de la fila (icono, categoria, fecha, monto).
+  describe('modo readonly', () => {
+    it('no muestra Editar ni Eliminar', () => {
+      const wrapper = mount(TransactionList, {
+        props: { transactions: [MANUAL_EXPENSE], wallets: WALLETS, readonly: true },
+      })
+
+      expect(wrapper.find('.transaction-edit-trigger').exists()).toBe(false)
+      expect(wrapper.find('.transaction-delete-trigger').exists()).toBe(false)
+    })
+
+    it('sigue mostrando categoria, fecha y monto', () => {
+      const wrapper = mount(TransactionList, {
+        props: { transactions: [MANUAL_EXPENSE], wallets: WALLETS, readonly: true },
+      })
+
+      expect(wrapper.find('.transaction-category').text()).toBe('comida')
+      expect(wrapper.find('.transaction-amount').text()).toContain('30')
     })
   })
 })

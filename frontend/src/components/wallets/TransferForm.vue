@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { TransferEditTarget } from '../../services/wallets/interfaces/wallets.interface'
 import { useWalletsStore } from '../../stores/wallets.store'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseCard from '../ui/BaseCard.vue'
@@ -9,17 +10,55 @@ import BaseCard from '../ui/BaseCard.vue'
 // automatica wireada aca (queda para una pasada futura, ver plan de Berry) -
 // por ahora el usuario lo llena a mano y el backend valida que venga si
 // hace falta (400 si falta, ver wallets.service.ts/TransferParams).
-const emit = defineEmits<{ transferred: []; cancel: [] }>()
+//
+// editingTransfer: pedido explicito del usuario ("que se pueda editar esto
+// [la fecha] y también los montos") - el MISMO form sirve para crear y
+// editar. A diferencia de TransactionForm.vue, editar NO permite cambiar las
+// billeteras origen/destino (los selects quedan deshabilitados, precargados)
+// - eso sigue requiriendo eliminar y recrear la transferencia, ver
+// update_transfer en el backend. El tipo vive en wallets.interface.ts (no
+// aca) porque TransactionList.vue tambien lo necesita para armarlo.
+const props = withDefaults(defineProps<{ editingTransfer?: TransferEditTarget | null }>(), {
+  editingTransfer: null,
+})
+const emit = defineEmits<{ transferred: []; updated: []; cancel: [] }>()
+const isEditing = computed(() => props.editingTransfer != null)
 
 const walletsStore = useWalletsStore()
 
-const fromWalletId = ref('')
-const toWalletId = ref('')
-const amount = ref<number | null>(null)
-const fee = ref<number | null>(null)
-const convertedAmount = ref<number | null>(null)
+const fromWalletId = ref(props.editingTransfer?.fromWalletId ?? '')
+const toWalletId = ref(props.editingTransfer?.toWalletId ?? '')
+const amount = ref<number | null>(props.editingTransfer?.amount ?? null)
+const fee = ref<number | null>(props.editingTransfer?.fee || null)
+const convertedAmount = ref<number | null>(props.editingTransfer?.convertedAmount ?? null)
 const submitting = ref(false)
 const errorMessage = ref('')
+
+// Fecha - mismo criterio que TransactionForm.vue (formato YYYY-MM-DD en hora
+// LOCAL, max=hoy, combinar con la hora actual al enviar).
+function todayInputValue(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+function localDateInputValue(iso: string): string {
+  const date = new Date(iso)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+const todayValue = todayInputValue()
+const occurredAtDate = ref(props.editingTransfer ? localDateInputValue(props.editingTransfer.occurredAt) : todayValue)
+
+function buildOccurredAt(): string {
+  const [year, month, day] = occurredAtDate.value.split('-').map(Number)
+  const now = new Date()
+  return new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString()
+}
+
+function openDatePicker(event: Event) {
+  const input = event.currentTarget as HTMLInputElement
+  input.showPicker?.()
+}
 
 const fromWallet = computed(() => walletsStore.wallets.find((wallet) => wallet.id === fromWalletId.value) ?? null)
 const toWallet = computed(() => walletsStore.wallets.find((wallet) => wallet.id === toWalletId.value) ?? null)
@@ -43,16 +82,32 @@ async function onSubmit() {
   errorMessage.value = ''
   submitting.value = true
   try {
-    await walletsStore.transfer({
-      fromWalletId: fromWalletId.value,
-      toWalletId: toWalletId.value,
-      amount: amount.value,
-      fee: fee.value ?? undefined,
-      convertedAmount: needsConvertedAmount.value ? (convertedAmount.value ?? undefined) : undefined,
-    })
-    emit('transferred')
+    if (props.editingTransfer) {
+      await walletsStore.updateTransfer(props.editingTransfer.transferId, {
+        amount: amount.value,
+        occurredAt: buildOccurredAt(),
+        fee: fee.value ?? undefined,
+        convertedAmount: needsConvertedAmount.value ? (convertedAmount.value ?? undefined) : undefined,
+      })
+      emit('updated')
+    } else {
+      await walletsStore.transfer({
+        fromWalletId: fromWalletId.value,
+        toWalletId: toWalletId.value,
+        amount: amount.value,
+        fee: fee.value ?? undefined,
+        convertedAmount: needsConvertedAmount.value ? (convertedAmount.value ?? undefined) : undefined,
+        occurredAt: buildOccurredAt(),
+      })
+      emit('transferred')
+    }
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'No se pudo completar la transferencia.'
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : props.editingTransfer
+          ? 'No se pudo editar la transferencia.'
+          : 'No se pudo completar la transferencia.'
   } finally {
     submitting.value = false
   }
@@ -61,12 +116,12 @@ async function onSubmit() {
 
 <template>
   <BaseCard class="transfer-form">
-    <h2 class="form-title">Transferir entre billeteras</h2>
+    <h2 class="form-title">{{ isEditing ? 'Editar transferencia' : 'Transferir entre billeteras' }}</h2>
 
     <form class="form-body" @submit.prevent="onSubmit">
       <label class="field">
         <span class="field-label">Desde</span>
-        <select v-model="fromWalletId" required>
+        <select v-model="fromWalletId" required :disabled="isEditing">
           <option value="" disabled>Elige una billetera</option>
           <option v-for="wallet in walletsStore.wallets" :key="wallet.id" :value="wallet.id">
             {{ wallet.name }} ({{ wallet.currency }})
@@ -76,13 +131,20 @@ async function onSubmit() {
 
       <label class="field">
         <span class="field-label">Hacia</span>
-        <select v-model="toWalletId" required>
+        <select v-model="toWalletId" required :disabled="isEditing">
           <option value="" disabled>Elige una billetera</option>
           <option v-for="wallet in walletsStore.wallets" :key="wallet.id" :value="wallet.id">
             {{ wallet.name }} ({{ wallet.currency }})
           </option>
         </select>
       </label>
+
+      <!-- Editar no permite cambiar las billeteras (ver update_transfer en el
+           backend) - se aclara para que el select deshabilitado de arriba no
+           se sienta como un bug. -->
+      <p v-if="isEditing" class="field-hint">
+        Para mover esta transferencia a otras billeteras, eliminala y creala de nuevo.
+      </p>
 
       <label class="field">
         <span class="field-label">Monto</span>
@@ -103,6 +165,11 @@ async function onSubmit() {
         </span>
       </label>
 
+      <label class="field">
+        <span class="field-label">Fecha</span>
+        <input v-model="occurredAtDate" type="date" :max="todayValue" required @click="openDatePicker" />
+      </label>
+
       <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
       <div class="form-actions">
@@ -110,7 +177,7 @@ async function onSubmit() {
           Cancelar
         </BaseButton>
         <BaseButton type="submit" size="sm" :disabled="submitting || !canSubmit">
-          {{ submitting ? 'Transfiriendo...' : 'Transferir' }}
+          {{ submitting ? (isEditing ? 'Guardando...' : 'Transfiriendo...') : isEditing ? 'Guardar cambios' : 'Transferir' }}
         </BaseButton>
       </div>
     </form>
@@ -161,6 +228,11 @@ async function onSubmit() {
 .field select:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.field select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .field-hint {
