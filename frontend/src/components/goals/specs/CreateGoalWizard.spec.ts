@@ -456,6 +456,24 @@ describe('CreateGoalWizard', () => {
       expect(options.some((text) => text.includes('Banco EUR'))).toBe(false)
     })
 
+    // Pedido explicito del usuario: "en billetera no me deja usar usdt, seria bueno
+    // que si es dolares, acepte dolares y usdt" - mismo criterio 1:1 ya establecido
+    // para deudas (AddDebtPaymentForm.vue/debt_payment_service.py).
+    it('el selector tambien ofrece billeteras USDT para una meta en USD (y viceversa)', async () => {
+      const WALLET_USDT = { id: 'wallet-3', name: 'Binance', currency: 'USDT', balance: 500, createdAt: '2026-01-01T00:00:00Z' }
+      vi.mocked(walletsService.listWallets).mockResolvedValue([WALLET_USD, WALLET_USDT])
+      const wrapper = mountAttached()
+      await wrapper.find('.type-tile-custom').trigger('click')
+      await flushPromises()
+      await goToWalletPill(wrapper)
+
+      const options = inSheet('.initial-savings-wallet-field select')
+        .findAll('option')
+        .map((o) => o.text())
+      expect(options.some((text) => text.includes('Efectivo'))).toBe(true)
+      expect(options.some((text) => text.includes('Binance'))).toBe(true)
+    })
+
     it('bloquea "Guardar" si el monto supera el disponible de la billetera elegida', async () => {
       vi.mocked(walletsService.listWallets).mockResolvedValue([WALLET_USD])
       vi.mocked(goalsService.getWalletCommitments).mockResolvedValue([])

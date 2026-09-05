@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Goal, SavingsCapacity } from '../../services/goals/interfaces/goals.interface'
 import type { Wallet } from '../../services/wallets/interfaces/wallets.interface'
+import { currenciesAreEquivalent } from '../../utils/currency/currencyEquivalence'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import { availableBalance } from '../../utils/wallets/availableBalance'
 import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
@@ -108,9 +109,11 @@ function toggleAddContribution() {
   contributionNote.value = ''
 }
 
-// Solo billeteras de la MISMA moneda que la meta - pedido explicito del
-// usuario, confirmado: sin conversion en esta pasada.
-const walletsForContribution = computed(() => props.wallets.filter((wallet) => wallet.currency === props.goal.currency))
+// Solo billeteras de la MISMA moneda que la meta (o el par USD/USDT, atado
+// 1:1 - pedido explicito del usuario).
+const walletsForContribution = computed(() =>
+  props.wallets.filter((wallet) => currenciesAreEquivalent(wallet.currency, props.goal.currency)),
+)
 
 const contributionWalletAvailable = computed(() => {
   const wallet = walletsForContribution.value.find((w) => w.id === contributionWalletId.value)

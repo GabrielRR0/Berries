@@ -8,6 +8,7 @@ from app.models.debts.debt_payment_model import DebtPayment
 from app.models.transactions.transaction_model import Transaction
 from app.models.wallets.wallet_model import Wallet
 from app.services.currency.currency_lookup import get_currency_by_code
+from app.services.currency.pegged_currencies import currencies_are_equivalent
 from app.services.debts.debt_service import get_debt_owned_by_user
 from app.services.debts.errors import DebtNotFoundError, DebtValidationError
 from app.services.wallets.errors import CurrencyMismatchError, InsufficientBalanceError
@@ -18,12 +19,6 @@ from app.services.wallets.wallet_service import get_wallet_owned_by_user
 # no una fila de la tabla categories).
 DEBT_INCOME_CATEGORY = "Cobro de deuda"
 DEBT_EXPENSE_CATEGORY = "Pago de deuda"
-
-# USDT es una stablecoin atada 1:1 al dólar - pedido explicito del usuario ("100$
-# equivale siempre a 100 usdt y viceversa"): a diferencia de EUR/VEF/COP/ARS (monedas
-# flotantes reales, que sí necesitan que el usuario escriba el equivalente a mano), este
-# par nunca pide applied_amount, se asume 1:1 salvo que el usuario lo pise a mano.
-_USD_PEGGED_CURRENCIES = {"USD", "USDT"}
 
 
 def create_debt_payment(
@@ -54,10 +49,7 @@ def create_debt_payment(
 
     currency_row = get_currency_by_code(db, currency)
 
-    same_currency = currency_row.code == debt.currency
-    pegged_1_to_1 = currency_row.code in _USD_PEGGED_CURRENCIES and debt.currency in _USD_PEGGED_CURRENCIES
-
-    if same_currency or pegged_1_to_1:
+    if currencies_are_equivalent(currency_row.code, debt.currency):
         # Misma moneda, o el par USD/USDT (atado 1:1) - el equivalente aplicado es el
         # mismo monto, sin pedirle al usuario que lo vuelva a escribir (sigue
         # aceptando un applied_amount manual si lo manda, por si alguna vez hace

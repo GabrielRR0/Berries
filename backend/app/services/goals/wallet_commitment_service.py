@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.models.goals.goal_check_in_model import GoalCheckIn
 from app.models.goals.goal_model import Goal
 from app.models.wallets.wallet_model import Wallet
+from app.services.currency.pegged_currencies import currencies_are_equivalent
 from app.services.goals.errors import InsufficientAvailableBalanceError
 from app.services.wallets.errors import CurrencyMismatchError
 from app.services.wallets.wallet_service import get_wallet_owned_by_user
@@ -61,11 +62,13 @@ def validate_and_get_wallet_for_commitment(
     exclude_check_in_id: uuid.UUID | None = None,
 ) -> Wallet:
     """Valida que `wallet_id` pueda respaldar un aporte de `amount` en `currency`:
-    dueño, misma moneda (pedido explicito del usuario: sin conversion en esta pasada,
-    solo billeteras de la moneda de la meta) y saldo DISPONIBLE suficiente (no el
-    saldo total - ya puede estar parcialmente comprometido en otras metas)."""
+    dueño, misma moneda o par USD/USDT (pedido explicito del usuario: "si es dolares,
+    acepte dolares y usdt", mismo criterio ya establecido en debt_payment_service.py -
+    sin conversion real para el resto de los pares, floating currencies como
+    EUR/VEF/COP/ARS si necesitan coincidir exacto) y saldo DISPONIBLE suficiente (no
+    el saldo total - ya puede estar parcialmente comprometido en otras metas)."""
     wallet = get_wallet_owned_by_user(db, wallet_id, user_id)
-    if wallet.currency != currency:
+    if not currencies_are_equivalent(wallet.currency, currency):
         raise CurrencyMismatchError("La billetera elegida no es de la misma moneda que la meta")
     available = get_available_balance(db, user_id, wallet, exclude_check_in_id=exclude_check_in_id)
     if amount > available:

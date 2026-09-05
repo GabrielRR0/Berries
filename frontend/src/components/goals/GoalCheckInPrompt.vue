@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import type { PendingCheckIn, RecordCheckInInput } from '../../services/goals/interfaces/goals.interface'
 import type { Wallet } from '../../services/wallets/interfaces/wallets.interface'
+import { currenciesAreEquivalent } from '../../utils/currency/currencyEquivalence'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import { availableBalance } from '../../utils/wallets/availableBalance'
 import BaseCard from '../ui/BaseCard.vue'
@@ -34,7 +35,11 @@ const walletId = ref<string | null>(null)
 // arriba), y un check-in solo tiene una columna de nota en el backend.
 const contributionNote = ref('')
 
-const walletsForCheckIn = computed(() => props.wallets.filter((wallet) => wallet.currency === props.pending.currency))
+// Solo billeteras de la MISMA moneda que la meta (o el par USD/USDT, atado 1:1 -
+// pedido explicito del usuario).
+const walletsForCheckIn = computed(() =>
+  props.wallets.filter((wallet) => currenciesAreEquivalent(wallet.currency, props.pending.currency)),
+)
 
 const selectedWalletAvailable = computed(() => {
   const wallet = walletsForCheckIn.value.find((w) => w.id === walletId.value)

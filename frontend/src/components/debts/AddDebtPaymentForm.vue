@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useWalletsStore } from '../../stores/wallets.store'
 import type { CreateDebtPaymentInput, Debt, DebtPaymentVoicePreview } from '../../services/debts/interfaces/debts.interface'
+import { currenciesAreEquivalent } from '../../utils/currency/currencyEquivalence'
 import { SUPPORTED_CURRENCIES } from '../../utils/currency/supportedCurrencies'
 import BaseButton from '../ui/BaseButton.vue'
 import DebtPaymentVoiceButton from './DebtPaymentVoiceButton.vue'
@@ -37,11 +38,7 @@ const note = ref('')
 const paidAt = ref(new Date().toISOString().slice(0, 10))
 const walletId = ref('')
 
-const USD_PEGGED_CURRENCIES = new Set(['USD', 'USDT'])
-const needsAppliedAmount = computed(() => {
-  if (currency.value === props.debt.currency) return false
-  return !(USD_PEGGED_CURRENCIES.has(currency.value) && USD_PEGGED_CURRENCIES.has(props.debt.currency))
-})
+const needsAppliedAmount = computed(() => !currenciesAreEquivalent(currency.value, props.debt.currency))
 
 const matchingWallets = computed(() => walletsStore.wallets.filter((wallet) => wallet.currency === currency.value))
 

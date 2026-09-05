@@ -9,6 +9,7 @@ import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import { formatDate } from '../../utils/formatters/formatDate'
 import { GOAL_TYPE_TEMPLATES } from '../../utils/goals/goalTypeTemplates'
 import { monthsBetween } from '../../utils/goals/monthsBetween'
+import { currenciesAreEquivalent } from '../../utils/currency/currencyEquivalence'
 import { availableBalance } from '../../utils/wallets/availableBalance'
 import BaseButton from '../ui/BaseButton.vue'
 import BottomSheet from '../ui/BottomSheet.vue'
@@ -111,9 +112,13 @@ onMounted(async () => {
   }
 })
 
-// Solo billeteras de la MISMA moneda que la meta - pedido explicito del usuario,
-// confirmado: sin conversion en esta pasada.
-const walletsForInitialAmount = computed(() => walletsStore.wallets.filter((wallet) => wallet.currency === currency.value))
+// Solo billeteras de la MISMA moneda que la meta (o el par USD/USDT, atado 1:1 -
+// pedido explicito del usuario: "si es dolares, acepte dolares y usdt", mismo
+// criterio ya establecido en AddDebtPaymentForm.vue) - confirmado: sin conversion
+// real para el resto de las monedas en esta pasada.
+const walletsForInitialAmount = computed(() =>
+  walletsStore.wallets.filter((wallet) => currenciesAreEquivalent(wallet.currency, currency.value)),
+)
 
 const draftInitialAmountDisplayStr = computed({
   get: () => groupAmountThousands(draftInitialAmountStr.value),

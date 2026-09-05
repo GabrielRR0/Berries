@@ -7,6 +7,7 @@ from app.services.auth.auth_service import register_user
 from app.services.goals.check_in_service import record_check_in
 from app.services.goals.errors import InsufficientAvailableBalanceError
 from app.services.goals.goal_service import create_goal
+from app.services.wallets.errors import CurrencyMismatchError
 from app.services.wallets.wallet_service import create_wallet
 from app.services.goals.wallet_commitment_service import (
     get_available_balance,
@@ -100,3 +101,32 @@ def test_validate_and_get_wallet_for_commitment_rejects_insufficient_available(d
 
     with pytest.raises(InsufficientAvailableBalanceError):
         validate_and_get_wallet_for_commitment(db, user.id, wallet.id, "USD", Decimal("150"))
+
+
+# Pedido explicito del usuario: "en billetera no me deja usar usdt, seria bueno que si
+# es dolares, acepte dolares y usdt" - mismo criterio 1:1 ya establecido para deudas
+# (ver debt_payment_service.py/pegged_currencies.py).
+def test_validate_and_get_wallet_for_commitment_accepts_usdt_wallet_for_a_usd_goal(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Binance", "USDT", Decimal("100"))
+
+    result = validate_and_get_wallet_for_commitment(db, user.id, wallet.id, "USD", Decimal("50"))
+
+    assert result.id == wallet.id
+
+
+def test_validate_and_get_wallet_for_commitment_accepts_usd_wallet_for_a_usdt_goal(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("100"))
+
+    result = validate_and_get_wallet_for_commitment(db, user.id, wallet.id, "USDT", Decimal("50"))
+
+    assert result.id == wallet.id
+
+
+def test_validate_and_get_wallet_for_commitment_still_rejects_a_non_pegged_mismatch(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "EUR", Decimal("100"))
+
+    with pytest.raises(CurrencyMismatchError):
+        validate_and_get_wallet_for_commitment(db, user.id, wallet.id, "USD", Decimal("50"))
