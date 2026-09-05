@@ -1,9 +1,12 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createGoal,
   getSavingsCapacity,
+  getWalletCommitments,
 } from '../../../services/goals/goals.service'
+import * as walletsService from '../../../services/wallets/wallets.service'
 import CreateGoalView from '../CreateGoalView.vue'
 
 vi.mock('../../../services/goals/goals.service', () => ({
@@ -11,6 +14,7 @@ vi.mock('../../../services/goals/goals.service', () => ({
   getGoalSummary: vi.fn(),
   getPendingCheckIns: vi.fn(),
   getSavingsCapacity: vi.fn(),
+  getWalletCommitments: vi.fn(),
   createGoal: vi.fn(),
   updateGoal: vi.fn(),
   deleteGoal: vi.fn(),
@@ -34,11 +38,14 @@ vi.mock('vue-router', () => ({
 
 describe('CreateGoalView', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     push.mockReset()
     vi.mocked(getSavingsCapacity)
       .mockReset()
       .mockResolvedValue({ avgMonthlyIncome: 0, avgMonthlyExpense: 0, avgMonthlyAvailable: 0, hasEnoughHistory: false })
     vi.mocked(createGoal).mockReset()
+    vi.mocked(getWalletCommitments).mockReset().mockResolvedValue([])
+    vi.spyOn(walletsService, 'listWallets').mockResolvedValue([])
   })
 
   it('pide el promedio de ingresos/gastos al montar', async () => {

@@ -16,7 +16,9 @@ import type {
   PendingCheckIn,
   RecordCheckInInput,
   SavingsCapacity,
+  UpdateCheckInInput,
   UpdateGoalInput,
+  WalletCommitment,
 } from './interfaces/goals.interface'
 
 // Forma "sobre el cable" tal cual la devuelve el backend (ver
@@ -58,7 +60,13 @@ interface GoalCheckInWire {
   previous_target_date: string | null
   new_target_date: string | null
   note: string | null
+  wallet_id: string | null
   created_at: string
+}
+
+interface WalletCommitmentWire {
+  wallet_id: string
+  committed_amount: number | string
 }
 
 interface PendingCheckInWire {
@@ -130,8 +138,13 @@ function mapCheckIn(wire: GoalCheckInWire): GoalCheckIn {
     previousTargetDate: wire.previous_target_date,
     newTargetDate: wire.new_target_date,
     note: wire.note,
+    walletId: wire.wallet_id,
     createdAt: wire.created_at,
   }
+}
+
+function mapWalletCommitment(wire: WalletCommitmentWire): WalletCommitment {
+  return { walletId: wire.wallet_id, committedAmount: Number(wire.committed_amount) }
 }
 
 function mapPendingCheckIn(wire: PendingCheckInWire): PendingCheckIn {
@@ -182,6 +195,7 @@ export async function createGoal(input: CreateGoalInput): Promise<Goal> {
     goal_type: string
     initial_amount?: number
     initial_amount_note?: string
+    initial_amount_wallet_id?: string
   } = {
     title: input.title,
     target_amount: input.targetAmount,
@@ -191,6 +205,7 @@ export async function createGoal(input: CreateGoalInput): Promise<Goal> {
   }
   if (input.initialAmount) payload.initial_amount = input.initialAmount
   if (input.initialAmountNote) payload.initial_amount_note = input.initialAmountNote
+  if (input.initialAmountWalletId) payload.initial_amount_wallet_id = input.initialAmountWalletId
 
   const response = await fetch(`${API_BASE_URL}/api/goals`, {
     method: 'POST',
@@ -307,6 +322,7 @@ export async function recordCheckIn(goalId: string, input: RecordCheckInInput): 
   const payload: Record<string, unknown> = { amount_saved: input.amountSaved }
   if (input.newTargetDate) payload.new_target_date = input.newTargetDate
   if (input.note) payload.note = input.note
+  if (input.walletId) payload.wallet_id = input.walletId
 
   const response = await fetch(`${API_BASE_URL}/api/goals/${goalId}/check-ins`, {
     method: 'POST',
@@ -319,6 +335,41 @@ export async function recordCheckIn(goalId: string, input: RecordCheckInInput): 
   }
 
   return mapCheckIn((await response.json()) as GoalCheckInWire)
+}
+
+// Edita SOLO la fuente (billetera/nota) de un aporte ya existente - pedido explicito
+// del usuario: reenlazar un aporte que quedo como "ingreso futuro" una vez que esa
+// plata efectivamente llego.
+export async function updateCheckIn(goalId: string, checkInId: string, input: UpdateCheckInInput): Promise<GoalCheckIn> {
+  const response = await fetch(`${API_BASE_URL}/api/goals/${goalId}/check-ins/${checkInId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ wallet_id: input.walletId, note: input.note }),
+  })
+
+  if (!response.ok) {
+    throw new GoalsApiError(await parseErrorMessage(response, 'No se pudo editar el aporte.'), response.status)
+  }
+
+  return mapCheckIn((await response.json()) as GoalCheckInWire)
+}
+
+// Cuanto de cada billetera ya esta comprometido en metas activas - pedido explicito
+// del usuario: mostrar, ademas del saldo real de siempre, un "disponible" que lo
+// descuenta (ver wallet_commitment_service.py del backend).
+export async function getWalletCommitments(): Promise<WalletCommitment[]> {
+  const response = await fetch(`${API_BASE_URL}/api/goals/wallet-commitments`, {
+    headers: { ...authHeaders() },
+  })
+
+  if (!response.ok) {
+    throw new GoalsApiError(
+      await parseErrorMessage(response, 'No se pudo obtener lo comprometido por billetera.'),
+      response.status,
+    )
+  }
+
+  return ((await response.json()) as WalletCommitmentWire[]).map(mapWalletCommitment)
 }
 
 export async function listCheckIns(goalId: string): Promise<GoalCheckIn[]> {

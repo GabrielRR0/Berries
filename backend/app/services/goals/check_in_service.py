@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.models.goals.goal_check_in_model import GoalCheckIn
 from app.models.goals.goal_model import Goal
-from app.services.goals.errors import GoalNotActiveError, GoalValidationError
+from app.services.goals.errors import GoalNotActiveError, GoalNotFoundError, GoalValidationError
 from app.services.goals.goal_service import get_goal_owned_by_user
+from app.services.goals.wallet_commitment_service import validate_and_get_wallet_for_commitment
 
 
 def get_goals_needing_check_in(db: Session, on_date: date) -> list[Goal]:
@@ -43,6 +44,7 @@ def record_check_in(
     amount_saved: Decimal,
     new_target_date: date | None = None,
     note: str | None = None,
+    wallet_id: uuid.UUID | None = None,
 ) -> GoalCheckIn:
     goal = get_goal_owned_by_user(db, goal_id, user_id)
     if goal.status != "active":
@@ -51,6 +53,12 @@ def record_check_in(
         raise GoalValidationError("La nueva fecha debe ser posterior a la fecha actual de la meta")
 
     amount_saved = Decimal(amount_saved)
+    # Reserva BLANDA (pedido explicito del usuario, confirmado) - ver
+    # wallet_commitment_service.py: nunca mueve plata real, solo valida que la
+    # billetera elegida tenga disponible suficiente.
+    if wallet_id is not None:
+        validate_and_get_wallet_for_commitment(db, user_id, wallet_id, goal.currency, amount_saved)
+
     check_in = GoalCheckIn(
         goal_id=goal.id,
         period_month=date.today().replace(day=1),
@@ -58,6 +66,7 @@ def record_check_in(
         previous_target_date=goal.target_date if new_target_date else None,
         new_target_date=new_target_date,
         note=note,
+        wallet_id=wallet_id,
     )
     db.add(check_in)
 
@@ -76,6 +85,38 @@ def record_check_in(
 def list_check_ins_for_goal(db: Session, goal_id: uuid.UUID, user_id: uuid.UUID) -> list[GoalCheckIn]:
     goal = get_goal_owned_by_user(db, goal_id, user_id)
     return sorted(goal.check_ins, key=lambda check_in: check_in.created_at)
+
+
+def update_check_in(
+    db: Session,
+    goal_id: uuid.UUID,
+    check_in_id: uuid.UUID,
+    user_id: uuid.UUID,
+    wallet_id: uuid.UUID | None,
+    note: str | None,
+) -> GoalCheckIn:
+    """Edita SOLO la fuente de un aporte ya existente (a que billetera esta enlazado, y
+    su nota) - pedido explicito del usuario: un aporte que quedo como "ingreso futuro"
+    se puede re-enlazar a una billetera real una vez que esa plata efectivamente llego.
+    Nunca toca amount_saved/period_month/new_target_date - reemplazo completo de
+    wallet_id/note (ver GoalCheckInUpdateRequest). No exige que la meta siga activa:
+    recalificar de donde salio una plata vieja tiene sentido aunque la meta ya se haya
+    completado o abandonado."""
+    goal = get_goal_owned_by_user(db, goal_id, user_id)
+    check_in = db.get(GoalCheckIn, check_in_id)
+    if check_in is None or check_in.goal_id != goal.id:
+        raise GoalNotFoundError("Aporte no encontrado")
+
+    if wallet_id is not None:
+        validate_and_get_wallet_for_commitment(
+            db, user_id, wallet_id, goal.currency, check_in.amount_saved, exclude_check_in_id=check_in.id
+        )
+
+    check_in.wallet_id = wallet_id
+    check_in.note = note
+    db.commit()
+    db.refresh(check_in)
+    return check_in
 
 
 def abandon_goal(db: Session, goal_id: uuid.UUID, user_id: uuid.UUID) -> Goal:

@@ -9,6 +9,7 @@ from app.models.auth.user_model import User
 from app.schemas.goals.goal_schemas import (
     GoalCheckInCreateRequest,
     GoalCheckInResponse,
+    GoalCheckInUpdateRequest,
     GoalCreateRequest,
     GoalResponse,
     GoalSavingsCapacityResponse,
@@ -18,16 +19,23 @@ from app.schemas.goals.goal_schemas import (
     GoalVoicePreviewResponse,
     PendingCheckInResponse,
     Status,
+    WalletCommitmentResponse,
 )
 from app.services.goals.check_in_service import (
     abandon_goal,
     get_goals_needing_check_in_for_user,
     list_check_ins_for_goal,
     record_check_in,
+    update_check_in,
 )
 from app.services.currency.errors import UnsupportedCurrencyError
 from app.services.goals.contribution_calculator import compute_monthly_contribution
-from app.services.goals.errors import GoalNotActiveError, GoalNotFoundError, GoalValidationError
+from app.services.goals.errors import (
+    GoalNotActiveError,
+    GoalNotFoundError,
+    GoalValidationError,
+    InsufficientAvailableBalanceError,
+)
 from app.services.goals.goal_service import (
     build_goal_response,
     create_goal,
@@ -39,6 +47,8 @@ from app.services.goals.goal_service import (
     update_goal,
 )
 from app.services.goals.goal_voice_service import parse_goal_voice_entry
+from app.services.goals.wallet_commitment_service import get_committed_amounts_for_user
+from app.services.wallets.errors import CurrencyMismatchError, WalletNotFoundError
 
 router = APIRouter()
 
@@ -58,8 +68,11 @@ async def create(
             goal_type=payload.goal_type,
             initial_amount=payload.initial_amount,
             initial_amount_note=payload.initial_amount_note,
+            initial_amount_wallet_id=payload.initial_amount_wallet_id,
         )
-    except (GoalValidationError, UnsupportedCurrencyError) as exc:
+    except WalletNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (GoalValidationError, UnsupportedCurrencyError, CurrencyMismatchError, InsufficientAvailableBalanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return build_goal_response(goal)
 
@@ -82,6 +95,20 @@ async def list_mine(
 async def summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> GoalSummaryResponse:
     totals = get_goal_summary(db, current_user.id)
     return GoalSummaryResponse(**totals)
+
+
+@router.get("/wallet-commitments", response_model=list[WalletCommitmentResponse])
+async def wallet_commitments(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+) -> list[WalletCommitmentResponse]:
+    # Declarado antes de "/{goal_id}" a proposito - mismo motivo que summary/
+    # savings-capacity/pending-check-ins de aca abajo (un "/{goal_id}" de un solo
+    # segmento los taparia si se registrara antes).
+    committed = get_committed_amounts_for_user(db, current_user.id)
+    return [
+        WalletCommitmentResponse(wallet_id=wallet_id, committed_amount=amount)
+        for wallet_id, amount in committed.items()
+    ]
 
 
 @router.get("/savings-capacity", response_model=GoalSavingsCapacityResponse)
@@ -191,12 +218,37 @@ async def create_check_in(
             amount_saved=payload.amount_saved,
             new_target_date=payload.new_target_date,
             note=payload.note,
+            wallet_id=payload.wallet_id,
         )
-    except GoalNotFoundError as exc:
+    except (GoalNotFoundError, WalletNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except GoalNotActiveError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    except GoalValidationError as exc:
+    except (GoalValidationError, CurrencyMismatchError, InsufficientAvailableBalanceError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return GoalCheckInResponse.model_validate(check_in)
+
+
+@router.patch("/{goal_id}/check-ins/{check_in_id}", response_model=GoalCheckInResponse)
+async def update_check_in_endpoint(
+    goal_id: uuid.UUID,
+    check_in_id: uuid.UUID,
+    payload: GoalCheckInUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> GoalCheckInResponse:
+    try:
+        check_in = update_check_in(
+            db,
+            goal_id,
+            check_in_id,
+            current_user.id,
+            wallet_id=payload.wallet_id,
+            note=payload.note,
+        )
+    except (GoalNotFoundError, WalletNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (CurrencyMismatchError, InsufficientAvailableBalanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return GoalCheckInResponse.model_validate(check_in)
 

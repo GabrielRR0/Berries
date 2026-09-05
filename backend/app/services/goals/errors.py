@@ -8,3 +8,7 @@ class GoalValidationError(Exception):
 
 class GoalNotActiveError(Exception):
     pass
+
+
+class InsufficientAvailableBalanceError(Exception):
+    pass

@@ -7,9 +7,11 @@ import {
   getGoalSummary,
   getPendingCheckIns,
   getSavingsCapacity,
+  getWalletCommitments,
   listGoals,
   previewGoalVoiceEntry,
   recordCheckIn,
+  updateCheckIn,
   updateGoal,
 } from '../goals.service'
 
@@ -171,6 +173,25 @@ describe('goals.service', () => {
       expect((error as GoalsApiError).status).toBe(400)
       expect((error as GoalsApiError).message).toBe('Monto inválido.')
     })
+
+    // Pedido explicito del usuario: de donde sale el aporte inicial (billetera vs.
+    // ingreso futuro).
+    it('incluye initial_amount_wallet_id solo cuando viene', async () => {
+      vi.mocked(fetch).mockResolvedValue(mockResponse(GOAL_WIRE, { status: 201 }))
+
+      await createGoal({
+        title: 'TV',
+        targetAmount: 1200,
+        currency: 'USD',
+        targetDate: '2026-11-28',
+        goalType: 'computer',
+        initialAmount: 700,
+        initialAmountWalletId: 'wallet-1',
+      })
+
+      const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+      expect(body.initial_amount_wallet_id).toBe('wallet-1')
+    })
   })
 
   describe('updateGoal', () => {
@@ -323,6 +344,125 @@ describe('goals.service', () => {
 
       expect(error).toBeInstanceOf(GoalsApiError)
       expect((error as GoalsApiError).status).toBe(409)
+    })
+
+    // Pedido explicito del usuario: enlazar un aporte nuevo a una billetera.
+    it('incluye wallet_id cuando se da', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({
+          id: 'ci-1',
+          goal_id: 'goal-1',
+          period_month: '2026-09-01',
+          amount_saved: 50,
+          previous_target_date: null,
+          new_target_date: null,
+          note: null,
+          wallet_id: 'wallet-1',
+          created_at: '2026-09-01T00:00:00Z',
+        }),
+      )
+
+      await recordCheckIn('goal-1', { amountSaved: 50, walletId: 'wallet-1' })
+
+      const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+      expect(body).toEqual({ amount_saved: 50, wallet_id: 'wallet-1' })
+    })
+
+    it('mapea wallet_id a walletId en la respuesta', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({
+          id: 'ci-1',
+          goal_id: 'goal-1',
+          period_month: '2026-09-01',
+          amount_saved: 50,
+          previous_target_date: null,
+          new_target_date: null,
+          note: null,
+          wallet_id: 'wallet-1',
+          created_at: '2026-09-01T00:00:00Z',
+        }),
+      )
+
+      const result = await recordCheckIn('goal-1', { amountSaved: 50, walletId: 'wallet-1' })
+
+      expect(result.walletId).toBe('wallet-1')
+    })
+  })
+
+  // Edicion de la fuente (billetera/nota) de un aporte ya existente - pedido
+  // explicito del usuario: reenlazar un aporte "a futuro" una vez que esa plata
+  // efectivamente llego.
+  describe('updateCheckIn', () => {
+    it('manda PATCH con wallet_id y note (reemplazo completo)', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({
+          id: 'ci-1',
+          goal_id: 'goal-1',
+          period_month: '2026-09-01',
+          amount_saved: 50,
+          previous_target_date: null,
+          new_target_date: null,
+          note: 'ya llego',
+          wallet_id: 'wallet-1',
+          created_at: '2026-09-01T00:00:00Z',
+        }),
+      )
+
+      const result = await updateCheckIn('goal-1', 'ci-1', { walletId: 'wallet-1', note: 'ya llego' })
+
+      const [url, init] = vi.mocked(fetch).mock.calls[0]
+      expect(url).toBe('/api/goals/goal-1/check-ins/ci-1')
+      expect(init!.method).toBe('PATCH')
+      expect(JSON.parse(init!.body as string)).toEqual({ wallet_id: 'wallet-1', note: 'ya llego' })
+      expect(result.walletId).toBe('wallet-1')
+      expect(result.note).toBe('ya llego')
+    })
+
+    it('manda wallet_id null para desenlazar', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({
+          id: 'ci-1',
+          goal_id: 'goal-1',
+          period_month: '2026-09-01',
+          amount_saved: 50,
+          previous_target_date: null,
+          new_target_date: null,
+          note: null,
+          wallet_id: null,
+          created_at: '2026-09-01T00:00:00Z',
+        }),
+      )
+
+      await updateCheckIn('goal-1', 'ci-1', { walletId: null, note: null })
+
+      expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)).toEqual({ wallet_id: null, note: null })
+    })
+
+    it('lanza GoalsApiError en 400 (saldo disponible insuficiente)', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({ detail: 'La billetera elegida no tiene saldo disponible suficiente.' }, { ok: false, status: 400 }),
+      )
+
+      const error: unknown = await updateCheckIn('goal-1', 'ci-1', { walletId: 'wallet-1', note: null }).catch(
+        (e: unknown) => e,
+      )
+
+      expect(error).toBeInstanceOf(GoalsApiError)
+      expect((error as GoalsApiError).status).toBe(400)
+    })
+  })
+
+  describe('getWalletCommitments', () => {
+    it('pide el endpoint y mapea la lista a camelCase', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse([{ wallet_id: 'wallet-1', committed_amount: '150.00' }]),
+      )
+
+      const result = await getWalletCommitments()
+
+      const [url] = vi.mocked(fetch).mock.calls[0]
+      expect(url).toBe('/api/goals/wallet-commitments')
+      expect(result).toEqual([{ walletId: 'wallet-1', committedAmount: 150 }])
     })
   })
 

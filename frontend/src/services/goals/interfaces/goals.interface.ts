@@ -39,6 +39,10 @@ export interface CreateGoalInput {
   // el detalle de donde sale la plata queda en initialAmountNote.
   initialAmount?: number
   initialAmountNote?: string
+  // Opcional - de que billetera sale ese aporte inicial, en vez de "ingreso futuro"
+  // (pedido explicito del usuario). Reserva BLANDA: nunca descuenta el saldo real de
+  // la billetera (ver wallet_commitment_service.py del backend).
+  initialAmountWalletId?: string
 }
 
 // A diferencia de CreateGoalInput, "editar" no permite cambiar la plantilla/icono
@@ -55,6 +59,9 @@ export interface RecordCheckInInput {
   amountSaved: number
   newTargetDate?: string
   note?: string
+  // Opcional - de que billetera sale este aporte (pedido explicito del usuario, ver
+  // CreateGoalInput.initialAmountWalletId).
+  walletId?: string
 }
 
 export interface GoalCheckIn {
@@ -65,7 +72,25 @@ export interface GoalCheckIn {
   previousTargetDate: string | null
   newTargetDate: string | null
   note: string | null
+  walletId: string | null
   createdAt: string
+}
+
+// Edita SOLO la fuente de un aporte ya existente (a que billetera esta enlazado, y su
+// nota) - pedido explicito del usuario: reenlazar un aporte que quedo como "ingreso
+// futuro" una vez que esa plata efectivamente llego. Nunca monto ni fecha. Reemplazo
+// completo (ambos campos siempre se mandan), mismo criterio que UpdateGoalInput.
+export interface UpdateCheckInInput {
+  walletId: string | null
+  note: string | null
+}
+
+// Cuanto de cada billetera ya esta comprometido en aportes de metas ACTIVAS del
+// usuario (ver GET /api/goals/wallet-commitments) - se usa junto con Wallet.balance
+// para mostrar "disponible" en los selectores de billetera de Metas.
+export interface WalletCommitment {
+  walletId: string
+  committedAmount: number
 }
 
 export interface PendingCheckIn {

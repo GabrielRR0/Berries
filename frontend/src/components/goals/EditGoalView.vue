@@ -2,13 +2,15 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGoals } from '../../composables/goals/useGoals'
-import { getGoal } from '../../services/goals/goals.service'
+import { getGoal, getWalletCommitments } from '../../services/goals/goals.service'
 import type { Goal, UpdateGoalInput } from '../../services/goals/interfaces/goals.interface'
+import { useWalletsStore } from '../../stores/wallets.store'
 import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
 import BaseCard from '../ui/BaseCard.vue'
 import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import EditGoalForm from './EditGoalForm.vue'
+import GoalCheckInHistory from './GoalCheckInHistory.vue'
 
 // Pantalla propia "/metas/:id/editar" - mismo criterio que CreateGoalView.vue
 // (pedido explicito del usuario: nada de modales para esto). A diferencia de
@@ -24,12 +26,32 @@ const goal = ref<Goal | null>(null)
 const isFetching = ref(true)
 const loadError = ref<string | null>(null)
 
+// Pedido explicito del usuario: "cuando le doy a editar meta debe salir la
+// opcion de editar aporte" - GoalCheckInHistory.vue ya tiene esa edicion (ver
+// GoalCheckInEditSheet.vue), esta pantalla solo necesita billeteras/
+// comprometido para poder mostrarla, mismo criterio self-contained que
+// CreateGoalWizard.vue (no comparte instancia de useGoals() con GoalsMain.vue).
+const walletsStore = useWalletsStore()
+const walletCommitments = ref<Record<string, number>>({})
+
+async function fetchWalletCommitments() {
+  try {
+    const commitments = await getWalletCommitments()
+    walletCommitments.value = Object.fromEntries(commitments.map((c) => [c.walletId, c.committedAmount]))
+  } catch {
+    // Best-effort: si falla, el historial simplemente no muestra "disponible"
+    // en el selector de billetera al editar un aporte.
+  }
+}
+
 function goalId(): string {
   return route.params.id as string
 }
 
 onMounted(async () => {
   fetchSavingsCapacity()
+  walletsStore.fetchWallets()
+  fetchWalletCommitments()
   try {
     goal.value = await getGoal(goalId())
   } catch (err) {
@@ -66,6 +88,17 @@ async function onSubmit(input: UpdateGoalInput) {
         <div v-else-if="goal" key="form">
           <p v-if="error" class="edit-goal-error" role="alert">{{ error }}</p>
           <EditGoalForm :goal="goal" :submitting="isLoading" :savings-capacity="savingsCapacity" @submit="onSubmit" @cancel="goBack" />
+
+          <section class="edit-goal-contributions">
+            <h2 class="edit-goal-contributions-title">Aportes registrados</h2>
+            <GoalCheckInHistory
+              :goal-id="goal.id"
+              :currency="goal.currency"
+              :wallets="walletsStore.wallets"
+              :wallet-commitments="walletCommitments"
+              @check-in-edited="fetchWalletCommitments"
+            />
+          </section>
         </div>
 
         <BaseCard v-else key="not-found" class="edit-goal-not-found">
@@ -97,5 +130,14 @@ async function onSubmit(input: UpdateGoalInput) {
 .edit-goal-not-found {
   text-align: center;
   color: var(--text-muted);
+}
+
+.edit-goal-contributions {
+  margin-top: 1.5rem;
+}
+
+.edit-goal-contributions-title {
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
 }
 </style>

@@ -5,7 +5,12 @@ from decimal import Decimal
 import pytest
 
 from app.services.auth.auth_service import register_user
-from app.services.goals.errors import GoalNotActiveError, GoalNotFoundError, GoalValidationError
+from app.services.goals.errors import (
+    GoalNotActiveError,
+    GoalNotFoundError,
+    GoalValidationError,
+    InsufficientAvailableBalanceError,
+)
 from app.services.goals.goal_service import (
     build_goal_response,
     create_goal,
@@ -17,6 +22,7 @@ from app.services.goals.goal_service import (
     update_goal,
 )
 from app.services.transactions.transaction_service import create_transaction
+from app.services.wallets.errors import CurrencyMismatchError, WalletNotFoundError
 from app.services.wallets.wallet_service import create_wallet
 
 _FUTURE = date.today() + timedelta(days=90)
@@ -162,6 +168,68 @@ def test_build_goal_response_includes_suggested_contribution_and_no_postponement
 
     assert response.suggested_monthly_contribution > Decimal("0")
     assert response.last_check_in_postponed is False
+
+
+# --- create_goal con initial_amount_wallet_id (reserva blanda) -----------------------
+# Pedido explicito del usuario: "de donde lo voy a sacar, puede ser de alguna
+# billetera... si no tengo dinero en esa billetera no se podria enlazar". Confirmado:
+# nunca mueve plata real (wallet.balance no cambia), solo valida disponible.
+
+
+def test_create_goal_with_wallet_link_does_not_touch_wallet_balance(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("1000"))
+
+    goal = create_goal(
+        db, user.id, "TV", Decimal("240"), "USD", _FUTURE, initial_amount=Decimal("700"), initial_amount_wallet_id=wallet.id
+    )
+
+    db.refresh(wallet)
+    assert wallet.balance == Decimal("1000")
+    assert goal.total_saved == Decimal("700")
+    check_in = goal.check_ins[0]
+    assert check_in.wallet_id == wallet.id
+
+
+def test_create_goal_rejects_a_wallet_without_enough_available_balance(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("500"))
+
+    with pytest.raises(InsufficientAvailableBalanceError):
+        create_goal(
+            db, user.id, "TV", Decimal("2000"), "USD", _FUTURE, initial_amount=Decimal("700"), initial_amount_wallet_id=wallet.id
+        )
+
+
+def test_create_goal_rejects_a_wallet_in_a_different_currency(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "EUR", Decimal("1000"))
+
+    with pytest.raises(CurrencyMismatchError):
+        create_goal(
+            db, user.id, "TV", Decimal("2000"), "USD", _FUTURE, initial_amount=Decimal("700"), initial_amount_wallet_id=wallet.id
+        )
+
+
+def test_create_goal_rejects_a_wallet_belonging_to_another_user(db):
+    owner = register_user(db, "ana@example.com", "clave12345", "Ana")
+    other = register_user(db, "beto@example.com", "clave12345", "Beto")
+    wallet = create_wallet(db, other.id, "Cash", "USD", Decimal("1000"))
+
+    with pytest.raises(WalletNotFoundError):
+        create_goal(
+            db, owner.id, "TV", Decimal("2000"), "USD", _FUTURE, initial_amount=Decimal("700"), initial_amount_wallet_id=wallet.id
+        )
+
+
+def test_create_goal_does_not_validate_a_wallet_when_initial_amount_is_zero(db):
+    # Sin initial_amount, initial_amount_wallet_id no deberia validarse ni usarse -
+    # no tiene sentido enlazar una billetera a un aporte de $0.
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+
+    goal = create_goal(db, user.id, "TV", Decimal("240"), "USD", _FUTURE, initial_amount_wallet_id=uuid.uuid4())
+
+    assert goal.check_ins == []
 
 
 # --- update_goal ---------------------------------------------------------------------

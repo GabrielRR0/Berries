@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.core.encryption import EncryptedDecimal, EncryptedString
-from app.models.shared.column_types import CreatedAt, GoalFk, UuidPk
+from app.models.shared.column_types import CreatedAt, GoalFk, NullableWalletFk, UuidPk
 
 
 class GoalCheckIn(Base):
@@ -38,5 +38,15 @@ class GoalCheckIn(Base):
     # mismo criterio que Debt.description.
     note: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
     created_at: Mapped[CreatedAt]
+
+    # Billetera de la que "sale" este aporte - pedido explicito del usuario ("decir de
+    # donde lo voy a sacar, puede ser de alguna billetera, o de un ingreso futuro").
+    # Nullable: None + note = "ingreso futuro" (todavia no llego), se puede enlazar
+    # despues (ver check_in_service.update_check_in). SIN relationship propia (mismo
+    # criterio que DebtPayment.wallet_id) - se busca con db.get(Wallet, ...) cuando
+    # hace falta. Reserva BLANDA a proposito (pedido explicito del usuario, confirmado):
+    # jamas se descuenta wallet.balance ni se crea una Transaction por esto, solo se sabe
+    # cuanto ya esta "comprometido" por billetera via wallet_commitment_service.
+    wallet_id: Mapped[NullableWalletFk]
 
     goal: Mapped["Goal"] = relationship("Goal", back_populates="check_ins")

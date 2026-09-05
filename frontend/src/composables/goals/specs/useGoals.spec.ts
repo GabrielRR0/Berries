@@ -6,8 +6,10 @@ import {
   getGoalSummary,
   getPendingCheckIns,
   getSavingsCapacity,
+  getWalletCommitments,
   listGoals,
   recordCheckIn,
+  updateCheckIn,
   updateGoal,
 } from '../../../services/goals/goals.service'
 import type { Goal, GoalSummary, PendingCheckIn, SavingsCapacity } from '../../../services/goals/interfaces/goals.interface'
@@ -18,10 +20,12 @@ vi.mock('../../../services/goals/goals.service', () => ({
   getGoalSummary: vi.fn(),
   getPendingCheckIns: vi.fn(),
   getSavingsCapacity: vi.fn(),
+  getWalletCommitments: vi.fn(),
   createGoal: vi.fn(),
   updateGoal: vi.fn(),
   deleteGoal: vi.fn(),
   recordCheckIn: vi.fn(),
+  updateCheckIn: vi.fn(),
   abandonGoal: vi.fn(),
 }))
 
@@ -59,10 +63,12 @@ describe('useGoals', () => {
     vi.mocked(getGoalSummary).mockReset().mockResolvedValue(SUMMARY)
     vi.mocked(getPendingCheckIns).mockReset().mockResolvedValue([PENDING])
     vi.mocked(getSavingsCapacity).mockReset().mockResolvedValue(CAPACITY)
+    vi.mocked(getWalletCommitments).mockReset().mockResolvedValue([])
     vi.mocked(createGoal).mockReset()
     vi.mocked(updateGoal).mockReset()
     vi.mocked(deleteGoal).mockReset()
     vi.mocked(recordCheckIn).mockReset()
+    vi.mocked(updateCheckIn).mockReset()
     vi.mocked(abandonGoal).mockReset()
   })
 
@@ -248,6 +254,50 @@ describe('useGoals', () => {
 
       await expect(checkIn('goal-1', { amountSaved: 10 })).rejects.toThrow('meta no activa')
       expect(error.value).toBe('meta no activa')
+    })
+  })
+
+  describe('fetchWalletCommitments', () => {
+    it('pide lo comprometido por billetera y lo guarda como mapa por id', async () => {
+      vi.mocked(getWalletCommitments).mockResolvedValue([{ walletId: 'wallet-1', committedAmount: 150 }])
+      const { walletCommitments, fetchWalletCommitments } = useGoals()
+
+      await fetchWalletCommitments()
+
+      expect(walletCommitments.value).toEqual({ 'wallet-1': 150 })
+    })
+
+    it('se pide como parte de refetchAll (ej. tras crear una meta)', async () => {
+      vi.mocked(createGoal).mockResolvedValue(GOAL)
+      const { create } = useGoals()
+
+      await create({ title: 'TV', targetAmount: 240, currency: 'USD', targetDate: '2026-11-28', goalType: 'custom' })
+
+      expect(getWalletCommitments).toHaveBeenCalled()
+    })
+  })
+
+  // Edicion de la fuente (billetera/nota) de un aporte ya existente - pedido
+  // explicito del usuario.
+  describe('updateCheckIn', () => {
+    it('edita el aporte y refresca todo (incluido lo comprometido por billetera)', async () => {
+      const { updateCheckIn: updateCheckInAction } = useGoals()
+
+      await updateCheckInAction('goal-1', 'ci-1', { walletId: 'wallet-1', note: 'ya llego' })
+
+      expect(updateCheckIn).toHaveBeenCalledWith('goal-1', 'ci-1', { walletId: 'wallet-1', note: 'ya llego' })
+      expect(getWalletCommitments).toHaveBeenCalled()
+      expect(listGoals).toHaveBeenCalled()
+    })
+
+    it('propaga el error del servicio', async () => {
+      vi.mocked(updateCheckIn).mockRejectedValue(new Error('saldo insuficiente'))
+      const { error, updateCheckIn: updateCheckInAction } = useGoals()
+
+      await expect(updateCheckInAction('goal-1', 'ci-1', { walletId: 'wallet-1', note: null })).rejects.toThrow(
+        'saldo insuficiente',
+      )
+      expect(error.value).toBe('saldo insuficiente')
     })
   })
 

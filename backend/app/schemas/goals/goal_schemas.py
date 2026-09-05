@@ -23,6 +23,9 @@ class GoalCreateRequest(BaseModel):
     # normal (ver create_goal), asi el detalle de donde sale la plata queda en su nota.
     initial_amount: Decimal = Field(default=Decimal("0"), ge=0)
     initial_amount_note: str | None = Field(default=None, max_length=500)
+    # Opcional - de que billetera sale ese aporte inicial (en vez de "ingreso futuro",
+    # pedido explicito del usuario). None = sin enlazar, solo queda la nota de arriba.
+    initial_amount_wallet_id: uuid.UUID | None = Field(default=None)
 
 
 class GoalUpdateRequest(BaseModel):
@@ -75,6 +78,9 @@ class GoalCheckInCreateRequest(BaseModel):
     amount_saved: Decimal = Field(ge=0)
     new_target_date: date | None = None
     note: str | None = Field(default=None, max_length=500)
+    # Opcional - de que billetera sale este aporte (pedido explicito del usuario, ver
+    # GoalCreateRequest.initial_amount_wallet_id). None = "ingreso futuro"/sin enlazar.
+    wallet_id: uuid.UUID | None = Field(default=None)
 
 
 class GoalCheckInResponse(BaseModel):
@@ -87,7 +93,24 @@ class GoalCheckInResponse(BaseModel):
     previous_target_date: date | None
     new_target_date: date | None
     note: str | None
+    wallet_id: uuid.UUID | None
     created_at: datetime
+
+
+class GoalCheckInUpdateRequest(BaseModel):
+    """Edita SOLO la fuente de un aporte ya existente (a que billetera esta enlazado,
+    y su nota) - pedido explicito del usuario: "editarlo y decir que los voy a usar de
+    mi billetera". Nunca el monto ni la fecha - reemplazo completo de estos 2 campos
+    (mismo criterio que GoalUpdateRequest/TransactionUpdateRequest, sin ambiguedad de
+    patch parcial)."""
+
+    wallet_id: uuid.UUID | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+
+class WalletCommitmentResponse(BaseModel):
+    wallet_id: uuid.UUID
+    committed_amount: Decimal
 
 
 class PendingCheckInResponse(BaseModel):

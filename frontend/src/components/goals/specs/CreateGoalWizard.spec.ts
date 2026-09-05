@@ -1,6 +1,9 @@
-import { DOMWrapper, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as goalsService from '../../../services/goals/goals.service'
 import type { SavingsCapacity } from '../../../services/goals/interfaces/goals.interface'
+import * as walletsService from '../../../services/wallets/wallets.service'
 import { monthsBetween } from '../../../utils/goals/monthsBetween'
 import CreateGoalWizard from '../CreateGoalWizard.vue'
 
@@ -46,8 +49,20 @@ async function setInitialSavings(wrapper: ReturnType<typeof mount>, amount: stri
 }
 
 describe('CreateGoalWizard', () => {
+  // Idea/pedido explicito del usuario ("puede ser de alguna billetera, o de un
+  // ingreso futuro"): el wizard ahora hace su propio fetch de billeteras y de lo
+  // ya comprometido en otras metas (useWalletsStore()/getWalletCommitments) - sin
+  // esto, useWalletsStore() explota por falta de una Pinia activa en CUALQUIER
+  // test de este archivo, no solo los que tocan billeteras.
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.spyOn(walletsService, 'listWallets').mockResolvedValue([])
+    vi.spyOn(goalsService, 'getWalletCommitments').mockResolvedValue([])
+  })
+
   afterEach(() => {
     for (const wrapper of mountedWrappers.splice(0)) wrapper.unmount()
+    vi.restoreAllMocks()
   })
 
   it('arranca en el paso 1, mostrando el grid de plantillas', () => {
@@ -399,5 +414,117 @@ describe('CreateGoalWizard', () => {
     await typeAmount(wrapper, '1000')
 
     expect(wrapper.find('.capacity-hint').exists()).toBe(false)
+  })
+
+  // Pedido explicito del usuario: "de donde lo voy a sacar, puede ser de alguna
+  // billetera, o de un ingreso futuro". Confirmado: reserva blanda (nunca mueve
+  // plata real), solo billeteras de la misma moneda que la meta.
+  describe('fuente del aporte inicial (billetera vs. ingreso futuro)', () => {
+    const WALLET_USD = { id: 'wallet-1', name: 'Efectivo', currency: 'USD', balance: 1000, createdAt: '2026-01-01T00:00:00Z' }
+    const WALLET_EUR = { id: 'wallet-2', name: 'Banco EUR', currency: 'EUR', balance: 500, createdAt: '2026-01-01T00:00:00Z' }
+
+    async function goToWalletPill(wrapper: ReturnType<typeof mount>) {
+      const trigger = wrapper.find('.initial-savings-toggle').exists()
+        ? wrapper.find('.initial-savings-toggle')
+        : wrapper.find('.initial-savings-edit')
+      await trigger.trigger('click')
+      const billeteraPill = new DOMWrapper(document.body).findAll('.pill').find((btn) => btn.text() === 'Billetera')!
+      await billeteraPill.trigger('click')
+    }
+
+    it('sin tocar nada, por defecto queda en "Ingreso futuro" (sin cambios de comportamiento)', async () => {
+      const wrapper = mountAttached()
+      await wrapper.find('.type-tile-custom').trigger('click')
+      await wrapper.find('.initial-savings-toggle').trigger('click')
+
+      const futuroPill = inSheet('.pill-toggle .pill.active')
+      expect(futuroPill.text()).toBe('Ingreso futuro')
+      expect(inSheet('.initial-savings-note').exists()).toBe(true)
+    })
+
+    it('el selector de billetera solo ofrece billeteras de la misma moneda que la meta', async () => {
+      vi.mocked(walletsService.listWallets).mockResolvedValue([WALLET_USD, WALLET_EUR])
+      const wrapper = mountAttached()
+      await wrapper.find('.type-tile-custom').trigger('click')
+      await flushPromises()
+      await goToWalletPill(wrapper)
+
+      const options = inSheet('.initial-savings-wallet-field select')
+        .findAll('option')
+        .map((o) => o.text())
+      expect(options.some((text) => text.includes('Efectivo'))).toBe(true)
+      expect(options.some((text) => text.includes('Banco EUR'))).toBe(false)
+    })
+
+    it('bloquea "Guardar" si el monto supera el disponible de la billetera elegida', async () => {
+      vi.mocked(walletsService.listWallets).mockResolvedValue([WALLET_USD])
+      vi.mocked(goalsService.getWalletCommitments).mockResolvedValue([])
+      const wrapper = mountAttached()
+      await wrapper.find('.type-tile-custom').trigger('click')
+      await flushPromises()
+      await goToWalletPill(wrapper)
+
+      await inSheet('.initial-savings-amount-input').setValue('5000')
+      await inSheet('.initial-savings-wallet-field select').setValue('wallet-1')
+
+      const guardar = new DOMWrapper(document.body)
+        .findAll('.initial-savings-sheet-actions button')
+        .find((btn) => btn.text() === 'Guardar')!
+      expect(guardar.attributes('disabled')).toBeDefined()
+      expect(inSheet('.capacity-hint.warning').exists()).toBe(true)
+    })
+
+    it('descuenta lo ya comprometido en otras metas al validar el disponible', async () => {
+      vi.mocked(walletsService.listWallets).mockResolvedValue([WALLET_USD])
+      vi.mocked(goalsService.getWalletCommitments).mockResolvedValue([{ walletId: 'wallet-1', committedAmount: 950 }])
+      const wrapper = mountAttached()
+      await wrapper.find('.type-tile-custom').trigger('click')
+      await flushPromises()
+      await goToWalletPill(wrapper)
+
+      // Saldo real 1000, ya comprometido 950 -> disponible real 50, pedir 100 no alcanza.
+      await inSheet('.initial-savings-amount-input').setValue('100')
+      await inSheet('.initial-savings-wallet-field select').setValue('wallet-1')
+
+      const guardar = new DOMWrapper(document.body)
+        .findAll('.initial-savings-sheet-actions button')
+        .find((btn) => btn.text() === 'Guardar')!
+      expect(guardar.attributes('disabled')).toBeDefined()
+    })
+
+    it('"Crear meta" incluye initialAmountWalletId cuando se elige una billetera', async () => {
+      vi.mocked(walletsService.listWallets).mockResolvedValue([WALLET_USD])
+      const wrapper = mountAttached()
+      await wrapper.findAll('.type-tile').find((tile) => tile.text().includes('Comprar un computador'))!.trigger('click')
+      await wrapper.find('input[type="date"]').setValue('2026-12-28')
+      await typeAmount(wrapper, '1200')
+      await flushPromises()
+      await goToWalletPill(wrapper)
+      await inSheet('.initial-savings-amount-input').setValue('700')
+      await inSheet('.initial-savings-wallet-field select').setValue('wallet-1')
+      await new DOMWrapper(document.body)
+        .findAll('.initial-savings-sheet-actions button')
+        .find((btn) => btn.text() === 'Guardar')!
+        .trigger('click')
+      await wrapper.find('.wizard-next').trigger('click')
+
+      await wrapper.find('.wizard-next').trigger('click')
+
+      const [payload] = wrapper.emitted('create')![0] as [Record<string, unknown>]
+      expect(payload.initialAmountWalletId).toBe('wallet-1')
+      expect(wrapper.text()).not.toContain('Ingreso futuro')
+    })
+
+    it('el resumen del paso 3 muestra "Ingreso futuro" cuando no se enlaza billetera', async () => {
+      const wrapper = mountAttached()
+      await wrapper.find('.type-tile-custom').trigger('click')
+      await wrapper.find('.wizard-title-input').setValue('TV')
+      await wrapper.find('input[type="date"]').setValue('2026-12-28')
+      await typeAmount(wrapper, '240')
+      await setInitialSavings(wrapper, '100')
+      await wrapper.find('.wizard-next').trigger('click')
+
+      expect(wrapper.text()).toContain('Ingreso futuro')
+    })
   })
 })

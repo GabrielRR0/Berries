@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGoals } from '../../composables/goals/useGoals'
 import type { GoalStatus, RecordCheckInInput } from '../../services/goals/interfaces/goals.interface'
+import { useWalletsStore } from '../../stores/wallets.store'
 import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
 import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
@@ -33,17 +34,20 @@ const FILTER_OPTIONS: { value: FilterValue; label: string }[] = [
 ]
 
 const router = useRouter()
+const walletsStore = useWalletsStore()
 const {
   goals,
   summary,
   pendingCheckIns,
   savingsCapacity,
+  walletCommitments,
   isLoading,
   error,
   fetchGoals,
   fetchSummary,
   fetchPendingCheckIns,
   fetchSavingsCapacity,
+  fetchWalletCommitments,
   remove,
   checkIn,
   abandon,
@@ -82,8 +86,11 @@ async function onAbandon(goalId: string) {
   await abandon(goalId).catch(() => {})
 }
 
-async function onAddContribution(goalId: string, amount: number) {
-  await checkIn(goalId, { amountSaved: amount }).catch(() => {})
+async function onAddContribution(
+  goalId: string,
+  input: { amountSaved: number; walletId?: string; note?: string },
+) {
+  await checkIn(goalId, input).catch(() => {})
 }
 
 async function onCheckInSubmit(goalId: string, input: RecordCheckInInput) {
@@ -97,6 +104,8 @@ onMounted(() => {
   fetchSummary()
   fetchPendingCheckIns()
   fetchSavingsCapacity()
+  fetchWalletCommitments()
+  walletsStore.fetchWallets()
 })
 </script>
 
@@ -128,6 +137,8 @@ onMounted(() => {
             v-for="pending in pendingCheckIns"
             :key="pending.goalId"
             :pending="pending"
+            :wallets="walletsStore.wallets"
+            :wallet-commitments="walletCommitments"
             @submit="onCheckInSubmit(pending.goalId, $event)"
           />
         </div>
@@ -161,10 +172,13 @@ onMounted(() => {
           :key="goal.id"
           :goal="goal"
           :savings-capacity="savingsCapacity"
+          :wallets="walletsStore.wallets"
+          :wallet-commitments="walletCommitments"
           @remove="onRemove(goal.id)"
           @add-contribution="onAddContribution(goal.id, $event)"
           @abandon="onAbandon(goal.id)"
           @edit="goToEdit(goal.id)"
+          @check-in-edited="fetchWalletCommitments"
         />
       </TransitionGroup>
 

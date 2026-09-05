@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { Goal, SavingsCapacity } from '../../services/goals/interfaces/goals.interface'
+import type { Wallet } from '../../services/wallets/interfaces/wallets.interface'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
+import { availableBalance } from '../../utils/wallets/availableBalance'
 import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
 import BaseCard from '../ui/BaseCard.vue'
+import BottomSheet from '../ui/BottomSheet.vue'
+import PillToggle from '../ui/PillToggle.vue'
 import GoalCheckInHistory from './GoalCheckInHistory.vue'
 import GoalProgressRing from './GoalProgressRing.vue'
 import GoalTypeIcon from './GoalTypeIcon.vue'
@@ -15,15 +19,26 @@ import GoalTypeIcon from './GoalTypeIcon.vue'
 // editar, abandonar, eliminar) viven detras de un menu de tres puntos en vez
 // de una fila de botones siempre visible - antes cada accion competia por
 // espacio permanente en la card, ahora la card en reposo es solo informacion.
-const props = withDefaults(defineProps<{ goal: Goal; savingsCapacity?: SavingsCapacity | null }>(), {
-  savingsCapacity: null,
-})
+const props = withDefaults(
+  defineProps<{
+    goal: Goal
+    savingsCapacity?: SavingsCapacity | null
+    wallets?: Wallet[]
+    walletCommitments?: Record<string, number>
+  }>(),
+  {
+    savingsCapacity: null,
+    wallets: () => [],
+    walletCommitments: () => ({}),
+  },
+)
 
 const emit = defineEmits<{
   remove: []
-  addContribution: [amount: number]
+  addContribution: [input: { amountSaved: number; walletId?: string; note?: string }]
   abandon: []
   edit: []
+  checkInEdited: []
 }>()
 
 const progressPercent = computed(() => {
@@ -75,23 +90,53 @@ function confirmPendingAction() {
   else if (action === 'abandon') emit('abandon')
 }
 
-// Reveal inline chico (mismo criterio que el confirm de borrado) en vez de
-// un BottomSheet aparte - un aporte suelto es un solo numero, no justifica
-// un formulario propio.
+// Sheet de aporte - pedido explicito del usuario ("para cuando quiero agregar
+// un aporte poder enlazarlo de alguna billetera que tenga"). Antes era un
+// reveal inline (un solo numero no justificaba un formulario propio) - ya no
+// aplica ese criterio ahora que suma billetera/nota.
 const showAddContribution = ref(false)
 const contributionAmount = ref('')
+const contributionSourceType = ref<'wallet' | 'future'>('future')
+const contributionWalletId = ref<string | null>(null)
+const contributionNote = ref('')
 
 function toggleAddContribution() {
   showAddContribution.value = !showAddContribution.value
   contributionAmount.value = ''
+  contributionSourceType.value = 'future'
+  contributionWalletId.value = null
+  contributionNote.value = ''
 }
 
+// Solo billeteras de la MISMA moneda que la meta - pedido explicito del
+// usuario, confirmado: sin conversion en esta pasada.
+const walletsForContribution = computed(() => props.wallets.filter((wallet) => wallet.currency === props.goal.currency))
+
+const contributionWalletAvailable = computed(() => {
+  const wallet = walletsForContribution.value.find((w) => w.id === contributionWalletId.value)
+  return wallet ? availableBalance(wallet, props.walletCommitments) : null
+})
+
+const canSubmitContribution = computed(() => {
+  const amount = Number(contributionAmount.value)
+  if (!Number.isFinite(amount) || amount <= 0) return false
+  if (contributionSourceType.value !== 'wallet') return true
+  if (contributionWalletId.value === null) return false
+  return contributionWalletAvailable.value !== null && amount <= contributionWalletAvailable.value
+})
+
 function submitContribution() {
-  const value = Number(contributionAmount.value)
-  if (!Number.isFinite(value) || value <= 0) return
-  emit('addContribution', value)
+  if (!canSubmitContribution.value) return
+  emit('addContribution', {
+    amountSaved: Number(contributionAmount.value),
+    walletId: contributionSourceType.value === 'wallet' ? (contributionWalletId.value ?? undefined) : undefined,
+    note: contributionNote.value.trim() || undefined,
+  })
   showAddContribution.value = false
   contributionAmount.value = ''
+  contributionSourceType.value = 'future'
+  contributionWalletId.value = null
+  contributionNote.value = ''
 }
 
 // Historial carga perezosa: GoalCheckInHistory pide sus datos en su propio
@@ -240,23 +285,76 @@ function onMenuDelete() {
       No se pudo cumplir el aporte de un mes, pero seguimos reuniendo para lograrlo.
     </p>
 
-    <Transition name="confirm-reveal">
-      <form v-if="showAddContribution" class="goal-add-contribution-form" @submit.prevent="submitContribution">
-        <input
-          v-model="contributionAmount"
-          type="number"
-          min="0"
-          step="0.01"
-          inputmode="decimal"
-          placeholder="0.00"
-          autofocus
-        />
-        <button type="submit" class="goal-add-contribution-confirm">Sumar</button>
-        <button type="button" class="goal-add-contribution-cancel" @click="toggleAddContribution">Cancelar</button>
-      </form>
-    </Transition>
+    <!-- <Teleport to="body">: mismo motivo que el menu de tres puntos de arriba -
+         BaseCard usa backdrop-filter, un ancestro con eso redefine el containing
+         block de un position:fixed anidado adentro (el .sheet-scrim de
+         BottomSheet.vue). -->
+    <Teleport to="body">
+      <BottomSheet v-if="showAddContribution" title="Agregar aporte" @close="toggleAddContribution">
+        <form class="goal-add-contribution-form" @submit.prevent="submitContribution">
+          <input
+            v-model="contributionAmount"
+            type="number"
+            min="0"
+            step="0.01"
+            inputmode="decimal"
+            placeholder="0.00"
+            autofocus
+          />
 
-    <GoalCheckInHistory v-if="showHistory" :goal-id="goal.id" :currency="goal.currency" class="goal-history-panel" />
+          <!-- De donde sale este aporte - pedido explicito del usuario: "puede
+               ser de alguna billetera, o de un ingreso futuro". -->
+          <PillToggle
+            :options="[
+              { value: 'wallet', label: 'Billetera' },
+              { value: 'future', label: 'Ingreso futuro' },
+            ]"
+            v-model="contributionSourceType"
+            class="goal-add-contribution-source-toggle"
+          />
+
+          <div v-if="contributionSourceType === 'wallet'" class="goal-add-contribution-wallet-field">
+            <select v-model="contributionWalletId">
+              <option :value="null" disabled>Elige una billetera</option>
+              <option v-for="wallet in walletsForContribution" :key="wallet.id" :value="wallet.id">
+                {{ wallet.name }} — disponible {{ formatCurrency(availableBalance(wallet, walletCommitments), wallet.currency) }}
+              </option>
+            </select>
+            <p v-if="walletsForContribution.length === 0" class="goal-add-contribution-hint">
+              No tienes billeteras en {{ goal.currency }} todavía.
+            </p>
+            <p
+              v-else-if="contributionWalletId !== null && !canSubmitContribution"
+              class="goal-add-contribution-hint warning"
+            >
+              Esa billetera no tiene disponible suficiente para este monto.
+            </p>
+          </div>
+          <input
+            v-else
+            v-model="contributionNote"
+            type="text"
+            maxlength="500"
+            placeholder="¿De dónde sale? (opcional)"
+          />
+
+          <div class="goal-add-contribution-actions">
+            <button type="button" class="goal-add-contribution-cancel" @click="toggleAddContribution">Cancelar</button>
+            <button type="submit" class="goal-add-contribution-confirm" :disabled="!canSubmitContribution">Sumar</button>
+          </div>
+        </form>
+      </BottomSheet>
+    </Teleport>
+
+    <GoalCheckInHistory
+      v-if="showHistory"
+      :goal-id="goal.id"
+      :currency="goal.currency"
+      :wallets="wallets"
+      :wallet-commitments="walletCommitments"
+      class="goal-history-panel"
+      @check-in-edited="emit('checkInEdited')"
+    />
 
     <!-- Alto fijo mientras esta activo (mismo criterio que antes): confirmar
          borrado o abandono nunca mueve nada fuera de la card. -->
@@ -561,15 +659,14 @@ function onMenuDelete() {
 
 .goal-add-contribution-form {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.75rem;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.goal-add-contribution-form input {
-  flex: 1;
-  min-width: 0;
-  padding: 0.5rem 0.625rem;
+.goal-add-contribution-form input,
+.goal-add-contribution-wallet-field select {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-inset);
@@ -578,18 +675,51 @@ function onMenuDelete() {
   font-size: 1rem;
 }
 
-.goal-add-contribution-form input:focus {
+.goal-add-contribution-form input:focus,
+.goal-add-contribution-wallet-field select:focus {
   outline: none;
   border-color: var(--accent);
 }
 
+.goal-add-contribution-source-toggle {
+  align-self: flex-start;
+}
+
+.goal-add-contribution-wallet-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.goal-add-contribution-hint {
+  padding: 0.4375rem 0.625rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-inset);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.goal-add-contribution-hint.warning {
+  border-color: var(--accent-border);
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+.goal-add-contribution-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
 .goal-add-contribution-confirm,
 .goal-add-contribution-cancel {
-  flex-shrink: 0;
-  padding: 0.5rem 0.75rem;
+  padding: 0.625rem 0.75rem;
   border-radius: var(--radius-sm);
   font: inherit;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   transition: opacity var(--duration-fast) var(--ease-out);
@@ -601,13 +731,18 @@ function onMenuDelete() {
   color: var(--accent-contrast);
 }
 
+.goal-add-contribution-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .goal-add-contribution-cancel {
   border: 1px solid var(--glass-border);
   background: var(--glass-bg);
   color: var(--text-h);
 }
 
-.goal-add-contribution-confirm:hover,
+.goal-add-contribution-confirm:not(:disabled):hover,
 .goal-add-contribution-cancel:hover {
   opacity: 0.9;
 }

@@ -6,8 +6,10 @@ import {
   getGoalSummary as getGoalSummaryApi,
   getPendingCheckIns as getPendingCheckInsApi,
   getSavingsCapacity as getSavingsCapacityApi,
+  getWalletCommitments as getWalletCommitmentsApi,
   listGoals as listGoalsApi,
   recordCheckIn as recordCheckInApi,
+  updateCheckIn as updateCheckInApi,
   updateGoal as updateGoalApi,
 } from '../../services/goals/goals.service'
 import type {
@@ -18,6 +20,7 @@ import type {
   PendingCheckIn,
   RecordCheckInInput,
   SavingsCapacity,
+  UpdateCheckInInput,
   UpdateGoalInput,
 } from '../../services/goals/interfaces/goals.interface'
 
@@ -28,6 +31,10 @@ export function useGoals() {
   const summary = ref<GoalSummary | null>(null)
   const pendingCheckIns = ref<PendingCheckIn[]>([])
   const savingsCapacity = ref<SavingsCapacity | null>(null)
+  // Cuanto de cada billetera ya esta comprometido en metas activas (id -> monto) -
+  // pedido explicito del usuario: mostrar "disponible" (saldo real menos esto) al
+  // elegir una billetera para un aporte.
+  const walletCommitments = ref<Record<string, number>>({})
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
@@ -78,11 +85,20 @@ export function useGoals() {
     }
   }
 
-  // Refresca lista + resumen + chequeos pendientes tras cualquier mutacion,
-  // con el mismo filtro que estaba activo - asi la UI nunca queda mostrando
-  // datos viejos.
+  async function fetchWalletCommitments(): Promise<void> {
+    try {
+      const commitments = await getWalletCommitmentsApi()
+      walletCommitments.value = Object.fromEntries(commitments.map((c) => [c.walletId, c.committedAmount]))
+    } catch (err) {
+      error.value = toMessage(err, 'No se pudo obtener lo comprometido por billetera.')
+    }
+  }
+
+  // Refresca lista + resumen + chequeos pendientes + comprometido por billetera tras
+  // cualquier mutacion, con el mismo filtro que estaba activo - asi la UI nunca queda
+  // mostrando datos viejos.
   async function refetchAll(): Promise<void> {
-    await Promise.all([fetchGoals(lastStatus), fetchSummary(), fetchPendingCheckIns()])
+    await Promise.all([fetchGoals(lastStatus), fetchSummary(), fetchPendingCheckIns(), fetchWalletCommitments()])
   }
 
   async function create(input: CreateGoalInput): Promise<void> {
@@ -138,6 +154,20 @@ export function useGoals() {
     }
   }
 
+  // Edita SOLO la fuente (billetera/nota) de un aporte ya existente - pedido
+  // explicito del usuario: reenlazar un aporte "a futuro" una vez que esa plata
+  // efectivamente llego. Nunca monto ni fecha.
+  async function updateCheckIn(goalId: string, checkInId: string, input: UpdateCheckInInput): Promise<void> {
+    error.value = null
+    try {
+      await updateCheckInApi(goalId, checkInId, input)
+      await refetchAll()
+    } catch (err) {
+      error.value = toMessage(err, 'No se pudo editar el aporte.')
+      throw err
+    }
+  }
+
   async function abandon(goalId: string): Promise<void> {
     error.value = null
     try {
@@ -154,16 +184,19 @@ export function useGoals() {
     summary,
     pendingCheckIns,
     savingsCapacity,
+    walletCommitments,
     isLoading,
     error,
     fetchGoals,
     fetchSummary,
     fetchPendingCheckIns,
     fetchSavingsCapacity,
+    fetchWalletCommitments,
     create,
     update,
     remove,
     checkIn,
+    updateCheckIn,
     abandon,
   }
 }

@@ -1,14 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { getWalletCommitments } from '../../services/goals/goals.service'
 import type { CreateGoalInput, GoalType, SavingsCapacity } from '../../services/goals/interfaces/goals.interface'
+import { useWalletsStore } from '../../stores/wallets.store'
 import { SUPPORTED_CURRENCIES } from '../../utils/currency/supportedCurrencies'
 import { groupAmountThousands, ungroupAmountThousands } from '../../utils/formatters/formatAmountInput'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import { formatDate } from '../../utils/formatters/formatDate'
 import { GOAL_TYPE_TEMPLATES } from '../../utils/goals/goalTypeTemplates'
 import { monthsBetween } from '../../utils/goals/monthsBetween'
+import { availableBalance } from '../../utils/wallets/availableBalance'
 import BaseButton from '../ui/BaseButton.vue'
 import BottomSheet from '../ui/BottomSheet.vue'
+import PillToggle from '../ui/PillToggle.vue'
 import GoalProgressRing from './GoalProgressRing.vue'
 import GoalTypeIcon from './GoalTypeIcon.vue'
 
@@ -78,10 +82,38 @@ const monthlyAmountStr = ref(props.initialAmountIsMonthly ? (props.initialAmount
 const hasInitialAmount = ref(false)
 const initialAmountStr = ref('')
 const initialAmountNote = ref('')
+// De donde sale ese aporte inicial - pedido explicito del usuario: "puede ser de
+// alguna billetera, o de un ingreso futuro". "future" por default: nadie que ignore
+// esto nota un cambio (el aporte sigue guardandose igual que antes, solo con nota).
+const initialAmountSourceType = ref<'wallet' | 'future'>('future')
+const initialAmountWalletId = ref<string | null>(null)
 
 const showInitialSavingsSheet = ref(false)
 const draftInitialAmountStr = ref('')
 const draftInitialAmountNote = ref('')
+const draftInitialAmountSourceType = ref<'wallet' | 'future'>('future')
+const draftInitialAmountWalletId = ref<string | null>(null)
+
+// Este wizard no comparte instancia de useGoals() con GoalsMain.vue (vive en su
+// propia ruta, ver CreateGoalView.vue) - hace su propio fetch de billeteras y de lo
+// ya comprometido en otras metas, igual criterio que TransferForm.vue con
+// useWalletsStore().
+const walletsStore = useWalletsStore()
+const walletCommitments = ref<Record<string, number>>({})
+onMounted(async () => {
+  await walletsStore.fetchWallets()
+  try {
+    const commitments = await getWalletCommitments()
+    walletCommitments.value = Object.fromEntries(commitments.map((c) => [c.walletId, c.committedAmount]))
+  } catch {
+    // Best-effort: si falla, el selector de billeteras simplemente no muestra
+    // "disponible" pero el resto del wizard sigue funcionando.
+  }
+})
+
+// Solo billeteras de la MISMA moneda que la meta - pedido explicito del usuario,
+// confirmado: sin conversion en esta pasada.
+const walletsForInitialAmount = computed(() => walletsStore.wallets.filter((wallet) => wallet.currency === currency.value))
 
 const draftInitialAmountDisplayStr = computed({
   get: () => groupAmountThousands(draftInitialAmountStr.value),
@@ -93,12 +125,32 @@ const draftInitialAmountDisplayStr = computed({
 function openInitialSavingsSheet() {
   draftInitialAmountStr.value = initialAmountStr.value
   draftInitialAmountNote.value = initialAmountNote.value
+  draftInitialAmountSourceType.value = initialAmountSourceType.value
+  draftInitialAmountWalletId.value = initialAmountWalletId.value
   showInitialSavingsSheet.value = true
 }
+
+// Disponible de la billetera elegida en el borrador - null si no eligio ninguna.
+const draftInitialAmountWalletAvailable = computed(() => {
+  const wallet = walletsForInitialAmount.value.find((w) => w.id === draftInitialAmountWalletId.value)
+  return wallet ? availableBalance(wallet, walletCommitments.value) : null
+})
+
+// Bloquea "Guardar" si eligio "Billetera" pero no selecciono ninguna, o si el monto
+// supera el disponible de la elegida - pedido explicito del usuario: "si no tengo
+// dinero en esa billetera no se podria enlazar".
+const canConfirmInitialSavings = computed(() => {
+  if (draftInitialAmountSourceType.value !== 'wallet') return true
+  if (draftInitialAmountWalletId.value === null) return false
+  const amount = Number(draftInitialAmountStr.value)
+  return draftInitialAmountWalletAvailable.value !== null && amount <= draftInitialAmountWalletAvailable.value
+})
 
 function confirmInitialSavings() {
   initialAmountStr.value = draftInitialAmountStr.value
   initialAmountNote.value = draftInitialAmountNote.value
+  initialAmountSourceType.value = draftInitialAmountSourceType.value
+  initialAmountWalletId.value = draftInitialAmountSourceType.value === 'wallet' ? draftInitialAmountWalletId.value : null
   hasInitialAmount.value = Number(draftInitialAmountStr.value) > 0
   showInitialSavingsSheet.value = false
 }
@@ -107,6 +159,8 @@ function clearInitialAmount() {
   hasInitialAmount.value = false
   initialAmountStr.value = ''
   initialAmountNote.value = ''
+  initialAmountSourceType.value = 'future'
+  initialAmountWalletId.value = null
 }
 
 const initialAmountValue = computed(() => {
@@ -295,6 +349,9 @@ function onCreate() {
     ...(initialAmountValue.value > 0 && initialAmountNote.value.trim()
       ? { initialAmountNote: initialAmountNote.value.trim() }
       : {}),
+    ...(initialAmountValue.value > 0 && initialAmountWalletId.value
+      ? { initialAmountWalletId: initialAmountWalletId.value }
+      : {}),
   })
 }
 </script>
@@ -418,7 +475,38 @@ function onCreate() {
               class="wizard-title-input initial-savings-amount-input"
               :placeholder="`0.00 ${currency}`"
             />
+
+            <!-- De donde sale ese aporte - pedido explicito del usuario: "puede ser
+                 de alguna billetera, o de un ingreso futuro". -->
+            <PillToggle
+              :options="[
+                { value: 'wallet', label: 'Billetera' },
+                { value: 'future', label: 'Ingreso futuro' },
+              ]"
+              v-model="draftInitialAmountSourceType"
+              class="initial-savings-source-toggle"
+            />
+
+            <div v-if="draftInitialAmountSourceType === 'wallet'" class="initial-savings-wallet-field">
+              <select v-model="draftInitialAmountWalletId" class="wizard-title-input">
+                <option :value="null" disabled>Elige una billetera</option>
+                <option v-for="wallet in walletsForInitialAmount" :key="wallet.id" :value="wallet.id">
+                  {{ wallet.name }} — disponible {{ formatCurrency(availableBalance(wallet, walletCommitments), wallet.currency) }}
+                </option>
+              </select>
+              <p v-if="walletsForInitialAmount.length === 0" class="wizard-hint">
+                No tienes billeteras en {{ currency }} todavía.
+              </p>
+              <p
+                v-else-if="draftInitialAmountWalletId !== null && !canConfirmInitialSavings"
+                class="capacity-hint warning"
+              >
+                Esa billetera no tiene disponible suficiente para este monto.
+              </p>
+            </div>
+
             <textarea
+              v-else
               v-model="draftInitialAmountNote"
               class="wizard-title-input initial-savings-note"
               rows="3"
@@ -427,7 +515,7 @@ function onCreate() {
             />
             <div class="initial-savings-sheet-actions">
               <BaseButton variant="secondary" @click="showInitialSavingsSheet = false">Cancelar</BaseButton>
-              <BaseButton @click="confirmInitialSavings">Guardar</BaseButton>
+              <BaseButton :disabled="!canConfirmInitialSavings" @click="confirmInitialSavings">Guardar</BaseButton>
             </div>
           </div>
         </BottomSheet>
@@ -487,6 +575,16 @@ function onCreate() {
         <div v-if="initialAmountValue > 0" class="summary-row">
           <dt>Ya tienes ahorrado</dt>
           <dd>{{ formatCurrency(initialAmountValue, currency) }}</dd>
+        </div>
+        <div v-if="initialAmountValue > 0" class="summary-row">
+          <dt>Fuente</dt>
+          <dd>
+            {{
+              initialAmountWalletId
+                ? walletsStore.wallets.find((w) => w.id === initialAmountWalletId)?.name
+                : 'Ingreso futuro'
+            }}
+          </dd>
         </div>
       </dl>
 
@@ -859,6 +957,19 @@ function onCreate() {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+/* Pedido explicito del usuario: "puede ser de alguna billetera, o de un ingreso
+   futuro" - PillToggle ya usado en TransactionsFilterSheet.vue, no se inventa un
+   toggle nuevo. */
+.initial-savings-source-toggle {
+  align-self: flex-start;
+}
+
+.initial-savings-wallet-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .initial-savings-sheet-actions {

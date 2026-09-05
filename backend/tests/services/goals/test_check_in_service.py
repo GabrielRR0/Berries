@@ -4,15 +4,24 @@ from decimal import Decimal
 
 import pytest
 
+from app.services.auth.auth_service import register_user
 from app.services.goals.check_in_service import (
     abandon_goal,
     get_goals_needing_check_in,
     get_goals_needing_check_in_for_user,
     list_check_ins_for_goal,
     record_check_in,
+    update_check_in,
 )
-from app.services.goals.errors import GoalNotActiveError, GoalValidationError
+from app.services.goals.errors import (
+    GoalNotActiveError,
+    GoalNotFoundError,
+    GoalValidationError,
+    InsufficientAvailableBalanceError,
+)
 from app.services.goals.goal_service import create_goal
+from app.services.wallets.errors import CurrencyMismatchError, WalletNotFoundError
+from app.services.wallets.wallet_service import create_wallet
 
 _FUTURE = date.today() + timedelta(days=180)
 
@@ -167,3 +176,160 @@ def test_get_goals_needing_check_in_for_user_filters_by_owner(db):
     pending = get_goals_needing_check_in_for_user(db, user_id, date.today())
 
     assert [g.id for g in pending] == [mine.id]
+
+
+# --- record_check_in con wallet_id (reserva blanda) -----------------------------------
+# Pedido explicito del usuario: "para cuando quiero agregar un aporte poder enlazarlo
+# de alguna billetera que tenga". Confirmado: nunca mueve plata real.
+
+
+def test_record_check_in_with_wallet_does_not_touch_wallet_balance(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("1000"))
+    goal = create_goal(db, user.id, "TV", Decimal("240"), "USD", _FUTURE)
+
+    check_in = record_check_in(db, goal.id, user.id, amount_saved=Decimal("50"), wallet_id=wallet.id)
+
+    db.refresh(wallet)
+    assert wallet.balance == Decimal("1000")
+    assert check_in.wallet_id == wallet.id
+
+
+def test_record_check_in_rejects_a_wallet_without_enough_available_balance(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("30"))
+    goal = create_goal(db, user.id, "TV", Decimal("240"), "USD", _FUTURE)
+
+    with pytest.raises(InsufficientAvailableBalanceError):
+        record_check_in(db, goal.id, user.id, amount_saved=Decimal("50"), wallet_id=wallet.id)
+
+
+def test_record_check_in_rejects_a_wallet_in_a_different_currency(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "EUR", Decimal("1000"))
+    goal = create_goal(db, user.id, "TV", Decimal("240"), "USD", _FUTURE)
+
+    with pytest.raises(CurrencyMismatchError):
+        record_check_in(db, goal.id, user.id, amount_saved=Decimal("50"), wallet_id=wallet.id)
+
+
+def test_record_check_in_second_contribution_from_same_wallet_counts_the_first_as_committed(db):
+    """Dos aportes de la misma meta enlazados a la MISMA billetera - el segundo debe
+    ver el disponible ya reducido por el primero, no el saldo total de la billetera."""
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("100"))
+    goal = create_goal(db, user.id, "TV", Decimal("240"), "USD", _FUTURE)
+
+    record_check_in(db, goal.id, user.id, amount_saved=Decimal("60"), wallet_id=wallet.id)
+
+    with pytest.raises(InsufficientAvailableBalanceError):
+        record_check_in(db, goal.id, user.id, amount_saved=Decimal("60"), wallet_id=wallet.id)
+
+
+# --- update_check_in -------------------------------------------------------------------
+# Pedido explicito del usuario: reenlazar despues un aporte que quedo como "ingreso
+# futuro" ("ese futuro ya acaba de pasar... quiero ir a metas y en ese aporte
+# editarlo y decir que los voy a usar de mi billetera").
+
+
+def test_update_check_in_links_a_previously_unlinked_contribution(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("1000"))
+    goal = create_goal(db, user.id, "TV", Decimal("240"), "USD", _FUTURE)
+    check_in = record_check_in(db, goal.id, user.id, amount_saved=Decimal("50"), note="venta de la laptop")
+
+    updated = update_check_in(db, goal.id, check_in.id, user.id, wallet_id=wallet.id, note="ya llego, es esta billetera")
+
+    assert updated.wallet_id == wallet.id
+    assert updated.note == "ya llego, es esta billetera"
+    db.refresh(wallet)
+    assert wallet.balance == Decimal("1000")  # nunca mueve plata real
+
+
+def test_update_check_in_never_touches_amount_saved_or_total_saved(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("1000"))
+    goal = create_goal(db, user.id, "TV", Decimal("240"), "USD", _FUTURE)
+    check_in = record_check_in(db, goal.id, user.id, amount_saved=Decimal("50"))
+
+    update_check_in(db, goal.id, check_in.id, user.id, wallet_id=wallet.id, note=None)
+
+    db.refresh(goal)
+    assert check_in.amount_saved == Decimal("50")
+    assert goal.total_saved == Decimal("50")
+
+
+def test_update_check_in_can_unlink_a_wallet_back_to_future_income(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("1000"))
+    goal = create_goal(db, user.id, "TV", Decimal("240"), "USD", _FUTURE)
+    check_in = record_check_in(db, goal.id, user.id, amount_saved=Decimal("50"), wallet_id=wallet.id)
+
+    updated = update_check_in(db, goal.id, check_in.id, user.id, wallet_id=None, note="en realidad todavia no llega")
+
+    assert updated.wallet_id is None
+
+
+def test_update_check_in_reconfirming_the_same_wallet_does_not_reject_itself(db):
+    """exclude_check_in_id: re-enlazar la MISMA billetera en una edicion no debe
+    rechazarse contra su propio monto ya comprometido."""
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("50"))
+    goal = create_goal(db, user.id, "TV", Decimal("240"), "USD", _FUTURE)
+    check_in = record_check_in(db, goal.id, user.id, amount_saved=Decimal("50"), wallet_id=wallet.id)
+
+    updated = update_check_in(db, goal.id, check_in.id, user.id, wallet_id=wallet.id, note="confirmado")
+
+    assert updated.wallet_id == wallet.id
+
+
+def test_update_check_in_still_works_on_a_completed_goal(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("1000"))
+    goal = create_goal(db, user.id, "TV", Decimal("50"), "USD", _FUTURE)
+    check_in = record_check_in(db, goal.id, user.id, amount_saved=Decimal("50"))
+    db.refresh(goal)
+    assert goal.status == "completed"
+
+    updated = update_check_in(db, goal.id, check_in.id, user.id, wallet_id=wallet.id, note=None)
+
+    assert updated.wallet_id == wallet.id
+
+
+def test_update_check_in_rejects_a_wallet_without_enough_available_balance(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("10"))
+    goal = create_goal(db, user.id, "TV", Decimal("240"), "USD", _FUTURE)
+    check_in = record_check_in(db, goal.id, user.id, amount_saved=Decimal("50"))
+
+    with pytest.raises(InsufficientAvailableBalanceError):
+        update_check_in(db, goal.id, check_in.id, user.id, wallet_id=wallet.id, note=None)
+
+
+def test_update_check_in_rejects_an_unknown_check_in_id(db):
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")
+    goal = create_goal(db, user.id, "TV", Decimal("240"), "USD", _FUTURE)
+
+    with pytest.raises(GoalNotFoundError):
+        update_check_in(db, goal.id, uuid.uuid4(), user.id, wallet_id=None, note=None)
+
+
+def test_update_check_in_rejects_a_check_in_belonging_to_another_users_goal(db):
+    owner = register_user(db, "ana@example.com", "clave12345", "Ana")
+    other = register_user(db, "beto@example.com", "clave12345", "Beto")
+    goal = create_goal(db, owner.id, "TV", Decimal("240"), "USD", _FUTURE)
+    check_in = record_check_in(db, goal.id, owner.id, amount_saved=Decimal("50"))
+
+    with pytest.raises(GoalNotFoundError):
+        update_check_in(db, goal.id, check_in.id, other.id, wallet_id=None, note=None)
+
+
+def test_update_check_in_rejects_a_wallet_belonging_to_another_user(db):
+    owner = register_user(db, "ana@example.com", "clave12345", "Ana")
+    other = register_user(db, "beto@example.com", "clave12345", "Beto")
+    other_wallet = create_wallet(db, other.id, "Cash", "USD", Decimal("1000"))
+    goal = create_goal(db, owner.id, "TV", Decimal("240"), "USD", _FUTURE)
+    check_in = record_check_in(db, goal.id, owner.id, amount_saved=Decimal("50"))
+
+    with pytest.raises(WalletNotFoundError):
+        update_check_in(db, goal.id, check_in.id, owner.id, wallet_id=other_wallet.id, note=None)

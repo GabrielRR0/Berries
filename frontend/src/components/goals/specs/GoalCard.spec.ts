@@ -170,27 +170,91 @@ describe('GoalCard', () => {
     })
   })
 
-  it('agregar aporte desde el menu revela el formulario y emite "addContribution"', async () => {
-    const wrapper = mountCard({ goal: GOAL })
+// El sheet de "Agregar aporte" tambien se teletransporta a <body> (BottomSheet,
+// ver GoalCard.vue) - mismo motivo/patron que menuDropdown()/menuItems() de
+// arriba.
+function inBody(selector: string) {
+  return new DOMWrapper(document.body).find(selector)
+}
 
+it('agregar aporte desde el menu revela el sheet y emite "addContribution" (ingreso futuro por defecto)', async () => {
+  const wrapper = mountCard({ goal: GOAL })
+
+  await clickMenuItem(wrapper, '+ Agregar aporte')
+  expect(inBody('.goal-add-contribution-form').exists()).toBe(true)
+
+  await inBody('.goal-add-contribution-form input[type="number"]').setValue('50')
+  await inBody('.goal-add-contribution-form').trigger('submit')
+
+  expect(wrapper.emitted('addContribution')).toEqual([[{ amountSaved: 50, walletId: undefined, note: undefined }]])
+})
+
+it('no emite "addContribution" con un monto invalido', async () => {
+  const wrapper = mountCard({ goal: GOAL })
+
+  await clickMenuItem(wrapper, '+ Agregar aporte')
+  await inBody('.goal-add-contribution-form input[type="number"]').setValue('0')
+  await inBody('.goal-add-contribution-form').trigger('submit')
+
+  expect(wrapper.emitted('addContribution')).toBeFalsy()
+})
+
+// Idea/pedido explicito del usuario: "para cuando quiero agregar un aporte
+// poder enlazarlo de alguna billetera que tenga... si no tengo dinero en esa
+// billetera no se podria enlazar".
+describe('aporte enlazado a una billetera', () => {
+  const WALLET = { id: 'wallet-1', name: 'Efectivo', currency: 'USD', balance: 100, createdAt: '2026-01-01T00:00:00Z' }
+  const WALLET_EUR = { id: 'wallet-2', name: 'Banco EUR', currency: 'EUR', balance: 500, createdAt: '2026-01-01T00:00:00Z' }
+
+  function mountCardWithWallets(commitments: Record<string, number> = {}) {
+    const wrapper = mount(GoalCard, {
+      props: { goal: GOAL, wallets: [WALLET, WALLET_EUR], walletCommitments: commitments },
+      attachTo: document.body,
+    })
+    mountedWrappers.push(wrapper)
+    return wrapper
+  }
+
+  async function chooseWalletSource(wrapper: ReturnType<typeof mount>) {
     await clickMenuItem(wrapper, '+ Agregar aporte')
-    expect(wrapper.find('.goal-add-contribution-form').exists()).toBe(true)
+    const billeteraPill = new DOMWrapper(document.body).findAll('.pill').find((btn) => btn.text() === 'Billetera')!
+    await billeteraPill.trigger('click')
+  }
 
-    await wrapper.find('.goal-add-contribution-form input').setValue('50')
-    await wrapper.find('.goal-add-contribution-form').trigger('submit')
+  it('el selector solo ofrece billeteras de la misma moneda que la meta', async () => {
+    const wrapper = mountCardWithWallets()
+    await chooseWalletSource(wrapper)
 
-    expect(wrapper.emitted('addContribution')).toEqual([[50]])
+    const options = inBody('.goal-add-contribution-wallet-field select')
+      .findAll('option')
+      .map((o) => o.text())
+    expect(options.some((text) => text.includes('Efectivo'))).toBe(true)
+    expect(options.some((text) => text.includes('Banco EUR'))).toBe(false)
   })
 
-  it('no emite "addContribution" con un monto invalido', async () => {
-    const wrapper = mountCard({ goal: GOAL })
+  it('emite "addContribution" con el walletId elegido', async () => {
+    const wrapper = mountCardWithWallets()
+    await chooseWalletSource(wrapper)
 
-    await clickMenuItem(wrapper, '+ Agregar aporte')
-    await wrapper.find('.goal-add-contribution-form input').setValue('0')
-    await wrapper.find('.goal-add-contribution-form').trigger('submit')
+    await inBody('.goal-add-contribution-form input[type="number"]').setValue('50')
+    await inBody('.goal-add-contribution-wallet-field select').setValue('wallet-1')
+    await inBody('.goal-add-contribution-form').trigger('submit')
+
+    expect(wrapper.emitted('addContribution')).toEqual([[{ amountSaved: 50, walletId: 'wallet-1', note: undefined }]])
+  })
+
+  it('bloquea el submit si el monto supera el disponible de la billetera elegida', async () => {
+    const wrapper = mountCardWithWallets({ 'wallet-1': 80 }) // disponible real: 100 - 80 = 20
+    await chooseWalletSource(wrapper)
+
+    await inBody('.goal-add-contribution-form input[type="number"]').setValue('50')
+    await inBody('.goal-add-contribution-wallet-field select').setValue('wallet-1')
+    await inBody('.goal-add-contribution-form').trigger('submit')
 
     expect(wrapper.emitted('addContribution')).toBeFalsy()
+    expect(inBody('.goal-add-contribution-hint.warning').exists()).toBe(true)
   })
+})
 
   // Idea de la sesion de brainstorm de UI: "Abandonar" ahora pide
   // confirmacion en 2 pasos, igual que "Eliminar" - antes disparaba el

@@ -13,6 +13,7 @@ from app.services.analytics.analytics_service import get_monthly_comparison
 from app.services.currency.currency_lookup import get_currency_by_code
 from app.services.goals.contribution_calculator import compute_monthly_contribution
 from app.services.goals.errors import GoalNotActiveError, GoalNotFoundError, GoalValidationError
+from app.services.goals.wallet_commitment_service import validate_and_get_wallet_for_commitment
 
 
 def create_goal(
@@ -25,6 +26,7 @@ def create_goal(
     goal_type: GoalType = "custom",
     initial_amount: Decimal = Decimal("0"),
     initial_amount_note: str | None = None,
+    initial_amount_wallet_id: uuid.UUID | None = None,
 ) -> Goal:
     target_amount = Decimal(target_amount)
     if target_amount <= 0:
@@ -36,11 +38,22 @@ def create_goal(
     if initial_amount < 0:
         raise GoalValidationError("initial_amount no puede ser negativo")
 
+    currency_row = get_currency_by_code(db, currency)
+
+    # Validar ANTES de crear nada - pedido explicito del usuario: "de donde lo voy a
+    # sacar, puede ser de alguna billetera... si no tengo dinero en esa billetera no
+    # se podria enlazar". Reserva BLANDA (confirmado con el usuario): nunca se
+    # descuenta wallet.balance ni se crea una Transaction, solo se valida que la
+    # billetera elegida tenga DISPONIBLE suficiente (su saldo menos lo ya comprometido
+    # en otras metas activas).
+    if initial_amount > 0 and initial_amount_wallet_id is not None:
+        validate_and_get_wallet_for_commitment(db, user_id, initial_amount_wallet_id, currency_row.code, initial_amount)
+
     goal = Goal(
         user_id=user_id,
         title=title,
         target_amount=target_amount,
-        currency_id=get_currency_by_code(db, currency).id,
+        currency_id=currency_row.id,
         target_date=target_date,
         total_saved=initial_amount,
         goal_type=goal_type,
@@ -64,6 +77,7 @@ def create_goal(
                 period_month=date.today().replace(day=1),
                 amount_saved=initial_amount,
                 note=initial_amount_note,
+                wallet_id=initial_amount_wallet_id,
             )
         )
 
