@@ -1,8 +1,10 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useOnlineStatus } from '../../../composables/connectivity/useOnlineStatus'
 import * as transactionsService from '../../../services/transactions/transactions.service'
 import * as walletsService from '../../../services/wallets/wallets.service'
+import { useOfflineQueueStore } from '../../../stores/offlineQueue.store'
 import { useWalletsStore } from '../../../stores/wallets.store'
 import DraftReviewCard from '../../transactions/DraftReviewCard.vue'
 import VoiceEntryButton from '../../voiceEntry/VoiceEntryButton.vue'
@@ -57,6 +59,7 @@ const TRANSACTIONS = [
 
 describe('IncomeExpenseSummary', () => {
   beforeEach(() => {
+    localStorage.clear()
     setActivePinia(createPinia())
     vi.spyOn(transactionsService, 'listTransactions').mockResolvedValue(TRANSACTIONS)
     vi.spyOn(transactionsService, 'deleteTransaction').mockResolvedValue(undefined)
@@ -65,6 +68,7 @@ describe('IncomeExpenseSummary', () => {
     // ese refresh intenta un fetch real y ensucia el test con un rejection
     // sin manejar.
     vi.spyOn(walletsService, 'listWallets').mockResolvedValue([])
+    useOnlineStatus().isOnline.value = true
   })
 
   afterEach(() => {
@@ -179,6 +183,30 @@ describe('IncomeExpenseSummary', () => {
     )
     expect(wrapper.find('.sheet-add-form').exists()).toBe(false)
     expect(wrapper.text()).toContain('Bono')
+  })
+
+  // Modo offline (cola de pendientes) - pedido explicito del usuario. Sin
+  // esto, el "queued" que emite TransactionForm.vue quedaba sin escuchar aca
+  // (bug real: el sheet se hubiera quedado abierto para siempre despues de
+  // encolar un movimiento sin conexion).
+  it('sin conexion, cierra el form igual y encola el movimiento en vez de crearlo', async () => {
+    useOnlineStatus().isOnline.value = false
+    vi.spyOn(transactionsService, 'createTransaction')
+    useWalletsStore().wallets = [WALLET]
+    const wrapper = mount(IncomeExpenseSummary)
+    await flushPromises()
+    await wrapper.find('[aria-haspopup="dialog"]').trigger('click') // Ingresos
+    await wrapper.find('.sheet-add-trigger').trigger('click')
+
+    await wrapper.find('select').setValue('wallet-1')
+    await wrapper.find('input[type="number"]').setValue(200)
+    await wrapper.find('input[maxlength="80"]').setValue('Bono')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(transactionsService.createTransaction).not.toHaveBeenCalled()
+    expect(wrapper.find('.sheet-add-form').exists()).toBe(false)
+    expect(useOfflineQueueStore().items).toHaveLength(1)
   })
 
   // Botones de voz/foto dentro del sheet - pedido explicito del usuario

@@ -2,6 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDebts } from '../../composables/debts/useDebts'
+import { submitWithOfflineFallback } from '../../composables/offline/useOfflineFallback'
+import type { PendingDebtPayment } from '../../stores/offlineQueue.store'
 import { useWalletsStore } from '../../stores/wallets.store'
 import type { CreateDebtInput, CreateDebtPaymentInput, DebtDirection } from '../../services/debts/interfaces/debts.interface'
 import BaseCard from '../ui/BaseCard.vue'
@@ -71,9 +73,24 @@ function onOpenAddPayment(debtId: string) {
 
 async function onAddPayment(input: CreateDebtPaymentInput) {
   if (!payingDebtId.value) return
+  const debtId = payingDebtId.value
+  const debt = payingDebt.value
   isSubmittingPayment.value = true
   try {
-    await addPayment(payingDebtId.value, input)
+    await submitWithOfflineFallback<void, PendingDebtPayment>(
+      {
+        kind: 'debtPayment',
+        debtId,
+        payload: input,
+        snapshot: {
+          counterpartyName: debt?.counterpartyName ?? '',
+          debtDirection: debt?.direction ?? 'owed_by_user',
+          amount: input.amount,
+          currency: input.currency,
+        },
+      },
+      () => addPayment(debtId, input),
+    )
     payingDebtId.value = null
   } catch {
     // El mensaje ya queda expuesto via el "error" reactivo del composable.

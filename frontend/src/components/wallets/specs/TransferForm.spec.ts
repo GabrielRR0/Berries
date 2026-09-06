@@ -1,7 +1,9 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useOnlineStatus } from '../../../composables/connectivity/useOnlineStatus'
 import type { TransferEditTarget } from '../../../services/wallets/interfaces/wallets.interface'
+import { useOfflineQueueStore } from '../../../stores/offlineQueue.store'
 import { useWalletsStore } from '../../../stores/wallets.store'
 import TransferForm from '../TransferForm.vue'
 
@@ -15,10 +17,12 @@ function mountForm(props: { editingTransfer?: TransferEditTarget | null } = {}) 
 
 describe('TransferForm', () => {
   beforeEach(() => {
+    localStorage.clear()
     setActivePinia(createPinia())
     useWalletsStore().wallets = [WALLET_CASH, WALLET_BANK, WALLET_VEF]
     vi.spyOn(useWalletsStore(), 'transfer').mockResolvedValue(undefined)
     vi.spyOn(useWalletsStore(), 'updateTransfer').mockResolvedValue(undefined)
+    useOnlineStatus().isOnline.value = true
   })
 
   it('el campo de fecha arranca en el dia de hoy, con max=hoy', () => {
@@ -111,6 +115,46 @@ describe('TransferForm', () => {
       expect(params.fee).toBe(2)
       expect(wrapper.emitted('updated')).toBeTruthy()
       expect(wrapper.emitted('transferred')).toBeFalsy()
+    })
+  })
+
+  // Modo offline (cola de pendientes) - pedido explicito del usuario, la mas
+  // delicada de las 4 acciones (mueve plata real) pero incluida a proposito.
+  // Solo aplica al modo creacion (editar sigue exigiendo conexion).
+  describe('modo offline (cola de pendientes)', () => {
+    it('sin conexion, encola la transferencia en vez de llamar a walletsStore.transfer y emite "queued"', async () => {
+      useOnlineStatus().isOnline.value = false
+      const wrapper = mountForm()
+
+      await wrapper.find('select').setValue('wallet-1')
+      await wrapper.findAll('select')[1]!.setValue('wallet-2')
+      await wrapper.find('input[type="number"]').setValue(40)
+      await wrapper.find('form').trigger('submit.prevent')
+      await flushPromises()
+
+      expect(useWalletsStore().transfer).not.toHaveBeenCalled()
+      expect(wrapper.emitted('queued')).toBeTruthy()
+      expect(wrapper.emitted('transferred')).toBeFalsy()
+      const offlineQueue = useOfflineQueueStore()
+      expect(offlineQueue.items).toHaveLength(1)
+      expect(offlineQueue.items[0]).toMatchObject({
+        kind: 'transfer',
+        snapshot: { fromWalletName: 'Cash', toWalletName: 'Banco', amount: 40 },
+      })
+    })
+
+    it('con conexion pero una falla de red real (no un rechazo del backend), tambien encola', async () => {
+      vi.mocked(useWalletsStore().transfer).mockRejectedValue(new TypeError('Failed to fetch'))
+      const wrapper = mountForm()
+
+      await wrapper.find('select').setValue('wallet-1')
+      await wrapper.findAll('select')[1]!.setValue('wallet-2')
+      await wrapper.find('input[type="number"]').setValue(40)
+      await wrapper.find('form').trigger('submit.prevent')
+      await flushPromises()
+
+      expect(wrapper.emitted('queued')).toBeTruthy()
+      expect(useOfflineQueueStore().items).toHaveLength(1)
     })
   })
 })

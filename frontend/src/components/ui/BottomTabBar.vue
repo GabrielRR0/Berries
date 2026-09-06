@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
+import { useOfflineQueueStore } from '../../stores/offlineQueue.store'
 
 // Barra flotante fija - 3 tabs alcanzan por ahora (Inicio/Movimientos/Menu),
 // segun el layout de referencia. "Menu" apunta a /ajustes hasta que exista
@@ -11,6 +12,9 @@ const tabs = [
 ] as const
 
 const route = useRoute()
+// Badge de pendientes en "Inicio" - unica pantalla donde vive PendingSyncSection,
+// para que se note aunque el usuario no este parado ahi (ver DashboardMain.vue).
+const offlineQueue = useOfflineQueueStore()
 </script>
 
 <template>
@@ -34,6 +38,9 @@ const route = useRoute()
         <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" />
         </svg>
+        <span v-if="tab.name === 'dashboard' && offlineQueue.pendingCount > 0" class="tab-pending-badge">
+          {{ offlineQueue.pendingCount }}
+        </span>
       </span>
       <span class="tab-label">{{ tab.label }}</span>
     </RouterLink>
@@ -85,6 +92,7 @@ const route = useRoute()
 }
 
 .tab-icon {
+  position: relative;
   display: inline-flex;
   width: 1.375rem;
   height: 1.375rem;
@@ -93,6 +101,22 @@ const route = useRoute()
 .tab-icon svg {
   width: 100%;
   height: 100%;
+}
+
+.tab-pending-badge {
+  position: absolute;
+  top: -0.375rem;
+  right: -0.5rem;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1.125rem;
+  text-align: center;
 }
 
 .tab-label {

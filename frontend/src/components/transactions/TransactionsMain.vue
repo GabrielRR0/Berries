@@ -214,6 +214,13 @@ function onTransactionCreated(transaction: Transaction) {
   closeCreateSheet()
 }
 
+// Sin conexion (o falla de red real) - TransactionForm.vue ya encolo el
+// movimiento y avisa con un toast (ver offlineQueue.store.ts); aca solo hace
+// falta cerrar el sheet, igual que si hubiera creado la transaction de una.
+function onTransactionQueued() {
+  closeCreateSheet()
+}
+
 // Edicion de un movimiento existente - pedido explicito del usuario. El MISMO sheet/
 // form de creacion sirve para editar (ver TransactionForm.vue): "Editar" en
 // TransactionList.vue precarga editingTransaction y abre el sheet; al guardar u
@@ -386,6 +393,7 @@ function goBack() {
         :editing-transaction="editingTransaction"
         @created="onTransactionCreated"
         @updated="onTransactionUpdated"
+        @queued="onTransactionQueued"
         @cancel="closeCreateSheet"
       />
     </BottomSheet>

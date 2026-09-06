@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue'
 import type { TransferEditTarget } from '../../services/wallets/interfaces/wallets.interface'
 import { useWalletsStore } from '../../stores/wallets.store'
+import { submitWithOfflineFallback } from '../../composables/offline/useOfflineFallback'
+import type { PendingTransfer } from '../../stores/offlineQueue.store'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseCard from '../ui/BaseCard.vue'
 
@@ -21,7 +23,7 @@ import BaseCard from '../ui/BaseCard.vue'
 const props = withDefaults(defineProps<{ editingTransfer?: TransferEditTarget | null }>(), {
   editingTransfer: null,
 })
-const emit = defineEmits<{ transferred: []; updated: []; cancel: [] }>()
+const emit = defineEmits<{ transferred: []; updated: []; queued: []; cancel: [] }>()
 const isEditing = computed(() => props.editingTransfer != null)
 
 const walletsStore = useWalletsStore()
@@ -91,15 +93,32 @@ async function onSubmit() {
       })
       emit('updated')
     } else {
-      await walletsStore.transfer({
+      const params = {
         fromWalletId: fromWalletId.value,
         toWalletId: toWalletId.value,
         amount: amount.value,
         fee: fee.value ?? undefined,
         convertedAmount: needsConvertedAmount.value ? (convertedAmount.value ?? undefined) : undefined,
         occurredAt: buildOccurredAt(),
-      })
-      emit('transferred')
+      }
+      const outcome = await submitWithOfflineFallback<void, PendingTransfer>(
+        {
+          kind: 'transfer',
+          payload: params,
+          snapshot: {
+            fromWalletName: fromWallet.value?.name ?? '',
+            toWalletName: toWallet.value?.name ?? '',
+            fromCurrency: fromWallet.value?.currency ?? '',
+            toCurrency: toWallet.value?.currency ?? '',
+            amount: params.amount,
+            fee: params.fee,
+            convertedAmount: params.convertedAmount,
+          },
+        },
+        () => walletsStore.transfer(params),
+      )
+      if (outcome.queued) emit('queued')
+      else emit('transferred')
     }
   } catch (error) {
     errorMessage.value =

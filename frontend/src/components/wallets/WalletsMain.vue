@@ -44,6 +44,13 @@ function onTransferred() {
   showTransferSheet.value = false
 }
 
+// Sin conexion (o falla de red real) - TransferForm.vue ya encolo la
+// transferencia y avisa con un toast (ver offlineQueue.store.ts); aca solo
+// hace falta cerrar el sheet, igual que si hubiera transferido de una.
+function onTransferQueued() {
+  showTransferSheet.value = false
+}
+
 async function onDeleteWallet(walletId: string) {
   await walletsStore.removeWallet(walletId).catch(() => {
     // Error ya reflejado en walletsStore.error, se muestra en el template.
@@ -115,7 +122,7 @@ async function onDeleteWallet(walletId: string) {
     </BottomSheet>
 
     <BottomSheet v-if="showTransferSheet" title="Transferir" @close="showTransferSheet = false">
-      <TransferForm @transferred="onTransferred" @cancel="showTransferSheet = false" />
+      <TransferForm @transferred="onTransferred" @queued="onTransferQueued" @cancel="showTransferSheet = false" />
     </BottomSheet>
   </PageShell>
 </template>

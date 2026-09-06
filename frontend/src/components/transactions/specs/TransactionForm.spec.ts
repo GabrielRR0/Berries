@@ -1,9 +1,11 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useOnlineStatus } from '../../../composables/connectivity/useOnlineStatus'
 import { listCategories } from '../../../services/categories/categories.service'
 import { createTransaction, updateTransaction } from '../../../services/transactions/transactions.service'
 import type { Transaction } from '../../../services/transactions/interfaces/transactions.interface'
+import { useOfflineQueueStore } from '../../../stores/offlineQueue.store'
 import { useWalletsStore } from '../../../stores/wallets.store'
 import TransactionForm from '../TransactionForm.vue'
 
@@ -18,6 +20,13 @@ vi.mock('../../../services/categories/categories.service', () => ({
 vi.mock('../../../services/transactions/transactions.service', () => ({
   createTransaction: vi.fn(),
   updateTransaction: vi.fn(),
+  TransactionsApiError: class TransactionsApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
 }))
 
 const WALLET = { id: 'wallet-1', name: 'Efectivo', currency: 'USD', balance: 500, createdAt: '2026-08-01T00:00:00Z' }
@@ -42,11 +51,13 @@ const CREATED: Transaction = {
 // "ahora" aunque createTransaction() ya aceptaba un occurredAt opcional.
 describe('TransactionForm', () => {
   beforeEach(() => {
+    localStorage.clear()
     setActivePinia(createPinia())
     useWalletsStore().wallets = [WALLET, OTHER_WALLET]
     vi.mocked(listCategories).mockReset().mockResolvedValue([])
     vi.mocked(createTransaction).mockReset().mockResolvedValue(CREATED)
     vi.mocked(updateTransaction).mockReset().mockResolvedValue(CREATED)
+    useOnlineStatus().isOnline.value = true
   })
 
   it('el campo de fecha arranca en el día de hoy', async () => {
@@ -183,6 +194,42 @@ describe('TransactionForm', () => {
       await flushPromises()
 
       expect(updateTransaction).toHaveBeenCalledWith('tx-existing', expect.objectContaining({ walletId: 'wallet-2' }))
+    })
+  })
+
+  // Modo offline (cola de pendientes) - pedido explicito del usuario. Solo aplica al
+  // modo creacion (editar sigue exigiendo conexion, ver TransactionForm.vue).
+  describe('modo offline (cola de pendientes)', () => {
+    it('sin conexion, encola el movimiento en vez de llamar a createTransaction y emite "queued"', async () => {
+      useOnlineStatus().isOnline.value = false
+      const wrapper = mount(TransactionForm)
+      await flushPromises()
+
+      await wrapper.find('select').setValue('wallet-1')
+      await wrapper.find('input[type="number"]').setValue(40)
+      await wrapper.find('input[maxlength="80"]').setValue('Comida')
+      await wrapper.find('form').trigger('submit.prevent')
+      await flushPromises()
+
+      expect(createTransaction).not.toHaveBeenCalled()
+      expect(wrapper.emitted('queued')).toBeTruthy()
+      expect(wrapper.emitted('created')).toBeFalsy()
+      expect(useOfflineQueueStore().items).toHaveLength(1)
+    })
+
+    it('con conexion pero una falla de red real (no un rechazo del backend), tambien encola', async () => {
+      vi.mocked(createTransaction).mockRejectedValue(new TypeError('Failed to fetch'))
+      const wrapper = mount(TransactionForm)
+      await flushPromises()
+
+      await wrapper.find('select').setValue('wallet-1')
+      await wrapper.find('input[type="number"]').setValue(40)
+      await wrapper.find('input[maxlength="80"]').setValue('Comida')
+      await wrapper.find('form').trigger('submit.prevent')
+      await flushPromises()
+
+      expect(wrapper.emitted('queued')).toBeTruthy()
+      expect(useOfflineQueueStore().items).toHaveLength(1)
     })
   })
 })

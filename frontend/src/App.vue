@@ -1,21 +1,33 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TopHeader from './components/layout/TopHeader.vue'
 import BottomTabBar from './components/ui/BottomTabBar.vue'
+import ToastBanner from './components/ui/ToastBanner.vue'
 import { useAvatarInitials } from './composables/auth/useAvatarInitials'
+import { useOnlineStatus } from './composables/connectivity/useOnlineStatus'
 import { useScrollHeader } from './composables/layout/useScrollHeader'
 import { usePageTransitionName } from './composables/navigation/usePageTransition'
 import { useOnboardingTour } from './composables/onboarding/useOnboardingTour'
 import { useAuthStore } from './stores/auth.store'
+import { useOfflineQueueStore } from './stores/offlineQueue.store'
 
 const authStore = useAuthStore()
+const offlineQueue = useOfflineQueueStore()
 const route = useRoute()
 const router = useRouter()
 const transitionName = usePageTransitionName()
 const avatarInitials = useAvatarInitials()
 const { start: startTour } = useOnboardingTour()
 const { isScrolled } = useScrollHeader()
+const { isOnline } = useOnlineStatus()
+
+// Reconexion dispara la sincronizacion sola (pedido explicito del usuario) -
+// vive aca (no dentro del store) para no depender de que pantalla instancie
+// useOfflineQueueStore() primero.
+watch(isOnline, (online) => {
+  if (online) offlineQueue.syncAll().catch(() => {})
+})
 
 // TopHeader/BottomTabBar viven UNA sola vez aca, fuera de <Transition> - no
 // dentro de cada pantalla (como antes) - porque son position:fixed: si cada
@@ -66,4 +78,5 @@ onMounted(() => {
   </div>
 
   <BottomTabBar v-if="showChrome" />
+  <ToastBanner />
 </template>

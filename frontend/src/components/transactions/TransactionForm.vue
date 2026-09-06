@@ -3,6 +3,8 @@ import { computed, ref } from 'vue'
 import { useWalletsStore } from '../../stores/wallets.store'
 import { createTransaction, updateTransaction } from '../../services/transactions/transactions.service'
 import type { Transaction, TransactionType } from '../../services/transactions/interfaces/transactions.interface'
+import { submitWithOfflineFallback } from '../../composables/offline/useOfflineFallback'
+import type { PendingTransaction } from '../../stores/offlineQueue.store'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseCard from '../ui/BaseCard.vue'
@@ -25,7 +27,12 @@ const props = withDefaults(
   defineProps<{ initialType?: TransactionType; editingTransaction?: Transaction | null }>(),
   { initialType: 'expense', editingTransaction: null },
 )
-const emit = defineEmits<{ created: [transaction: Transaction]; updated: [transaction: Transaction]; cancel: [] }>()
+const emit = defineEmits<{
+  created: [transaction: Transaction]
+  updated: [transaction: Transaction]
+  queued: []
+  cancel: []
+}>()
 
 const walletsStore = useWalletsStore()
 const isEditing = computed(() => props.editingTransaction != null)
@@ -114,8 +121,23 @@ async function onSubmit() {
       const transaction = await updateTransaction(props.editingTransaction.id, fields)
       emit('updated', transaction)
     } else {
-      const transaction = await createTransaction(fields)
-      emit('created', transaction)
+      const outcome = await submitWithOfflineFallback<Transaction, PendingTransaction>(
+        {
+          kind: 'transaction',
+          payload: fields,
+          snapshot: {
+            walletName: selectedWallet.value?.name ?? '',
+            walletCurrency: selectedWallet.value?.currency ?? '',
+            type: fields.type,
+            amount: fields.amount,
+            category: fields.category,
+            description: fields.description,
+          },
+        },
+        () => createTransaction(fields),
+      )
+      if (outcome.queued) emit('queued')
+      else emit('created', outcome.result)
     }
   } catch (error) {
     errorMessage.value =

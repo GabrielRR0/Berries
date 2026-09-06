@@ -2,7 +2,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGoals } from '../../composables/goals/useGoals'
+import { submitWithOfflineFallback } from '../../composables/offline/useOfflineFallback'
 import type { GoalStatus, RecordCheckInInput } from '../../services/goals/interfaces/goals.interface'
+import type { PendingGoalContribution } from '../../stores/offlineQueue.store'
 import { useWalletsStore } from '../../stores/wallets.store'
 import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
@@ -86,15 +88,32 @@ async function onAbandon(goalId: string) {
   await abandon(goalId).catch(() => {})
 }
 
+async function submitCheckIn(goalId: string, input: RecordCheckInInput) {
+  const goal = goals.value.find((g) => g.id === goalId)
+  await submitWithOfflineFallback<void, PendingGoalContribution>(
+    {
+      kind: 'goalContribution',
+      goalId,
+      payload: input,
+      snapshot: {
+        goalTitle: goal?.title ?? '',
+        goalCurrency: goal?.currency ?? '',
+        amountSaved: input.amountSaved,
+      },
+    },
+    () => checkIn(goalId, input),
+  ).catch(() => {})
+}
+
 async function onAddContribution(
   goalId: string,
   input: { amountSaved: number; walletId?: string; note?: string },
 ) {
-  await checkIn(goalId, input).catch(() => {})
+  await submitCheckIn(goalId, input)
 }
 
 async function onCheckInSubmit(goalId: string, input: RecordCheckInInput) {
-  await checkIn(goalId, input).catch(() => {})
+  await submitCheckIn(goalId, input)
 }
 
 const hasGoals = computed(() => goals.value.length > 0)

@@ -173,6 +173,13 @@ function onTransactionCreated(transaction: Transaction) {
   closeAddForm()
 }
 
+// Sin conexion (o falla de red real) - TransactionForm.vue ya encolo el
+// movimiento y avisa con un toast (ver offlineQueue.store.ts); aca solo hace
+// falta cerrar el sheet, igual que si hubiera creado la transaction de una.
+function onTransactionQueued() {
+  closeAddForm()
+}
+
 function onEditTransaction(transaction: Transaction) {
   editingTransaction.value = transaction
   showAddForm.value = true
@@ -291,6 +298,7 @@ function onDraftDiscarded(draftId: string) {
         :editing-transaction="editingTransaction"
         @created="onTransactionCreated"
         @updated="onTransactionUpdated"
+        @queued="onTransactionQueued"
         @cancel="closeAddForm"
       />
 
