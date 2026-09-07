@@ -58,6 +58,7 @@ onUnmounted(closeTour)
            identico a como era antes. -->
       <div class="dashboard-col dashboard-col-primary">
         <BalanceCard class="dashboard-section" />
+        <PendingSyncSection class="dashboard-section" />
         <QuickActionsGrid class="dashboard-section" />
       </div>
 

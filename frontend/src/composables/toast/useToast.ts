@@ -21,7 +21,6 @@ const DISPLAY_MS = 3200
 const queue: ToastMessage[] = []
 const active = ref<ToastMessage | null>(null)
 let nextId = 0
-let dismissTimer: ReturnType<typeof setTimeout> | null = null
 
 // Uno a la vez (igual que un banner de iPhone) - si llegan varios avisos
 // juntos (ej. varios items sincronizando en fila), se encolan y se muestran
@@ -29,9 +28,8 @@ let dismissTimer: ReturnType<typeof setTimeout> | null = null
 function processQueue() {
   if (active.value || queue.length === 0) return
   active.value = queue.shift() ?? null
-  dismissTimer = setTimeout(() => {
+  setTimeout(() => {
     active.value = null
-    dismissTimer = null
     processQueue()
   }, DISPLAY_MS)
 }
