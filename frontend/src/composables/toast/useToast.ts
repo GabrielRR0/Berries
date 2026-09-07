@@ -1,13 +1,11 @@
 import { ref } from 'vue'
 
-// Aviso al usuario tipo notificacion de iPhone (pedido explicito: "una
-// notificacion... que aparece arriba en el medio, desliza de arriba a abajo
-// y despues sube") - pensado en primer lugar para el modo offline (avisar
-// que algo quedo pendiente/se sincronizo), pero generico para cualquier
-// pantalla. Singleton a nivel de modulo, mismo criterio que useOnlineStatus.ts -
-// cualquier store/composable puede disparar un aviso sin que la pantalla
-// activa tenga que montar nada especial (ToastBanner.vue vive una sola vez,
-// en App.vue).
+// Notificacion flotante generica (usada por el modo offline para avisar que
+// algo quedo pendiente/se sincronizo, pero disponible para cualquier
+// pantalla). Singleton a nivel de modulo, mismo criterio que
+// useOnlineStatus.ts - cualquier store/composable puede disparar un aviso sin
+// que la pantalla activa tenga que montar nada especial (ToastBanner.vue vive
+// una sola vez, en App.vue).
 export type ToastTone = 'info' | 'success' | 'error'
 
 export interface ToastMessage {

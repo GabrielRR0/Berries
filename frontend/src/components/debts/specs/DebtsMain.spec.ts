@@ -65,9 +65,11 @@ describe('DebtsMain - registrar pago en modo offline', () => {
   })
 
   it('offline: encola el pago en vez de llamar al service, con el snapshot de la deuda', async () => {
-    useOnlineStatus().isOnline.value = false
     const wrapper = mountDebtsMain()
     await flushPromises()
+    // Se corta la señal DESPUES de que la lista de deudas ya cargo - esto
+    // prueba el encolado del pago, no el fetch inicial de la pantalla.
+    useOnlineStatus().isOnline.value = false
 
     await wrapper.find('.add-payment-trigger').trigger('click')
     await wrapper.findComponent(AddDebtPaymentForm).vm.$emit('create', { amount: 250, currency: 'CLP' })

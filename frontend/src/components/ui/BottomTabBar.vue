@@ -12,8 +12,9 @@ const tabs = [
 ] as const
 
 const route = useRoute()
-// Badge de pendientes en "Inicio" - unica pantalla donde vive PendingSyncSection,
-// para que se note aunque el usuario no este parado ahi (ver DashboardMain.vue).
+// Badge de pendientes en "Menú" - ahi vive la pantalla real (/pendientes,
+// dentro de Ajustes), para que el conteo se note aunque el usuario no este
+// parado ahi.
 const offlineQueue = useOfflineQueueStore()
 </script>
 
@@ -38,7 +39,7 @@ const offlineQueue = useOfflineQueueStore()
         <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" />
         </svg>
-        <span v-if="tab.name === 'dashboard' && offlineQueue.pendingCount > 0" class="tab-pending-badge">
+        <span v-if="tab.name === 'ajustes' && offlineQueue.pendingCount > 0" class="tab-pending-badge">
           {{ offlineQueue.pendingCount }}
         </span>
       </span>

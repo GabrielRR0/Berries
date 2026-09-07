@@ -21,6 +21,13 @@ vi.mock('../../../services/goals/goals.service', () => ({
   recordCheckIn: vi.fn(),
   abandonGoal: vi.fn(),
   getGoal: vi.fn(),
+  GoalsApiError: class GoalsApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
 }))
 
 vi.mock('../../../services/categories/categories.service', () => ({
@@ -29,6 +36,13 @@ vi.mock('../../../services/categories/categories.service', () => ({
   deleteCategory: vi.fn(),
   hideCategory: vi.fn(),
   unhideCategory: vi.fn(),
+  CategoriesApiError: class CategoriesApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
 }))
 
 const push = vi.fn()

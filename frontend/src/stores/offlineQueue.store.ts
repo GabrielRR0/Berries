@@ -1,23 +1,23 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { useToast } from '../composables/toast/useToast'
-import { addDebtPayment, DebtsApiError } from '../services/debts/debts.service'
+import { addDebtPayment } from '../services/debts/debts.service'
 import type { CreateDebtPaymentInput, DebtDirection } from '../services/debts/interfaces/debts.interface'
-import { GoalsApiError, recordCheckIn } from '../services/goals/goals.service'
+import { recordCheckIn } from '../services/goals/goals.service'
 import type { RecordCheckInInput } from '../services/goals/interfaces/goals.interface'
-import { createTransaction, TransactionsApiError } from '../services/transactions/transactions.service'
+import { createTransaction } from '../services/transactions/transactions.service'
 import type { CreateTransactionParams, TransactionType } from '../services/transactions/interfaces/transactions.interface'
-import { transferBetweenWallets, WalletsApiError } from '../services/wallets/wallets.service'
+import { transferBetweenWallets } from '../services/wallets/wallets.service'
 import type { TransferParams } from '../services/wallets/interfaces/wallets.interface'
+import { isConnectivityFailure } from '../utils/network/isConnectivityFailure'
 import { useTransactionsStore } from './transactions.store'
 import { useWalletsStore } from './wallets.store'
 
-// Pedido explicito del usuario ("modo offline... queden guardados en el navegador
-// con un estado de pendiente"): cola de acciones que no se pudieron mandar al
-// backend (sin señal, o el fetch en si fallo) para las 4 acciones confirmadas -
-// movimiento manual, pago de deuda, aporte de meta, transferencia. Siempre sobre
-// entidades YA EXISTENTES (billetera/deuda/meta) - crear una billetera/deuda/meta
-// nueva sigue necesitando conexion, no es parte de esta cola.
+// Cola de acciones que no se pudieron mandar al backend (sin señal, o el
+// fetch en si fallo) para 4 tipos de accion - movimiento manual, pago de
+// deuda, aporte de meta, transferencia. Siempre sobre entidades YA
+// EXISTENTES (billetera/deuda/meta) - crear una billetera/deuda/meta nueva
+// sigue necesitando conexion, no es parte de esta cola.
 export type PendingStatus = 'pending' | 'syncing' | 'failed'
 
 interface PendingBase {
@@ -119,9 +119,9 @@ export const useOfflineQueueStore = defineStore('offlineQueue', () => {
     const item = { ...op, id: generateId(), status: 'pending', createdAt: new Date().toISOString() } as T
     items.value = [...items.value, item]
     persist()
-    // Aviso inmediato (pedido explicito del usuario) - sin esto, el formulario
-    // se cierra igual que si hubiera funcionado y nada le avisa al usuario que
-    // en realidad quedo pendiente de sincronizar.
+    // Aviso inmediato - sin esto, el formulario se cierra igual que si
+    // hubiera funcionado y nada avisa que en realidad quedo pendiente de
+    // sincronizar.
     useToast().showToast('Sin conexión: se guardó como pendiente, se sincroniza solo.', 'info')
     return item
   }
@@ -129,19 +129,6 @@ export const useOfflineQueueStore = defineStore('offlineQueue', () => {
   function discard(id: string) {
     items.value = items.value.filter((item) => item.id !== id)
     persist()
-  }
-
-  // El backend ya respondio (un rechazo real: saldo insuficiente, billetera
-  // borrada, etc.) - no es un problema de conexion, no tiene sentido reintentar
-  // solo. Cualquier OTRO error (el fetch nunca llego a golpear al servidor) se
-  // trata como falla de conectividad, no como fallo real.
-  function isRealApiError(err: unknown): boolean {
-    return (
-      err instanceof TransactionsApiError ||
-      err instanceof WalletsApiError ||
-      err instanceof DebtsApiError ||
-      err instanceof GoalsApiError
-    )
   }
 
   async function syncOne(item: PendingOperation): Promise<void> {
@@ -162,13 +149,13 @@ export const useOfflineQueueStore = defineStore('offlineQueue', () => {
         useTransactionsStore().fetchTransactions({ force: true }),
       ])
     } catch (err) {
-      if (isRealApiError(err)) {
-        item.status = 'failed'
-        item.errorMessage = err instanceof Error ? err.message : 'No se pudo sincronizar.'
-      } else {
+      if (isConnectivityFailure(err)) {
         // Sigue sin señal (o volvio a cortarse a mitad de sincronizar) - nunca
         // "failed" por esto, se queda "pending" para el proximo intento.
         item.status = 'pending'
+      } else {
+        item.status = 'failed'
+        item.errorMessage = err instanceof Error ? err.message : 'No se pudo sincronizar.'
       }
       persist()
       throw err
@@ -182,10 +169,10 @@ export const useOfflineQueueStore = defineStore('offlineQueue', () => {
   }
 
   // Aviso al terminar una tanda de sincronizacion automatica (al reconectar) -
-  // pedido explicito del usuario: el usuario puede estar en cualquier otra
-  // pantalla cuando esto pasa solo, sin esto no se enteraria salvo que entre a
-  // Inicio a mirar. Nunca se dispara en un retry() manual puntual: ahi el
-  // usuario ya esta mirando la tarjeta, el cambio de estado ya es aviso suficiente.
+  // puede estar en cualquier otra pantalla cuando esto pasa solo, sin esto no
+  // se enteraria salvo que entre a Inicio a mirar. Nunca se dispara en un
+  // retry() manual puntual: ahi ya esta mirando la tarjeta, el cambio de
+  // estado ya es aviso suficiente.
   function notifySyncOutcome(succeeded: number, failed: number) {
     if (succeeded === 0 && failed === 0) return
     const { showToast } = useToast()

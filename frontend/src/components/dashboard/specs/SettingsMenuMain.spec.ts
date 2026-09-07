@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { deleteAccount } from '../../../services/auth/auth.service'
 import { useAuthStore } from '../../../stores/auth.store'
+import { useOfflineQueueStore } from '../../../stores/offlineQueue.store'
 import SettingsMenuMain from '../SettingsMenuMain.vue'
 
 vi.mock('../../../services/auth/auth.service', async () => {
@@ -51,7 +52,7 @@ describe('SettingsMenuMain - header e iconos', () => {
     const wrapper = mountSettings()
 
     const labels = wrapper.findAll('.menu-section-label').map((el) => el.text())
-    expect(labels).toEqual(['Tus finanzas', 'Herramientas'])
+    expect(labels).toEqual(['Tus finanzas', 'Modo offline', 'Herramientas'])
   })
 
   it('cada item del menu tiene un icono propio', () => {
@@ -62,10 +63,58 @@ describe('SettingsMenuMain - header e iconos', () => {
     const wrapper = mount(SettingsMenuMain)
 
     const items = wrapper.findAll('.menu-item')
-    expect(items).toHaveLength(5)
+    expect(items).toHaveLength(6)
     for (const item of items) {
       expect(item.find('.icon-badge svg').exists()).toBe(true)
     }
+  })
+})
+
+describe('SettingsMenuMain - modo offline', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+    push.mockReset()
+  })
+
+  it('los 5 interruptores arrancan apagados', () => {
+    const wrapper = mountSettings()
+
+    const switches = wrapper.findAll('.toggle-switch')
+    expect(switches).toHaveLength(5)
+    for (const toggle of switches) {
+      expect(toggle.attributes('aria-checked')).toBe('false')
+    }
+  })
+
+  it('activar un interruptor lo refleja encendido', async () => {
+    const wrapper = mountSettings()
+
+    await wrapper.findAll('.toggle-switch')[0]!.trigger('click')
+
+    expect(wrapper.findAll('.toggle-switch')[0]!.attributes('aria-checked')).toBe('true')
+  })
+
+  // Sin stubear RouterLink (mismo motivo que "cada item del menu tiene un
+  // icono propio" mas arriba): el stub global descarta el contenido de sus
+  // slots, y el badge de conteo vive adentro de ese slot.
+  it('no muestra el badge de pendientes en "Pendientes" si no hay ninguno', () => {
+    const wrapper = mount(SettingsMenuMain)
+
+    const pendingLink = wrapper.findAll('.menu-item').find((item) => item.text().includes('Pendientes'))
+    expect(pendingLink?.find('.menu-item-badge').exists()).toBe(false)
+  })
+
+  it('muestra el conteo en el badge de "Pendientes" cuando hay items en la cola', () => {
+    useOfflineQueueStore().enqueue({
+      kind: 'transaction',
+      payload: { walletId: 'w1', type: 'expense', amount: 100, category: 'comida' } as never,
+      snapshot: { walletName: 'Efectivo', walletCurrency: 'CLP', type: 'expense', amount: 100, category: 'comida' },
+    })
+    const wrapper = mount(SettingsMenuMain)
+
+    const pendingLink = wrapper.findAll('.menu-item').find((item) => item.text().includes('Pendientes'))
+    expect(pendingLink?.find('.menu-item-badge').text()).toBe('1')
   })
 })
 

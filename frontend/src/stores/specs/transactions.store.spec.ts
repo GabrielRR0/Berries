@@ -1,6 +1,12 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { deleteTransaction, listTransactions } from '../../services/transactions/transactions.service'
+import {
+  deleteTransaction,
+  listTransactions,
+  TransactionsApiError,
+} from '../../services/transactions/transactions.service'
+import * as secureCache from '../../utils/offlineCache/secureCache'
+import { useOfflineCachePreferencesStore } from '../offlineCachePreferences.store'
 import { useWalletsStore } from '../wallets.store'
 import { useTransactionsStore } from '../transactions.store'
 
@@ -10,6 +16,12 @@ vi.mock('../../services/transactions/transactions.service', async () => {
   )
   return { ...actual, listTransactions: vi.fn(), deleteTransaction: vi.fn() }
 })
+
+vi.mock('../../utils/offlineCache/secureCache', () => ({
+  readCache: vi.fn(),
+  writeCache: vi.fn(),
+  clearCacheByPrefix: vi.fn(),
+}))
 
 const TX_A = {
   id: 'tx-1',
@@ -40,9 +52,12 @@ const TX_B = {
 
 describe('transactions.store', () => {
   beforeEach(() => {
+    localStorage.clear()
     setActivePinia(createPinia())
     vi.mocked(listTransactions).mockReset()
     vi.mocked(deleteTransaction).mockReset()
+    vi.mocked(secureCache.readCache).mockReset().mockResolvedValue(null)
+    vi.mocked(secureCache.writeCache).mockReset().mockResolvedValue(undefined)
   })
 
   it('arranca vacio, sin cargar y sin error', () => {
@@ -86,12 +101,44 @@ describe('transactions.store', () => {
       expect(listTransactions).toHaveBeenCalledTimes(2)
     })
 
-    it('guarda el mensaje de error y lo propaga si el service falla', async () => {
-      vi.mocked(listTransactions).mockRejectedValue(new Error('network error'))
+    it('guarda el mensaje de error y lo propaga si el backend rechaza el pedido', async () => {
+      vi.mocked(listTransactions).mockRejectedValue(new TransactionsApiError('No autorizado.', 401))
       const store = useTransactionsStore()
 
-      await expect(store.fetchTransactions()).rejects.toThrow('network error')
-      expect(store.error).toBe('network error')
+      await expect(store.fetchTransactions()).rejects.toThrow('No autorizado.')
+      expect(store.error).toBe('No autorizado.')
+    })
+
+    it('sin cache guardada, una falla de conexion NO tira ni llena error (se resuelve igual)', async () => {
+      vi.mocked(listTransactions).mockRejectedValue(new TypeError('Failed to fetch'))
+      const store = useTransactionsStore()
+
+      await store.fetchTransactions()
+
+      expect(store.error).toBeNull()
+      expect(store.transactions).toEqual([])
+    })
+
+    it('con la cache habilitada, un fetch exitoso la escribe', async () => {
+      useOfflineCachePreferencesStore().setPreference('transactions', true)
+      vi.mocked(listTransactions).mockResolvedValue([TX_A])
+      const store = useTransactionsStore()
+
+      await store.fetchTransactions()
+
+      expect(secureCache.writeCache).toHaveBeenCalledWith('berry_cache_transactions', [TX_A])
+    })
+
+    it('con la cache habilitada, una falla de conexion sirve lo guardado en cache', async () => {
+      useOfflineCachePreferencesStore().setPreference('transactions', true)
+      vi.mocked(secureCache.readCache).mockResolvedValue([TX_A])
+      vi.mocked(listTransactions).mockRejectedValue(new TypeError('Failed to fetch'))
+      const store = useTransactionsStore()
+
+      await store.fetchTransactions()
+
+      expect(store.transactions).toEqual([TX_A])
+      expect(store.error).toBeNull()
     })
   })
 

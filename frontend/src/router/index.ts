@@ -92,6 +92,12 @@ const router = createRouter({
       component: () => import('../components/categories/CategoriesMain.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/pendientes',
+      name: 'pendientes',
+      component: () => import('../components/offline/PendingSyncMain.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

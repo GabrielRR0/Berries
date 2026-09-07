@@ -6,7 +6,10 @@ import {
   listWallets,
   transferBetweenWallets,
   updateTransfer,
+  WalletsApiError,
 } from '../../services/wallets/wallets.service'
+import * as secureCache from '../../utils/offlineCache/secureCache'
+import { useOfflineCachePreferencesStore } from '../offlineCachePreferences.store'
 import { useTransactionsStore } from '../transactions.store'
 import { useWalletsStore } from '../wallets.store'
 
@@ -24,17 +27,26 @@ vi.mock('../../services/wallets/wallets.service', async () => {
   }
 })
 
+vi.mock('../../utils/offlineCache/secureCache', () => ({
+  readCache: vi.fn(),
+  writeCache: vi.fn(),
+  clearCacheByPrefix: vi.fn(),
+}))
+
 const WALLET_A = { id: 'wallet-1', name: 'Efectivo', currency: 'USD', balance: 100, createdAt: '2026-01-01T00:00:00Z' }
 const WALLET_B = { id: 'wallet-2', name: 'Banco', currency: 'EUR', balance: 50, createdAt: '2026-01-01T00:00:00Z' }
 
 describe('wallets.store', () => {
   beforeEach(() => {
+    localStorage.clear()
     setActivePinia(createPinia())
     vi.mocked(createWallet).mockReset()
     vi.mocked(listWallets).mockReset()
     vi.mocked(deleteWallet).mockReset()
     vi.mocked(transferBetweenWallets).mockReset()
     vi.mocked(updateTransfer).mockReset()
+    vi.mocked(secureCache.readCache).mockReset().mockResolvedValue(null)
+    vi.mocked(secureCache.writeCache).mockReset().mockResolvedValue(undefined)
   })
 
   it('arranca con la lista vacia, sin cargar y sin error', () => {
@@ -59,20 +71,50 @@ describe('wallets.store', () => {
       expect(store.error).toBeNull()
     })
 
-    it('guarda el mensaje de error y lo propaga si el service falla', async () => {
-      vi.mocked(listWallets).mockRejectedValue(new Error('network error'))
+    it('guarda el mensaje de error y lo propaga si el backend rechaza el pedido', async () => {
+      vi.mocked(listWallets).mockRejectedValue(new WalletsApiError('No autorizado.', 401))
       const store = useWalletsStore()
 
-      await expect(store.fetchWallets()).rejects.toThrow('network error')
+      await expect(store.fetchWallets()).rejects.toThrow('No autorizado.')
 
-      expect(store.error).toBe('network error')
+      expect(store.error).toBe('No autorizado.')
       expect(store.isLoading).toBe(false)
       expect(store.wallets).toEqual([])
     })
 
-    // Pedido explicito del usuario: "guardar los datos cargados en cache...
-    // asi cuando nos movamos de un lado a otro ya los montos esten
-    // cargados, a menos que si requeria actualizar en casos concretos".
+    it('sin cache guardada, una falla de conexion NO tira ni llena error (se resuelve igual)', async () => {
+      vi.mocked(listWallets).mockRejectedValue(new TypeError('Failed to fetch'))
+      const store = useWalletsStore()
+
+      await store.fetchWallets()
+
+      expect(store.error).toBeNull()
+      expect(store.isLoading).toBe(false)
+      expect(store.wallets).toEqual([])
+    })
+
+    it('con la cache habilitada, un fetch exitoso la escribe', async () => {
+      useOfflineCachePreferencesStore().setPreference('wallets', true)
+      vi.mocked(listWallets).mockResolvedValue([WALLET_A])
+      const store = useWalletsStore()
+
+      await store.fetchWallets()
+
+      expect(secureCache.writeCache).toHaveBeenCalledWith('berry_cache_wallets', [WALLET_A])
+    })
+
+    it('con la cache habilitada, una falla de conexion sirve lo guardado en cache', async () => {
+      useOfflineCachePreferencesStore().setPreference('wallets', true)
+      vi.mocked(secureCache.readCache).mockResolvedValue([WALLET_A])
+      vi.mocked(listWallets).mockRejectedValue(new TypeError('Failed to fetch'))
+      const store = useWalletsStore()
+
+      await store.fetchWallets()
+
+      expect(store.wallets).toEqual([WALLET_A])
+      expect(store.error).toBeNull()
+    })
+
     it('no vuelve a pedir la lista si ya esta cargada y fresca', async () => {
       vi.mocked(listWallets).mockResolvedValue([WALLET_A])
       const store = useWalletsStore()

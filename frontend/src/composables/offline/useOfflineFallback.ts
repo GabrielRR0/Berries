@@ -1,21 +1,9 @@
-import { DebtsApiError } from '../../services/debts/debts.service'
-import { GoalsApiError } from '../../services/goals/goals.service'
-import { TransactionsApiError } from '../../services/transactions/transactions.service'
-import { WalletsApiError } from '../../services/wallets/wallets.service'
 import { useOfflineQueueStore } from '../../stores/offlineQueue.store'
 import type { PendingOperation } from '../../stores/offlineQueue.store'
+import { isConnectivityFailure } from '../../utils/network/isConnectivityFailure'
 import { useOnlineStatus } from '../connectivity/useOnlineStatus'
 
 export type OfflineFallbackResult<T> = { queued: false; result: T } | { queued: true }
-
-function isConnectivityFailure(err: unknown): boolean {
-  return (
-    !(err instanceof TransactionsApiError) &&
-    !(err instanceof WalletsApiError) &&
-    !(err instanceof DebtsApiError) &&
-    !(err instanceof GoalsApiError)
-  )
-}
 
 // Helper compartido por las 4 acciones que soportan modo offline (movimiento,
 // transferencia, pago de deuda, aporte de meta) - evita repetir la misma rama

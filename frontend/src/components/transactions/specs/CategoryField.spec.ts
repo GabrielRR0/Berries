@@ -1,4 +1,5 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createCategory,
@@ -13,6 +14,13 @@ vi.mock('../../../services/categories/categories.service', () => ({
   deleteCategory: vi.fn(),
   hideCategory: vi.fn(),
   unhideCategory: vi.fn(),
+  CategoriesApiError: class CategoriesApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
 }))
 
 const MERCADO: Category = { id: 'cat-1', name: 'Mercado', kind: 'expense', isDefault: true, isHidden: false }
@@ -20,6 +28,8 @@ const GYM: Category = { id: 'cat-2', name: 'Gym', kind: 'expense', isDefault: tr
 
 describe('CategoryField', () => {
   beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
     vi.mocked(listCategories).mockReset().mockResolvedValue([MERCADO, GYM])
     vi.mocked(createCategory).mockReset()
   })

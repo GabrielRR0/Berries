@@ -1,8 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { fetchWithOfflineCache } from '../composables/offline/useCachedFetch'
 import { deleteTransaction, listTransactions } from '../services/transactions/transactions.service'
 import type { Transaction } from '../services/transactions/interfaces/transactions.interface'
+import { useOfflineCachePreferencesStore } from './offlineCachePreferences.store'
 import { useWalletsStore } from './wallets.store'
+
+const TRANSACTIONS_CACHE_KEY = 'berry_cache_transactions'
 
 // Cache compartida de movimientos entre pantallas - pedido explicito del
 // usuario ("guardar los datos cargados en cache... asi cuando nos movamos
@@ -42,18 +46,24 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
     isLoading.value = true
     error.value = null
-    inFlightFetch = (async () => {
-      try {
-        transactions.value = await listTransactions()
+    inFlightFetch = fetchWithOfflineCache<Transaction[]>({
+      isCachingEnabled: useOfflineCachePreferencesStore().preferences.transactions,
+      cacheKey: TRANSACTIONS_CACHE_KEY,
+      fetchFn: listTransactions,
+      onSuccess: (data) => {
+        transactions.value = data
         lastFetchedAt = Date.now()
-      } catch (err) {
-        error.value = err instanceof Error ? err.message : 'No se pudieron cargar los movimientos.'
-        throw err
-      } finally {
-        isLoading.value = false
-        inFlightFetch = null
-      }
-    })()
+      },
+      onCacheFallback: (data) => {
+        if (transactions.value.length === 0) transactions.value = data
+      },
+      onRealError: (message) => {
+        error.value = message
+      },
+    }).finally(() => {
+      isLoading.value = false
+      inFlightFetch = null
+    })
     return inFlightFetch
   }
 

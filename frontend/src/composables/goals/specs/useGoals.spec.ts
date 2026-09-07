@@ -1,3 +1,4 @@
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   abandonGoal,
@@ -7,6 +8,7 @@ import {
   getPendingCheckIns,
   getSavingsCapacity,
   getWalletCommitments,
+  GoalsApiError,
   listGoals,
   recordCheckIn,
   updateCheckIn,
@@ -27,6 +29,13 @@ vi.mock('../../../services/goals/goals.service', () => ({
   recordCheckIn: vi.fn(),
   updateCheckIn: vi.fn(),
   abandonGoal: vi.fn(),
+  GoalsApiError: class GoalsApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
 }))
 
 const GOAL: Goal = {
@@ -59,6 +68,8 @@ const CAPACITY: SavingsCapacity = { avgMonthlyIncome: 900, avgMonthlyExpense: 60
 
 describe('useGoals', () => {
   beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
     vi.mocked(listGoals).mockReset().mockResolvedValue([GOAL])
     vi.mocked(getGoalSummary).mockReset().mockResolvedValue(SUMMARY)
     vi.mocked(getPendingCheckIns).mockReset().mockResolvedValue([PENDING])
@@ -104,13 +115,23 @@ describe('useGoals', () => {
       expect(listGoals).toHaveBeenCalledWith('completed')
     })
 
-    it('guarda el mensaje de error si el servicio falla', async () => {
-      vi.mocked(listGoals).mockRejectedValue(new Error('fallo de red'))
+    it('guarda el mensaje de error si el backend rechaza el pedido', async () => {
+      vi.mocked(listGoals).mockRejectedValue(new GoalsApiError('no autorizado', 401))
       const { goals, error, fetchGoals } = useGoals()
 
       await fetchGoals()
 
-      expect(error.value).toBe('fallo de red')
+      expect(error.value).toBe('no autorizado')
+      expect(goals.value).toEqual([])
+    })
+
+    it('sin cache guardada, una falla de conexion no llena error (deja la lista vacia)', async () => {
+      vi.mocked(listGoals).mockRejectedValue(new TypeError('Failed to fetch'))
+      const { goals, error, fetchGoals } = useGoals()
+
+      await fetchGoals()
+
+      expect(error.value).toBeNull()
       expect(goals.value).toEqual([])
     })
   })

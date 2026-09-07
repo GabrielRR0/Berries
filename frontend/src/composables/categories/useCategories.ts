@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { fetchWithOfflineCache } from '../offline/useCachedFetch'
 import {
   createCategory as createCategoryApi,
   deleteCategory as deleteCategoryApi,
@@ -7,6 +8,11 @@ import {
   unhideCategory as unhideCategoryApi,
 } from '../../services/categories/categories.service'
 import type { Category, CategoryKind, CreateCategoryInput } from '../../services/categories/interfaces/categories.interface'
+import { useOfflineCachePreferencesStore } from '../../stores/offlineCachePreferences.store'
+
+function cacheKeyFor(kind?: CategoryKind): string {
+  return `berry_cache_categories_${kind ?? 'all'}`
+}
 
 // includeHidden: solo lo usa la pantalla de Ajustes (para poder restaurar una
 // categoría por defecto que el usuario ocultó antes) - CategoryField.vue nunca lo
@@ -34,13 +40,25 @@ export function useCategories() {
     lastIncludeHidden = includeHidden
     isLoading.value = true
     error.value = null
-    try {
-      categories.value = await listCategoriesApi(kind, includeHidden)
-    } catch (err) {
-      error.value = toMessage(err, 'No se pudieron obtener las categorías.')
-    } finally {
-      isLoading.value = false
-    }
+    await fetchWithOfflineCache<Category[]>({
+      // La variante con ocultas (pantalla de Ajustes, para restaurar una
+      // categoria) no se cachea - administrar categorias ocultas ya
+      // requiere conexion para las mutaciones, y CategoryField.vue (que si
+      // necesita esto offline) nunca pide includeHidden.
+      isCachingEnabled: !includeHidden && useOfflineCachePreferencesStore().preferences.categories,
+      cacheKey: cacheKeyFor(kind),
+      fetchFn: () => listCategoriesApi(kind, includeHidden),
+      onSuccess: (data) => {
+        categories.value = data
+      },
+      onCacheFallback: (data) => {
+        if (categories.value.length === 0) categories.value = data
+      },
+      onRealError: (message) => {
+        error.value = message
+      },
+    }).catch(() => {})
+    isLoading.value = false
   }
 
   async function create(input: CreateCategoryInput): Promise<Category> {

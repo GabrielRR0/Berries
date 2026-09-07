@@ -1,8 +1,10 @@
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   addDebtPayment,
   createDebt,
   deleteDebt,
+  DebtsApiError,
   deleteDebtPayment,
   getDebtSummary,
   listDebts,
@@ -10,6 +12,8 @@ import {
   unpayInstallment,
 } from '../../../services/debts/debts.service'
 import type { Debt, DebtPayment, DebtSummary } from '../../../services/debts/interfaces/debts.interface'
+import * as secureCache from '../../../utils/offlineCache/secureCache'
+import { useOfflineCachePreferencesStore } from '../../../stores/offlineCachePreferences.store'
 import { useDebts } from '../useDebts'
 
 vi.mock('../../../services/debts/debts.service', () => ({
@@ -21,6 +25,19 @@ vi.mock('../../../services/debts/debts.service', () => ({
   unpayInstallment: vi.fn(),
   addDebtPayment: vi.fn(),
   deleteDebtPayment: vi.fn(),
+  DebtsApiError: class DebtsApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
+}))
+
+vi.mock('../../../utils/offlineCache/secureCache', () => ({
+  readCache: vi.fn(),
+  writeCache: vi.fn(),
+  clearCacheByPrefix: vi.fn(),
 }))
 
 const DEBT: Debt = {
@@ -54,6 +71,8 @@ const SUMMARY: DebtSummary = { totalOwedByUser: 0, totalOwedToUser: 300 }
 
 describe('useDebts', () => {
   beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
     vi.mocked(listDebts).mockReset().mockResolvedValue([DEBT])
     vi.mocked(getDebtSummary).mockReset().mockResolvedValue(SUMMARY)
     vi.mocked(createDebt).mockReset()
@@ -62,6 +81,8 @@ describe('useDebts', () => {
     vi.mocked(unpayInstallment).mockReset()
     vi.mocked(addDebtPayment).mockReset()
     vi.mocked(deleteDebtPayment).mockReset()
+    vi.mocked(secureCache.readCache).mockReset().mockResolvedValue(null)
+    vi.mocked(secureCache.writeCache).mockReset().mockResolvedValue(undefined)
   })
 
   it('arranca vacio, sin cargar y sin error', () => {
@@ -94,19 +115,60 @@ describe('useDebts', () => {
       expect(listDebts).toHaveBeenCalledWith('owed_by_user')
     })
 
-    it('guarda el mensaje de error si el servicio falla', async () => {
-      vi.mocked(listDebts).mockRejectedValue(new Error('fallo de red'))
+    it('guarda el mensaje de error si el backend rechaza el pedido', async () => {
+      vi.mocked(listDebts).mockRejectedValue(new DebtsApiError('no autorizado', 401))
       const { debts, error, fetchDebts } = useDebts()
 
       await fetchDebts()
 
-      expect(error.value).toBe('fallo de red')
+      expect(error.value).toBe('no autorizado')
       expect(debts.value).toEqual([])
+    })
+
+    it('sin cache guardada, una falla de conexion no llena error (deja la lista vacia)', async () => {
+      vi.mocked(listDebts).mockRejectedValue(new TypeError('Failed to fetch'))
+      const { debts, error, fetchDebts } = useDebts()
+
+      await fetchDebts()
+
+      expect(error.value).toBeNull()
+      expect(debts.value).toEqual([])
+    })
+
+    it('con la cache habilitada, un fetch exitoso la escribe', async () => {
+      useOfflineCachePreferencesStore().setPreference('debts', true)
+      const { fetchDebts } = useDebts()
+
+      await fetchDebts()
+
+      expect(secureCache.writeCache).toHaveBeenCalledWith('berry_cache_debts_list', [DEBT])
+    })
+
+    it('con la cache habilitada, una falla de conexion sirve lo guardado en cache', async () => {
+      useOfflineCachePreferencesStore().setPreference('debts', true)
+      vi.mocked(secureCache.readCache).mockResolvedValue([DEBT])
+      vi.mocked(listDebts).mockRejectedValue(new TypeError('Failed to fetch'))
+      const { debts, fetchDebts } = useDebts()
+
+      await fetchDebts()
+
+      expect(debts.value).toEqual([DEBT])
     })
   })
 
   describe('fetchSummary', () => {
     it('pide el resumen y lo guarda', async () => {
+      const { summary, fetchSummary } = useDebts()
+
+      await fetchSummary()
+
+      expect(summary.value).toEqual(SUMMARY)
+    })
+
+    it('con la cache habilitada, una falla de conexion sirve el resumen guardado en cache', async () => {
+      useOfflineCachePreferencesStore().setPreference('debts', true)
+      vi.mocked(secureCache.readCache).mockResolvedValue(SUMMARY)
+      vi.mocked(getDebtSummary).mockRejectedValue(new TypeError('Failed to fetch'))
       const { summary, fetchSummary } = useDebts()
 
       await fetchSummary()

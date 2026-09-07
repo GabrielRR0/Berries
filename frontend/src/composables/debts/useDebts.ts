@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { fetchWithOfflineCache } from '../offline/useCachedFetch'
 import {
   addDebtPayment as addDebtPaymentApi,
   createDebt as createDebtApi,
@@ -16,6 +17,10 @@ import type {
   DebtDirection,
   DebtSummary,
 } from '../../services/debts/interfaces/debts.interface'
+import { useOfflineCachePreferencesStore } from '../../stores/offlineCachePreferences.store'
+
+const DEBTS_LIST_CACHE_KEY = 'berry_cache_debts_list'
+const DEBTS_SUMMARY_CACHE_KEY = 'berry_cache_debts_summary'
 
 // Estado local de la pantalla de deudas (no un store de Pinia: ninguna otra
 // pantalla necesita esto ahora mismo, ver limites del trabajo). Envuelve
@@ -40,21 +45,38 @@ export function useDebts() {
     lastDirection = direction
     isLoading.value = true
     error.value = null
-    try {
-      debts.value = await listDebtsApi(direction)
-    } catch (err) {
-      error.value = toMessage(err, 'No se pudieron obtener las deudas.')
-    } finally {
-      isLoading.value = false
-    }
+    await fetchWithOfflineCache<Debt[]>({
+      isCachingEnabled: useOfflineCachePreferencesStore().preferences.debts,
+      cacheKey: DEBTS_LIST_CACHE_KEY,
+      fetchFn: () => listDebtsApi(direction),
+      onSuccess: (data) => {
+        debts.value = data
+      },
+      onCacheFallback: (data) => {
+        if (debts.value.length === 0) debts.value = data
+      },
+      onRealError: (message) => {
+        error.value = message
+      },
+    }).catch(() => {})
+    isLoading.value = false
   }
 
   async function fetchSummary(): Promise<void> {
-    try {
-      summary.value = await getDebtSummaryApi()
-    } catch (err) {
-      error.value = toMessage(err, 'No se pudo obtener el resumen de deudas.')
-    }
+    await fetchWithOfflineCache<DebtSummary>({
+      isCachingEnabled: useOfflineCachePreferencesStore().preferences.debts,
+      cacheKey: DEBTS_SUMMARY_CACHE_KEY,
+      fetchFn: getDebtSummaryApi,
+      onSuccess: (data) => {
+        summary.value = data
+      },
+      onCacheFallback: (data) => {
+        if (summary.value === null) summary.value = data
+      },
+      onRealError: (message) => {
+        error.value = message
+      },
+    }).catch(() => {})
   }
 
   // Refresca lista + resumen tras cualquier mutacion, con el mismo filtro

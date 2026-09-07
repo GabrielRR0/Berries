@@ -26,6 +26,13 @@ vi.mock('../../../services/goals/goals.service', () => ({
   abandonGoal: vi.fn(),
   getGoal: vi.fn(),
   listCheckIns: vi.fn(),
+  GoalsApiError: class GoalsApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
 }))
 
 const push = vi.fn()

@@ -1,9 +1,7 @@
-# USDT es una stablecoin atada 1:1 al dolar - pedido explicito del usuario ("100$
-# equivale siempre a 100 usdt y viceversa"). Extraido de debt_payment_service.py (que
-# tenia esta misma constante en local) para que goals/wallet_commitment_service.py
-# tambien lo use, en vez de duplicar el set - pedido explicito del usuario: "si es
-# dolares, acepte dolares y usdt" tambien para enlazar un aporte de meta a una
-# billetera.
+# USDT es una stablecoin atada 1:1 al dolar, nunca necesita conversion manual.
+# Extraido de debt_payment_service.py (que tenia esta misma constante en local)
+# para que goals/wallet_commitment_service.py tambien lo use al enlazar un
+# aporte de meta a una billetera, en vez de duplicar el set.
 USD_PEGGED_CURRENCIES = {"USD", "USDT"}
 
 

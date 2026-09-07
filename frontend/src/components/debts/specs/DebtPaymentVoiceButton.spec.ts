@@ -5,6 +5,13 @@ import DebtPaymentVoiceButton from '../DebtPaymentVoiceButton.vue'
 
 vi.mock('../../../services/debts/debts.service', () => ({
   parseDebtPaymentVoice: vi.fn(),
+  DebtsApiError: class DebtsApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
 }))
 
 // VoiceRecorderModal.vue depende de la Web Speech API del navegador (no

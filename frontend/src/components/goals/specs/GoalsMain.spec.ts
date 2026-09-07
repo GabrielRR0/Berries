@@ -71,9 +71,11 @@ describe('GoalsMain - agregar aporte en modo offline', () => {
   })
 
   it('offline: encola el aporte en vez de llamar al service, con el snapshot de la meta', async () => {
-    useOnlineStatus().isOnline.value = false
     const wrapper = mountGoalsMain()
     await flushPromises()
+    // Se corta la señal DESPUES de que la lista de metas ya cargo - esto
+    // prueba el encolado del aporte, no el fetch inicial de la pantalla.
+    useOnlineStatus().isOnline.value = false
 
     await wrapper.findComponent(GoalCard).vm.$emit('addContribution', { amountSaved: 7000 })
     await flushPromises()

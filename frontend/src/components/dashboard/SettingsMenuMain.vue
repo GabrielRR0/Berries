@@ -3,12 +3,16 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAvatarInitials } from '../../composables/auth/useAvatarInitials'
 import { useAuthStore } from '../../stores/auth.store'
+import { useOfflineCachePreferencesStore } from '../../stores/offlineCachePreferences.store'
+import type { OfflineCacheDomain } from '../../stores/offlineCachePreferences.store'
+import { useOfflineQueueStore } from '../../stores/offlineQueue.store'
 import BottomSheet from '../ui/BottomSheet.vue'
 import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseCard from '../ui/BaseCard.vue'
 import IconBadge from '../ui/IconBadge.vue'
+import ToggleSwitch from '../ui/ToggleSwitch.vue'
 
 // Hub de "Ajustes" (reemplaza PlaceholderScreen.vue en esa ruta - ver
 // router/index.ts, cambio reportado, no aplicado aca directo por los
@@ -18,11 +22,25 @@ import IconBadge from '../ui/IconBadge.vue'
 // TopHeader/BottomTabBar ya no se montan aca, ver PageShell.vue.
 const authStore = useAuthStore()
 const router = useRouter()
+const offlineQueue = useOfflineQueueStore()
+const offlineCachePreferences = useOfflineCachePreferencesStore()
 
 const avatarInitials = useAvatarInitials()
 const showHelpSheet = ref(false)
 
 const displayName = computed(() => authStore.user?.displayName || authStore.user?.email || 'Usuario')
+
+const OFFLINE_CACHE_TOGGLES: { domain: OfflineCacheDomain; label: string }[] = [
+  { domain: 'wallets', label: 'Balances y billeteras' },
+  { domain: 'transactions', label: 'Historial de movimientos' },
+  { domain: 'debts', label: 'Deudas' },
+  { domain: 'goals', label: 'Metas' },
+  { domain: 'categories', label: 'Categorías' },
+]
+
+function onToggleOfflineCache(domain: OfflineCacheDomain, enabled: boolean) {
+  offlineCachePreferences.setPreference(domain, enabled)
+}
 
 // Idea de la sesion de brainstorm de UI: esta era la unica pantalla
 // secundaria sin SectionHeader (sin titulo visible ni "?" de ayuda),
@@ -124,7 +142,36 @@ async function onDeleteAccount() {
             <span class="menu-item-label">Metas</span>
             <span class="menu-item-arrow" aria-hidden="true">›</span>
           </RouterLink>
+
+          <RouterLink to="/pendientes" class="menu-item">
+            <IconBadge size="sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 3" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </IconBadge>
+            <span class="menu-item-label">Pendientes</span>
+            <span v-if="offlineQueue.pendingCount > 0" class="menu-item-badge">{{ offlineQueue.pendingCount }}</span>
+            <span class="menu-item-arrow" aria-hidden="true">›</span>
+          </RouterLink>
         </nav>
+      </div>
+
+      <div class="menu-section">
+        <p class="menu-section-label">Modo offline</p>
+        <BaseCard class="offline-cache-card">
+          <p class="offline-cache-hint">
+            Elegí qué guardar en este dispositivo para poder verlo sin conexión. Nada se guarda hasta que actives cada
+            opción.
+          </p>
+          <ToggleSwitch
+            v-for="toggle in OFFLINE_CACHE_TOGGLES"
+            :key="toggle.domain"
+            :model-value="offlineCachePreferences.preferences[toggle.domain]"
+            :label="toggle.label"
+            @update:model-value="onToggleOfflineCache(toggle.domain, $event)"
+          />
+        </BaseCard>
       </div>
 
       <div class="menu-section">
@@ -174,8 +221,9 @@ async function onDeleteAccount() {
 
     <BottomSheet v-if="showHelpSheet" title="¿Qué es Menú?" @close="showHelpSheet = false">
       <p class="help-text">
-        Tu perfil, el acceso a Calculadora, Deudas, Metas, Categorías y Análisis, y cerrar sesión. Desde acá también
-        podés eliminar tu cuenta si ya no querés usar Berries.
+        Tu perfil, el acceso a Calculadora, Deudas, Metas, Pendientes, Categorías y Análisis, qué guardar en este
+        dispositivo para modo offline, y cerrar sesión. Desde acá también podés eliminar tu cuenta si ya no querés
+        usar Berries.
       </p>
     </BottomSheet>
 
@@ -335,6 +383,30 @@ async function onDeleteAccount() {
 .menu-item-arrow {
   color: var(--text-muted);
   font-size: 1.125rem;
+}
+
+.menu-item-badge {
+  flex-shrink: 0;
+  min-width: 1.375rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.offline-cache-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.offline-cache-hint {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
 .logout-button {

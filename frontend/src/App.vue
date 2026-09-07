@@ -22,9 +22,8 @@ const { start: startTour } = useOnboardingTour()
 const { isScrolled } = useScrollHeader()
 const { isOnline } = useOnlineStatus()
 
-// Reconexion dispara la sincronizacion sola (pedido explicito del usuario) -
-// vive aca (no dentro del store) para no depender de que pantalla instancie
-// useOfflineQueueStore() primero.
+// Reconexion dispara la sincronizacion sola - vive aca (no dentro del store)
+// para no depender de que pantalla instancie useOfflineQueueStore() primero.
 watch(isOnline, (online) => {
   if (online) offlineQueue.syncAll().catch(() => {})
 })

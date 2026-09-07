@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { fetchWithOfflineCache } from '../offline/useCachedFetch'
 import {
   abandonGoal as abandonGoalApi,
   createGoal as createGoalApi,
@@ -22,7 +23,15 @@ import type {
   SavingsCapacity,
   UpdateCheckInInput,
   UpdateGoalInput,
+  WalletCommitment,
 } from '../../services/goals/interfaces/goals.interface'
+import { useOfflineCachePreferencesStore } from '../../stores/offlineCachePreferences.store'
+
+const GOALS_LIST_CACHE_KEY = 'berry_cache_goals_list'
+const GOALS_SUMMARY_CACHE_KEY = 'berry_cache_goals_summary'
+const GOALS_PENDING_CHECKINS_CACHE_KEY = 'berry_cache_goals_pending_checkins'
+const GOALS_SAVINGS_CAPACITY_CACHE_KEY = 'berry_cache_goals_savings_capacity'
+const GOALS_WALLET_COMMITMENTS_CACHE_KEY = 'berry_cache_goals_wallet_commitments'
 
 // Estado local de la pantalla de metas (no un store de Pinia: ninguna otra
 // pantalla necesita esto ahora mismo), mismo patron que useDebts.ts.
@@ -46,52 +55,99 @@ export function useGoals() {
     return err instanceof Error ? err.message : fallback
   }
 
+  const isCachingEnabled = () => useOfflineCachePreferencesStore().preferences.goals
+
   async function fetchGoals(status?: GoalStatus): Promise<void> {
     lastStatus = status
     isLoading.value = true
     error.value = null
-    try {
-      goals.value = await listGoalsApi(status)
-    } catch (err) {
-      error.value = toMessage(err, 'No se pudieron obtener las metas.')
-    } finally {
-      isLoading.value = false
-    }
+    await fetchWithOfflineCache<Goal[]>({
+      isCachingEnabled: isCachingEnabled(),
+      cacheKey: GOALS_LIST_CACHE_KEY,
+      fetchFn: () => listGoalsApi(status),
+      onSuccess: (data) => {
+        goals.value = data
+      },
+      onCacheFallback: (data) => {
+        if (goals.value.length === 0) goals.value = data
+      },
+      onRealError: (message) => {
+        error.value = message
+      },
+    }).catch(() => {})
+    isLoading.value = false
   }
 
   async function fetchSummary(): Promise<void> {
-    try {
-      summary.value = await getGoalSummaryApi()
-    } catch (err) {
-      error.value = toMessage(err, 'No se pudo obtener el resumen de metas.')
-    }
+    await fetchWithOfflineCache<GoalSummary>({
+      isCachingEnabled: isCachingEnabled(),
+      cacheKey: GOALS_SUMMARY_CACHE_KEY,
+      fetchFn: getGoalSummaryApi,
+      onSuccess: (data) => {
+        summary.value = data
+      },
+      onCacheFallback: (data) => {
+        if (summary.value === null) summary.value = data
+      },
+      onRealError: (message) => {
+        error.value = message
+      },
+    }).catch(() => {})
   }
 
   async function fetchPendingCheckIns(): Promise<void> {
-    try {
-      pendingCheckIns.value = await getPendingCheckInsApi()
-    } catch (err) {
-      error.value = toMessage(err, 'No se pudieron obtener los chequeos pendientes.')
-    }
+    await fetchWithOfflineCache<PendingCheckIn[]>({
+      isCachingEnabled: isCachingEnabled(),
+      cacheKey: GOALS_PENDING_CHECKINS_CACHE_KEY,
+      fetchFn: getPendingCheckInsApi,
+      onSuccess: (data) => {
+        pendingCheckIns.value = data
+      },
+      onCacheFallback: (data) => {
+        if (pendingCheckIns.value.length === 0) pendingCheckIns.value = data
+      },
+      onRealError: (message) => {
+        error.value = message
+      },
+    }).catch(() => {})
   }
 
   // Se pide una sola vez al montar la pantalla (no cambia con las mutaciones de
   // metas) - promedio de ingresos/gastos reales, solo informativo.
   async function fetchSavingsCapacity(): Promise<void> {
-    try {
-      savingsCapacity.value = await getSavingsCapacityApi()
-    } catch (err) {
-      error.value = toMessage(err, 'No se pudo obtener el promedio de ingresos y gastos.')
-    }
+    await fetchWithOfflineCache<SavingsCapacity>({
+      isCachingEnabled: isCachingEnabled(),
+      cacheKey: GOALS_SAVINGS_CAPACITY_CACHE_KEY,
+      fetchFn: getSavingsCapacityApi,
+      onSuccess: (data) => {
+        savingsCapacity.value = data
+      },
+      onCacheFallback: (data) => {
+        if (savingsCapacity.value === null) savingsCapacity.value = data
+      },
+      onRealError: (message) => {
+        error.value = message
+      },
+    }).catch(() => {})
   }
 
   async function fetchWalletCommitments(): Promise<void> {
-    try {
-      const commitments = await getWalletCommitmentsApi()
-      walletCommitments.value = Object.fromEntries(commitments.map((c) => [c.walletId, c.committedAmount]))
-    } catch (err) {
-      error.value = toMessage(err, 'No se pudo obtener lo comprometido por billetera.')
-    }
+    await fetchWithOfflineCache<WalletCommitment[]>({
+      isCachingEnabled: isCachingEnabled(),
+      cacheKey: GOALS_WALLET_COMMITMENTS_CACHE_KEY,
+      fetchFn: getWalletCommitmentsApi,
+      onSuccess: (data) => {
+        walletCommitments.value = Object.fromEntries(data.map((c) => [c.walletId, c.committedAmount]))
+      },
+      onCacheFallback: (data) => {
+        if (Object.keys(walletCommitments.value).length === 0) {
+          walletCommitments.value = Object.fromEntries(data.map((c) => [c.walletId, c.committedAmount]))
+        }
+      },
+      onRealError: (message) => {
+        error.value = message
+      },
+    }).catch(() => {})
   }
 
   // Refresca lista + resumen + chequeos pendientes + comprometido por billetera tras

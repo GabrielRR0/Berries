@@ -13,11 +13,25 @@ vi.mock('../../../services/categories/categories.service', () => ({
   deleteCategory: vi.fn(),
   hideCategory: vi.fn(),
   unhideCategory: vi.fn(),
+  CategoriesApiError: class CategoriesApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
 }))
 
 vi.mock('../../../services/transactions/transactions.service', () => ({
   confirmDraft: vi.fn(),
   discardDraft: vi.fn(),
+  TransactionsApiError: class TransactionsApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
 }))
 
 const CASH_USD = { id: 'wallet-cash', name: 'Cash', currency: 'USD', balance: 100, createdAt: '2026-08-01T00:00:00Z' }

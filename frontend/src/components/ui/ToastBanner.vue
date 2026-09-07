@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { useToast } from '../../composables/toast/useToast'
 
-// Aviso flotante tipo notificacion de iPhone - pedido explicito del usuario:
-// "que aparece arriba en el medio que desliza de arriba a abajo y despues
-// cuando termina, suba". Vive una sola vez en App.vue (mismo criterio que
+// Aviso flotante centrado arriba de la pantalla, que se desliza al aparecer
+// y desaparecer. Vive una sola vez en App.vue (mismo criterio que
 // BottomTabBar) para que cualquier pantalla pueda dispararlo via useToast().
 const { active } = useToast()
 </script>

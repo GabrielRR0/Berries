@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { fetchWithOfflineCache } from '../composables/offline/useCachedFetch'
 import {
   createWallet,
   deleteWallet,
@@ -8,7 +9,10 @@ import {
   updateTransfer as updateTransferRequest,
 } from '../services/wallets/wallets.service'
 import type { TransferParams, TransferUpdateParams, Wallet } from '../services/wallets/interfaces/wallets.interface'
+import { useOfflineCachePreferencesStore } from './offlineCachePreferences.store'
 import { useTransactionsStore } from './transactions.store'
+
+const WALLETS_CACHE_KEY = 'berry_cache_wallets'
 
 // Estado global/cross-cutting de wallets (lista de cuentas del usuario) -
 // igual criterio que auth.store.ts: llama directo al service y guarda el
@@ -50,18 +54,24 @@ export const useWalletsStore = defineStore('wallets', () => {
 
     isLoading.value = true
     error.value = null
-    inFlightFetch = (async () => {
-      try {
-        wallets.value = await listWallets()
+    inFlightFetch = fetchWithOfflineCache<Wallet[]>({
+      isCachingEnabled: useOfflineCachePreferencesStore().preferences.wallets,
+      cacheKey: WALLETS_CACHE_KEY,
+      fetchFn: listWallets,
+      onSuccess: (data) => {
+        wallets.value = data
         lastFetchedAt = Date.now()
-      } catch (err) {
-        error.value = err instanceof Error ? err.message : 'No se pudieron cargar las billeteras.'
-        throw err
-      } finally {
-        isLoading.value = false
-        inFlightFetch = null
-      }
-    })()
+      },
+      onCacheFallback: (data) => {
+        if (wallets.value.length === 0) wallets.value = data
+      },
+      onRealError: (message) => {
+        error.value = message
+      },
+    }).finally(() => {
+      isLoading.value = false
+      inFlightFetch = null
+    })
     return inFlightFetch
   }
 

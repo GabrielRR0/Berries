@@ -1,5 +1,7 @@
+import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  CategoriesApiError,
   createCategory,
   deleteCategory,
   hideCategory,
@@ -15,6 +17,13 @@ vi.mock('../../../services/categories/categories.service', () => ({
   deleteCategory: vi.fn(),
   hideCategory: vi.fn(),
   unhideCategory: vi.fn(),
+  CategoriesApiError: class CategoriesApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
 }))
 
 const DEFAULT_CATEGORY: Category = { id: 'cat-1', name: 'Mercado', kind: 'expense', isDefault: true, isHidden: false }
@@ -22,6 +31,8 @@ const CUSTOM_CATEGORY: Category = { id: 'cat-2', name: 'Mascotas', kind: 'expens
 
 describe('useCategories', () => {
   beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
     vi.mocked(listCategories).mockReset().mockResolvedValue([DEFAULT_CATEGORY])
     vi.mocked(createCategory).mockReset()
     vi.mocked(deleteCategory).mockReset()
@@ -58,13 +69,23 @@ describe('useCategories', () => {
       expect(listCategories).toHaveBeenCalledWith('expense', true)
     })
 
-    it('guarda el mensaje de error si el servicio falla', async () => {
-      vi.mocked(listCategories).mockRejectedValue(new Error('fallo de red'))
+    it('guarda el mensaje de error si el backend rechaza el pedido', async () => {
+      vi.mocked(listCategories).mockRejectedValue(new CategoriesApiError('no autorizado', 401))
       const { categories, error, fetchCategories } = useCategories()
 
       await fetchCategories()
 
-      expect(error.value).toBe('fallo de red')
+      expect(error.value).toBe('no autorizado')
+      expect(categories.value).toEqual([])
+    })
+
+    it('sin cache guardada, una falla de conexion no llena error (deja la lista vacia)', async () => {
+      vi.mocked(listCategories).mockRejectedValue(new TypeError('Failed to fetch'))
+      const { categories, error, fetchCategories } = useCategories()
+
+      await fetchCategories()
+
+      expect(error.value).toBeNull()
       expect(categories.value).toEqual([])
     })
   })

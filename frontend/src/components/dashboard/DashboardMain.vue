@@ -9,7 +9,6 @@ import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
 import BaseCard from '../ui/BaseCard.vue'
 import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import TransactionList from '../transactions/TransactionList.vue'
-import PendingSyncSection from '../offline/PendingSyncSection.vue'
 import BalanceCard from './BalanceCard.vue'
 import IncomeExpenseSummary from './IncomeExpenseSummary.vue'
 import QuickActionsGrid from './QuickActionsGrid.vue'
@@ -58,7 +57,6 @@ onUnmounted(closeTour)
            identico a como era antes. -->
       <div class="dashboard-col dashboard-col-primary">
         <BalanceCard class="dashboard-section" />
-        <PendingSyncSection class="dashboard-section" />
         <QuickActionsGrid class="dashboard-section" />
       </div>
 
