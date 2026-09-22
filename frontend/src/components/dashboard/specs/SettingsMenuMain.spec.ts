@@ -63,7 +63,7 @@ describe('SettingsMenuMain - header e iconos', () => {
     const wrapper = mount(SettingsMenuMain)
 
     const items = wrapper.findAll('.menu-item')
-    expect(items).toHaveLength(6)
+    expect(items).toHaveLength(7)
     for (const item of items) {
       expect(item.find('.icon-badge svg').exists()).toBe(true)
     }

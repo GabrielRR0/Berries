@@ -8,7 +8,15 @@ Comandos:
     python manage.py migrate:rollback         # alembic downgrade -1
     python manage.py make:migration "mensaje" # alembic revision --autogenerate -m "mensaje"
     python manage.py seed:demo [--reset]      # crea/reseedea el usuario demo con datos falsos
-    python manage.py backfill:reference-amounts  # rellena reference_amount_usd de transactions viejas
+    python manage.py backfill:reference-amounts [--dry-run]  # rellena/reconcilia currency_id,
+        # reference_amount_usd y reference_rate de transactions viejas - puede MODIFICAR valores ya
+        # existentes (no solo NULLs), ver backfill_reference_amounts en transaction_service.py.
+        # --dry-run hace el mismo trabajo pero termina en rollback, para revisar el reporte de
+        # cambios antes de tocar datos reales (recomendado correrlo así primero, contra una copia).
+    python manage.py backfill:vef-rate-history [--months N]  # trae el histórico REAL de la
+        # tasa oficial (BCV) de los últimos N meses (12 por default) vía dolarapi.com e inserta
+        # los días que todavía no existan en ExchangeRate - idempotente, ver
+        # backfill_historical_vef_rates en currency_service.py.
 """
 
 import argparse
@@ -75,18 +83,43 @@ def cmd_seed_demo(args: argparse.Namespace) -> None:
         db.close()
 
 
-def cmd_backfill_reference_amounts(_args: argparse.Namespace) -> None:
+def cmd_backfill_reference_amounts(args: argparse.Namespace) -> None:
     # Pedido explícito del usuario, con captura real: en Movimientos vio transactions
     # viejas en VEF (creadas antes de que reference_amount_usd existiera) sin ningún
     # valor de referencia. Corre sobre TODO el sistema (no un usuario en particular) -
-    # ver backfill_reference_amounts en transaction_service.py.
+    # ver backfill_reference_amounts en transaction_service.py, que ahora también
+    # reconcilia (no solo rellena) valores ya existentes que quedaron mal calculados
+    # por el fallback roto de get_rate_at, corregido en esta misma tanda de cambios.
     from app.core.database import SessionLocal
     from app.services.transactions.transaction_service import backfill_reference_amounts
 
     db = SessionLocal()
     try:
-        updated = backfill_reference_amounts(db)
-        print(f"{updated} transacciones actualizadas con su valor de referencia en USD.")
+        report = backfill_reference_amounts(db, dry_run=args.dry_run)
+        mode = "[DRY RUN, nada se guardó] " if args.dry_run else ""
+        print(f"{mode}{report['currency_id_filled']} transacciones con currency_id rellenado.")
+        print(f"{mode}{report['reference_filled']} transacciones con reference_amount_usd/reference_rate rellenado (antes NULL).")
+        print(f"{mode}{report['reference_reconciled']} transacciones con reference_amount_usd/reference_rate CORREGIDO (valor previo distinto).")
+        for change in report["changes"]:
+            print(
+                f"  - transaction {change['transaction_id']} (usuario {change['user_id']}, {change['currency']}): "
+                f"{change['old_reference_amount_usd']} -> {change['new_reference_amount_usd']} USD"
+            )
+    finally:
+        db.close()
+
+
+def cmd_backfill_vef_rate_history(args: argparse.Namespace) -> None:
+    # Pedido explícito del usuario: "buscar registros anteriores... de hace un año
+    # para acá" - dolarapi.com ya tiene el histórico real completo, solo hacía falta
+    # traerlo. Ver backfill_historical_vef_rates en currency_service.py.
+    from app.core.database import SessionLocal
+    from app.services.currency.currency_service import backfill_historical_vef_rates
+
+    db = SessionLocal()
+    try:
+        inserted = backfill_historical_vef_rates(db, months=args.months)
+        print(f"{inserted} días nuevos de historial VEF/USD agregados (últimos {args.months} meses).")
     finally:
         db.close()
 
@@ -108,9 +141,24 @@ def main() -> None:
     seed_demo.add_argument("--reset", action="store_true", help="Borra el usuario demo existente antes de crearlo")
     seed_demo.set_defaults(func=cmd_seed_demo)
 
-    subparsers.add_parser(
-        "backfill:reference-amounts", help="Rellena reference_amount_usd de transactions creadas antes de este campo"
-    ).set_defaults(func=cmd_backfill_reference_amounts)
+    backfill_reference_amounts = subparsers.add_parser(
+        "backfill:reference-amounts",
+        help="Rellena/reconcilia currency_id, reference_amount_usd y reference_rate de transactions viejas "
+        "(puede modificar valores ya existentes, no solo NULLs)",
+    )
+    backfill_reference_amounts.add_argument(
+        "--dry-run", action="store_true", help="Solo reporta los cambios, no los guarda (rollback al final)"
+    )
+    backfill_reference_amounts.set_defaults(func=cmd_backfill_reference_amounts)
+
+    backfill_vef_rate_history = subparsers.add_parser(
+        "backfill:vef-rate-history",
+        help="Trae el histórico real de la tasa oficial (BCV) vía dolarapi.com e inserta los días que falten",
+    )
+    backfill_vef_rate_history.add_argument(
+        "--months", type=int, default=12, help="Cuántos meses hacia atrás traer (default 12)"
+    )
+    backfill_vef_rate_history.set_defaults(func=cmd_backfill_vef_rate_history)
 
     args = parser.parse_args()
     args.func(args)

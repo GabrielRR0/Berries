@@ -69,6 +69,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/tasas',
+      name: 'tasas',
+      component: () => import('../components/rates/RatesMain.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/metas',
       name: 'metas',
       component: () => import('../components/goals/GoalsMain.vue'),

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from sqlalchemy import select
 
+from app.models.currency.exchange_rate_model import ExchangeRate
 from app.models.transactions.transaction_model import Transaction
 from app.models.wallets.wallet_model import Wallet
 from app.services.wallets.errors import CurrencyMismatchError, InsufficientBalanceError, TransferNotFoundError
@@ -13,6 +14,66 @@ from app.services.wallets.wallet_service import get_wallet_owned_by_user
 
 TRANSFER_CATEGORY = "Transferencia"
 FEE_CATEGORY = "Comisión"
+TRANSFER_RATE_SOURCE = "user-transfer"
+
+
+def _record_transfer_rate_observation(
+    db: Session,
+    transfer_id: uuid.UUID,
+    from_wallet: Wallet,
+    to_wallet: Wallet,
+    amount: Decimal,
+    credit_amount: Decimal,
+    occurred_at: datetime,
+) -> None:
+    """Congela la tasa IMPLÍCITA real de una transferencia entre monedas distintas
+    (ej. cuántos bolívares dieron por USDT ese día/hora) - pedido explícito del
+    usuario: "quiero que se guarden este tipo de registros adicionales para
+    análisis, de cuánto estaba aprox el usdt ese día y a esa hora". No es una tasa
+    de mercado genérica (BCV, Open Exchange Rates...) sino la que el usuario
+    obtuvo DE VERDAD en esa operación puntual - más real que cualquier fetch de
+    API, así que se guarda con is_estimated=False.
+
+    Usa la MISMA tabla ExchangeRate (ya es un log histórico append-only) en vez de
+    una tabla nueva - el par (from.currency, to.currency) es distinto del par que
+    usa la tasa oficial (ej. USD/VEF), así que nunca se mezclan ni se pisan entre
+    sí. Guarda ambas direcciones, mismo criterio que refresh_all_active_currencies
+    en currency_service.py. rate = "cuántas unidades de quote equivalen a 1 de
+    base" (misma convención que el resto de ExchangeRate).
+
+    transfer_id vincula esta fila con la transferencia que la generó - permite que
+    update_transfer la corrija en vez de acumular una nueva cada vez que se edita
+    un monto, y que delete_transaction la borre junto con el resto."""
+    if amount == 0:
+        return
+    db.add(
+        ExchangeRate(
+            base_currency_id=from_wallet.currency_id,
+            quote_currency_id=to_wallet.currency_id,
+            rate=credit_amount / amount,
+            fetched_at=occurred_at,
+            source=TRANSFER_RATE_SOURCE,
+            is_estimated=False,
+            transfer_id=transfer_id,
+        )
+    )
+    if credit_amount != 0:
+        db.add(
+            ExchangeRate(
+                base_currency_id=to_wallet.currency_id,
+                quote_currency_id=from_wallet.currency_id,
+                rate=amount / credit_amount,
+                fetched_at=occurred_at,
+                source=TRANSFER_RATE_SOURCE,
+                is_estimated=False,
+                transfer_id=transfer_id,
+            )
+        )
+
+
+def _delete_transfer_rate_observations(db: Session, transfer_id: uuid.UUID) -> None:
+    for row in db.scalars(select(ExchangeRate).where(ExchangeRate.transfer_id == transfer_id)):
+        db.delete(row)
 
 
 def execute_transfer(
@@ -109,6 +170,11 @@ def execute_transfer(
             )
         )
 
+    if from_wallet.currency != to_wallet.currency:
+        _record_transfer_rate_observation(
+            db, transfer_id, from_wallet, to_wallet, amount, credit_amount, resolved_occurred_at
+        )
+
     db.commit()
     db.refresh(from_wallet)
     db.refresh(to_wallet)
@@ -196,6 +262,14 @@ def update_transfer(
             )
     elif fee_leg is not None:
         db.delete(fee_leg)
+
+    if from_wallet.currency != to_wallet.currency:
+        # Reemplaza la observación vieja por la corregida en vez de acumular una
+        # nueva cada vez que se edita el monto - las wallets (y por lo tanto el par
+        # de monedas) no se pueden cambiar acá, así que si existía una observación
+        # antes, sigue existiendo con el mismo par, solo cambia la tasa/fecha.
+        _delete_transfer_rate_observations(db, transfer_id)
+        _record_transfer_rate_observation(db, transfer_id, from_wallet, to_wallet, amount, credit_amount, occurred_at)
 
     db.commit()
     db.refresh(from_wallet)

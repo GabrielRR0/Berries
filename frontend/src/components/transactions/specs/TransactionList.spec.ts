@@ -173,6 +173,26 @@ describe('TransactionList', () => {
     expect(wrapper.find('.transaction-reference').exists()).toBe(false)
   })
 
+  // referenceRate (ver reference_rate/create_transaction del backend) - pedido
+  // explicito del usuario: "que se entienda a que tasa se calcula", no solo mostrar
+  // el monto ya convertido.
+  it('muestra la tasa usada cuando el backend la trae', () => {
+    const walletVef = { id: 'wallet-3', name: 'Banco Vnz', currency: 'VEF', balance: 0, createdAt: '2026-08-01T00:00:00Z' }
+    const expenseInVef = {
+      ...MANUAL_EXPENSE,
+      walletId: walletVef.id,
+      referenceAmountUsd: 5.1,
+      referenceRate: 841.6,
+    }
+    const wrapper = mount(TransactionList, {
+      props: { transactions: [expenseInVef], wallets: [...WALLETS, walletVef] },
+    })
+
+    const text = wrapper.find('.transaction-reference').text()
+    expect(text).toContain('tasa:')
+    expect(text).toContain('por USD')
+  })
+
   // Si un filtro externo (busqueda, categoria) deja visible solo UNA pata de
   // una transferencia, se muestra suelta en vez de forzar una fusion a
   // medias - mismo tratamiento neutro que la card fusionada.

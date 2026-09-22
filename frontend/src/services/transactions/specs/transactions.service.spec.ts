@@ -39,12 +39,14 @@ const TRANSACTION_MAPPED = {
   walletId: 'wallet-1',
   type: 'expense',
   amount: 25.99,
+  currency: null,
   category: 'comida',
   description: 'Almuerzo',
   occurredAt: '2026-08-01T12:00:00Z',
   source: 'manual',
   transferId: null,
   referenceAmountUsd: null,
+  referenceRate: null,
   createdAt: '2026-08-01T12:00:01Z',
 }
 
@@ -146,6 +148,19 @@ describe('transactions.service', () => {
       const result = await createTransaction({ walletId: 'wallet-1', type: 'expense', amount: 4082, category: 'Mercado' })
 
       expect(result.referenceAmountUsd).toBe(12.04)
+    })
+
+    // Mismo criterio que reference_amount_usd: reference_rate/currency son Decimal/FK
+    // resuelto del backend, viajan como string|null - se normalizan a number|null.
+    it('mapea currency y reference_rate cuando el backend los trae', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        mockResponse({ ...TRANSACTION_WIRE, currency: 'VEF', reference_rate: '841.60' }, { status: 201 }),
+      )
+
+      const result = await createTransaction({ walletId: 'wallet-1', type: 'expense', amount: 4082, category: 'Mercado' })
+
+      expect(result.currency).toBe('VEF')
+      expect(result.referenceRate).toBe(841.6)
     })
 
     it('lanza TransactionsApiError en 400 de validacion', async () => {

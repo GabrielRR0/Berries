@@ -11,6 +11,7 @@ from app.models.goals.goal_model import Goal
 from app.schemas.goals.goal_schemas import GoalResponse, GoalType, Status
 from app.services.analytics.analytics_service import get_monthly_comparison
 from app.services.currency.currency_lookup import get_currency_by_code
+from app.services.currency.currency_service import get_conversion_rate
 from app.services.goals.contribution_calculator import compute_monthly_contribution
 from app.services.goals.errors import GoalNotActiveError, GoalNotFoundError, GoalValidationError
 from app.services.goals.wallet_commitment_service import validate_and_get_wallet_for_commitment
@@ -149,10 +150,25 @@ def delete_goal(db: Session, goal_id: uuid.UUID, user_id: uuid.UUID) -> None:
 def get_goal_summary(db: Session, user_id: uuid.UUID) -> dict[str, Decimal]:
     """Suma simple sobre metas ACTIVAS unicamente - una meta completada o abandonada ya
     no aporta a "cuanto falta reunir en total", mismo criterio de alcance que
-    get_debt_summary (que tambien excluye lo que ya no esta pendiente)."""
+    get_debt_summary (que tambien excluye lo que ya no esta pendiente).
+
+    Bug real de la misma familia que el de analytics_service.py: cada Goal puede tener
+    su propia moneda (Goal.currency_id), así que sumar total_saved/target_amount crudos
+    de metas en monedas distintas mezclaba números sin convertir. Se convierte cada
+    meta a User.default_currency antes de sumar - con la tasa EN VIVO (get_conversion_rate,
+    no _at): a diferencia de una Transaction ya ocurrida, una meta es un valor que
+    existe HOY (cuánto llevás ahorrado / cuánto falta ahora), no un hecho histórico que
+    deba congelarse - mismo criterio que un balance de wallet."""
+    user = db.get(User, user_id)
+    target_currency = user.default_currency if user else "USD"
     goals = list_goals_for_user(db, user_id, status="active")
-    total_saved = sum((g.total_saved for g in goals), Decimal("0"))
-    total_target = sum((g.target_amount for g in goals), Decimal("0"))
+
+    total_saved = Decimal("0")
+    total_target = Decimal("0")
+    for goal in goals:
+        rate = Decimal("1") if goal.currency == target_currency else get_conversion_rate(db, goal.currency, target_currency)
+        total_saved += goal.total_saved * rate
+        total_target += goal.target_amount * rate
     return {"total_saved": total_saved, "total_target": total_target}
 
 

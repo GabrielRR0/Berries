@@ -1,10 +1,12 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import * as currencyService from '../../../services/currency/currency.service'
+import * as analyticsService from '../../../services/analytics/analytics.service'
 import * as transactionsService from '../../../services/transactions/transactions.service'
 import * as walletsService from '../../../services/wallets/wallets.service'
-import { useCurrencyStore } from '../../../stores/currency.store'
+import type { AuthUser } from '../../../services/auth/interfaces/auth.interface'
+import { useAuthStore } from '../../../stores/auth.store'
+import MonthPager from '../../ui/MonthPager.vue'
 import TransactionsMain from '../TransactionsMain.vue'
 
 vi.mock('vue-router', () => ({
@@ -12,101 +14,71 @@ vi.mock('vue-router', () => ({
 }))
 
 const now = new Date()
-function thisMonthDate(day: number): string {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T12:00:00Z`
+const CURRENT_PERIOD = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+const USD_WALLET = { id: 'wallet-usd', name: 'Facebank', currency: 'USD', balance: 100, createdAt: '2026-08-01T00:00:00Z' }
+
+function periodSummary(totalIncome: number, totalExpense: number) {
+  return {
+    period: CURRENT_PERIOD,
+    totalIncome,
+    totalExpense,
+    netSavings: totalIncome - totalExpense,
+    previousPeriodNetSavings: 0,
+  }
 }
 
-const USD_WALLET = { id: 'wallet-usd', name: 'Facebank', currency: 'USD', balance: 100, createdAt: thisMonthDate(1) }
-const VEF_WALLET = { id: 'wallet-vef', name: 'Banco Vnz', currency: 'VEF', balance: 100, createdAt: thisMonthDate(1) }
-
 // Bug real reportado por el usuario, con captura: las boxes de Ingresos/Gastos de
-// Movimientos (a diferencia de las de Inicio, ya arregladas antes) sumaban el monto
-// crudo de cada movimiento sin convertir - un gasto de 31.187 VEF aparecía como
-// "31.187,00 €" apenas la moneda de visualización activa era EUR. Una Transaction no
-// trae su propia moneda (solo wallet_id): hay que resolverla por su wallet y convertir
-// antes de sumar (ver walletCurrency/sumConverted en TransactionsMain.vue).
-describe('TransactionsMain - conversión de moneda en las boxes de Ingresos/Gastos', () => {
+// Movimientos (a diferencia de las de Inicio, ya arregladas antes) recalculaban su
+// propio total agrupando por moneda y convirtiendo con la tasa EN VIVO - un camino
+// totalmente distinto al que ya usa Análisis (get_period_summary, tasa histórica
+// congelada por transacción). Ahora Movimientos simplemente pide el mismo resumen que
+// Análisis, para el mes activo del pager, en vez de reimplementar su propia suma.
+describe('TransactionsMain - boxes de Ingresos/Gastos usan el mismo resumen que Análisis', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.spyOn(transactionsService, 'listDrafts').mockResolvedValue([])
-    vi.spyOn(walletsService, 'listWallets').mockResolvedValue([USD_WALLET, VEF_WALLET])
+    vi.spyOn(transactionsService, 'listTransactions').mockResolvedValue([])
+    vi.spyOn(walletsService, 'listWallets').mockResolvedValue([USD_WALLET])
+    useAuthStore().user = {
+      id: 'user-1',
+      email: 'ana@example.com',
+      displayName: 'Ana',
+      defaultCurrency: 'USD',
+      createdAt: '2026-08-01T00:00:00Z',
+    } satisfies AuthUser
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it('convierte los gastos de una wallet en otra moneda antes de sumarlos, en vez de sumar el monto crudo', async () => {
-    vi.spyOn(transactionsService, 'listTransactions').mockResolvedValue([
-      {
-        id: 'tx-1',
-        walletId: VEF_WALLET.id,
-        type: 'expense',
-        amount: 4082,
-        category: 'Mercado',
-        description: null,
-        occurredAt: thisMonthDate(5),
-        source: 'manual',
-        transferId: null,
-        referenceAmountUsd: null,
-        createdAt: thisMonthDate(5),
-      },
-      {
-        id: 'tx-2',
-        walletId: USD_WALLET.id,
-        type: 'expense',
-        amount: 40,
-        category: 'Transporte',
-        description: null,
-        occurredAt: thisMonthDate(7),
-        source: 'manual',
-        transferId: null,
-        referenceAmountUsd: null,
-        createdAt: thisMonthDate(7),
-      },
-    ])
-    // 4082 VEF -> 5.10 USD (tasa ficticia del test) + 40 USD directos = 45.10 USD.
-    vi.spyOn(currencyService, 'convertAmount').mockImplementation(async (amount, from, to) => {
-      if (from === 'VEF' && to === 'USD') return { convertedAmount: amount / 800, rateUsed: 1 / 800 }
-      throw new Error(`conversión no mockeada: ${from} -> ${to}`)
-    })
-    useCurrencyStore().setDisplayCurrency('USD')
+  it('pide getPeriodSummary con el mes activo del pager y muestra sus totales', async () => {
+    const getPeriodSummarySpy = vi
+      .spyOn(analyticsService, 'getPeriodSummary')
+      .mockResolvedValue(periodSummary(1000, 45.1))
 
     const wrapper = mount(TransactionsMain)
     await flushPromises()
-    await flushPromises() // deja resolver el recompute async encadenado (convert -> sum)
 
+    expect(getPeriodSummarySpy).toHaveBeenCalledWith(CURRENT_PERIOD)
     const amounts = wrapper.findAll('.summary-amount').map((el) => el.text())
-    // 4082/800 + 40 = 5.1025 + 40 = 45.1025 -> nunca 4082 + 40 = 4122 (el bug real).
+    expect(amounts.some((text) => /1,000|1000/.test(text))).toBe(true)
     expect(amounts.some((text) => /45\.10/.test(text))).toBe(true)
-    expect(amounts.some((text) => text.includes('4122') || text.includes('4,122'))).toBe(false)
   })
 
-  it('no mezcla monedas: una wallet en la MISMA moneda que el display no pasa por convert()', async () => {
-    vi.spyOn(transactionsService, 'listTransactions').mockResolvedValue([
-      {
-        id: 'tx-1',
-        walletId: USD_WALLET.id,
-        type: 'income',
-        amount: 1000,
-        category: 'Salario',
-        description: null,
-        occurredAt: thisMonthDate(2),
-        source: 'manual',
-        transferId: null,
-        referenceAmountUsd: null,
-        createdAt: thisMonthDate(2),
-      },
-    ])
-    const convertSpy = vi.spyOn(currencyService, 'convertAmount')
-    useCurrencyStore().setDisplayCurrency('USD')
+  it('vuelve a pedir el resumen al cambiar de mes con el pager', async () => {
+    const getPeriodSummarySpy = vi.spyOn(analyticsService, 'getPeriodSummary').mockResolvedValue(periodSummary(0, 0))
 
     const wrapper = mount(TransactionsMain)
     await flushPromises()
+    getPeriodSummarySpy.mockClear()
+
+    await wrapper.findComponent(MonthPager).vm.$emit('change', now.getFullYear(), now.getMonth() - 1)
     await flushPromises()
 
-    expect(convertSpy).not.toHaveBeenCalled()
-    const amounts = wrapper.findAll('.summary-amount').map((el) => el.text())
-    expect(amounts.some((text) => /1,000\.00|1000/.test(text))).toBe(true)
+    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const previousPeriod = `${previousMonth.getFullYear()}-${String(previousMonth.getMonth() + 1).padStart(2, '0')}`
+    expect(getPeriodSummarySpy).toHaveBeenCalledWith(previousPeriod)
   })
 })

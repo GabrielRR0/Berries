@@ -86,3 +86,49 @@ def test_convert_accepts_zero_amount(client):
 
     assert response.status_code == 200
     assert float(response.json()["converted_amount"]) == 0.0
+
+
+def test_history_returns_points_with_source_and_is_estimated(client):
+    token = _register(client)
+
+    # Cualquier conversion involucrando VEF ya deja al menos una fila en ExchangeRate
+    # (get_fresh_rate la crea on-demand) - alcanza para tener algo que listar.
+    client.get("/api/currency/convert", params={"amount": "1", "from": "USD", "to": "VEF"}, headers=_auth_headers(token))
+
+    response = client.get("/api/currency/history", params={"code": "VEF"}, headers=_auth_headers(token))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["code"] == "VEF"
+    assert body["quote"] == "USD"  # default de "against"
+    assert len(body["points"]) >= 1
+    point = body["points"][0]
+    assert "source" in point
+    assert "is_estimated" in point
+
+
+def test_history_against_usdt_defaults_to_empty_without_transfers(client):
+    token = _register(client)
+
+    response = client.get(
+        "/api/currency/history", params={"code": "VEF", "against": "USDT"}, headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["quote"] == "USDT"
+    assert body["points"] == []
+
+
+def test_history_rejects_unsupported_currency(client):
+    token = _register(client)
+
+    response = client.get("/api/currency/history", params={"code": "XXX"}, headers=_auth_headers(token))
+
+    assert response.status_code == 400
+
+
+def test_history_requires_auth(client):
+    response = client.get("/api/currency/history", params={"code": "VEF"})
+
+    assert response.status_code == 401

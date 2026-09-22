@@ -161,6 +161,20 @@ def test_get_goal_summary_only_counts_active_goals(db):
     assert summary["total_saved"] == Decimal("0")
 
 
+def test_get_goal_summary_converts_goals_in_different_currencies_before_summing(db):
+    """Bug real de la misma familia que analytics_service.py: cada Goal puede tener su
+    propia moneda - sumar total_target crudo de una meta en USD y otra en VEF sin
+    convertir mezclaba números sin sentido (240 + 3650 = 3890, en vez de 240 + 100)."""
+    user = register_user(db, "ana@example.com", "clave12345", "Ana")  # default_currency USD
+    create_goal(db, user.id, "TV", Decimal("240"), "USD", _FUTURE)
+    # Fallback documentado: 1 USD = 36.5 VEF (ver test_currency_service.py).
+    create_goal(db, user.id, "Moto", Decimal("3650"), "VEF", _FUTURE)
+
+    summary = get_goal_summary(db, user.id)
+
+    assert round(summary["total_target"], 2) == Decimal("340")  # 240 + (3650 VEF -> 100 USD)
+
+
 def test_build_goal_response_includes_suggested_contribution_and_no_postponement_flag(db):
     goal = create_goal(db, uuid.uuid4(), "TV", Decimal("240"), "USD", date.today() + timedelta(days=89))
 

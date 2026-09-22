@@ -76,7 +76,14 @@ def _mock_vef_rate(monkeypatch):
     de los tests ya esperaban de VEF. Los tests de venezuela_rate_client.py que SÍ
     prueban el parseo real / el fallback ante error mockean httpx.get directamente,
     parcheando la función en su propio módulo - no dependen de este mock global."""
-    monkeypatch.setattr("app.services.currency.rates.cache_refresh.fetch_vef_rate", lambda: Decimal("36.5"))
+    monkeypatch.setattr("app.services.currency.rates.cache_refresh.fetch_vef_rate", lambda: (Decimal("36.5"), False))
+    # Mismo criterio para el histórico (fetch_vef_rate_history, usado por
+    # backfill_historical_vef_rates - ver currency_service.py): sin este mock,
+    # cualquier test que dispare refresh_all_active_currencies con VEF activo
+    # terminaría pegándole de verdad al endpoint histórico de dolarapi.com. Vacío por
+    # default (ningún día nuevo) - los tests que SÍ prueban el backfill lo mockean
+    # explícitamente con datos propios.
+    monkeypatch.setattr("app.services.currency.currency_service.fetch_vef_rate_history", lambda: [])
     yield
 
 

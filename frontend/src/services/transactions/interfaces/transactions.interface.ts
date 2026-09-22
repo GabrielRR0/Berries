@@ -11,6 +11,13 @@ export interface Transaction {
   walletId: string
   type: TransactionType
   amount: number
+  // Snapshot de la moneda de la wallet al crear/editar (ver transaction_model.py del
+  // backend) - null solo en filas viejísimas que un backfill todavía no alcanzó a
+  // rellenar. Fuente de verdad para saber en qué moneda está esta transacción, en vez
+  // de tener que cruzar walletId contra la lista de wallets. Opcional (no solo
+  // `| null`), mismo criterio que referenceRate más abajo: no forzar a tocar los specs
+  // existentes que ya construyen un Transaction a mano sin este campo.
+  currency?: string | null
   // Valor congelado en USD al momento de crear la transacción (ver
   // create_transaction del backend) - null si la wallet ya estaba en USD, o si la
   // conversión falló en su momento. Pedido explícito del usuario: para una wallet en
@@ -18,6 +25,11 @@ export interface Transaction {
   // de "cuánto era eso ese día", que nunca cambie con el paso del tiempo - a diferencia
   // de convertir "amount" en vivo con la tasa de HOY (ver TransactionList.vue).
   referenceAmountUsd: number | null
+  // Tasa congelada junto con referenceAmountUsd (moneda de la wallet por USD, ej. "Bs
+  // por USD") - para poder mostrarle al usuario a qué tasa se calculó, no solo el
+  // resultado ya convertido. Opcional (no solo `| null`): filas creadas antes de que
+  // este campo existiera en el backend no lo traen en absoluto.
+  referenceRate?: number | null
   category: string
   description: string | null
   occurredAt: string

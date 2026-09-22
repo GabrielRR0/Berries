@@ -3,16 +3,25 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
+from sqlalchemy import select
 
+from app.models.currency.exchange_rate_model import ExchangeRate
 from app.services.auth.auth_service import register_user
-from app.services.transactions.transaction_service import list_transactions_for_user
+from app.services.currency.currency_lookup import get_currency_by_code
+from app.services.transactions.transaction_service import delete_transaction, list_transactions_for_user
 from app.services.wallets.errors import (
     CurrencyMismatchError,
     InsufficientBalanceError,
     TransferNotFoundError,
     WalletNotFoundError,
 )
-from app.services.wallets.transfer_service import FEE_CATEGORY, TRANSFER_CATEGORY, execute_transfer, update_transfer
+from app.services.wallets.transfer_service import (
+    FEE_CATEGORY,
+    TRANSFER_CATEGORY,
+    TRANSFER_RATE_SOURCE,
+    execute_transfer,
+    update_transfer,
+)
 from app.services.wallets.wallet_service import create_wallet
 
 
@@ -337,3 +346,80 @@ def test_update_transfer_raises_not_found_for_another_users_transfer(db):
 
     with pytest.raises(TransferNotFoundError):
         update_transfer(db, user_b.id, transfer_id, Decimal("20.00"), datetime.now(timezone.utc))
+
+
+# --- tasa implícita real de una transferencia entre monedas distintas (pedido
+# explicito del usuario: "quiero que se guarden este tipo de registros adicionales
+# para análisis, de cuánto estaba aprox el usdt ese día y a esa hora") -----------
+
+
+def _rate_rows_for(db, transfer_id):
+    return list(db.scalars(select(ExchangeRate).where(ExchangeRate.transfer_id == transfer_id)))
+
+
+def test_transfer_cross_currency_records_the_implied_rate_both_directions(db):
+    user = _user(db)
+    usdt = _funded_wallet(db, user.id, "Binance", "USDT", "100.00")
+    bank = _funded_wallet(db, user.id, "Banco Vnz", "VEF", "0.00")
+    when = datetime(2026, 9, 20, 14, 30, tzinfo=timezone.utc)
+
+    execute_transfer(db, user.id, usdt.id, bank.id, Decimal("10"), converted_amount=Decimal("1900"), occurred_at=when)
+    transfer_id = _transfer_id_of(db, user.id)
+
+    rows = _rate_rows_for(db, transfer_id)
+    assert len(rows) == 2
+    usdt_currency = get_currency_by_code(db, "USDT")
+    vef_currency = get_currency_by_code(db, "VEF")
+
+    usdt_to_vef = next(r for r in rows if r.base_currency_id == usdt_currency.id)
+    assert usdt_to_vef.quote_currency_id == vef_currency.id
+    assert usdt_to_vef.rate == Decimal("190")  # 1900 VEF / 10 USDT
+    assert usdt_to_vef.source == TRANSFER_RATE_SOURCE
+    assert usdt_to_vef.is_estimated is False
+    assert usdt_to_vef.fetched_at.replace(tzinfo=timezone.utc) == when
+
+    vef_to_usdt = next(r for r in rows if r.base_currency_id == vef_currency.id)
+    assert vef_to_usdt.quote_currency_id == usdt_currency.id
+    # round(...,10): la columna es Numeric(24,10) y 10/1900 es periódica - mismo
+    # criterio que el resto de la suite (ver test_currency_service.py).
+    assert round(vef_to_usdt.rate, 10) == round(Decimal("10") / Decimal("1900"), 10)
+
+
+def test_transfer_same_currency_does_not_record_any_rate_observation(db):
+    user = _user(db)
+    cash = _funded_wallet(db, user.id, "Cash", "USD", "100.00")
+    bank = _funded_wallet(db, user.id, "Banco", "USD", "0.00")
+
+    execute_transfer(db, user.id, cash.id, bank.id, Decimal("40.00"))
+    transfer_id = _transfer_id_of(db, user.id)
+
+    assert _rate_rows_for(db, transfer_id) == []
+
+
+def test_update_transfer_cross_currency_replaces_the_rate_observation_instead_of_accumulating(db):
+    user = _user(db)
+    usdt = _funded_wallet(db, user.id, "Binance", "USDT", "100.00")
+    bank = _funded_wallet(db, user.id, "Banco Vnz", "VEF", "0.00")
+    execute_transfer(db, user.id, usdt.id, bank.id, Decimal("10"), converted_amount=Decimal("1900"))
+    transfer_id = _transfer_id_of(db, user.id)
+
+    update_transfer(db, user.id, transfer_id, Decimal("10"), datetime.now(timezone.utc), converted_amount=Decimal("2000"))
+
+    rows = _rate_rows_for(db, transfer_id)
+    assert len(rows) == 2  # no se acumularon 4 filas (2 viejas + 2 nuevas)
+    usdt_currency = get_currency_by_code(db, "USDT")
+    usdt_to_vef = next(r for r in rows if r.base_currency_id == usdt_currency.id)
+    assert usdt_to_vef.rate == Decimal("200")  # 2000/10, no la tasa vieja (190)
+
+
+def test_delete_transfer_removes_its_rate_observation(db):
+    user = _user(db)
+    usdt = _funded_wallet(db, user.id, "Binance", "USDT", "100.00")
+    bank = _funded_wallet(db, user.id, "Banco Vnz", "VEF", "0.00")
+    execute_transfer(db, user.id, usdt.id, bank.id, Decimal("10"), converted_amount=Decimal("1900"))
+    transfer_id = _transfer_id_of(db, user.id)
+    expense_leg = next(t for t in list_transactions_for_user(db, user.id) if t.wallet_id == usdt.id)
+
+    delete_transaction(db, expense_leg.id, user.id)
+
+    assert _rate_rows_for(db, transfer_id) == []

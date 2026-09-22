@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import type { Draft, Transaction } from '../../services/transactions/interfaces/transactions.interface'
-import { useCurrency } from '../../composables/currency/useCurrency'
+import { useAnalytics } from '../../composables/analytics/useAnalytics'
 import { useOnboardingTour } from '../../composables/onboarding/useOnboardingTour'
 import { useScrollIntoViewOnActive } from '../../composables/onboarding/useScrollIntoViewOnActive'
+import { useAuthStore } from '../../stores/auth.store'
 import { useTransactionsStore } from '../../stores/transactions.store'
 import { useWalletsStore } from '../../stores/wallets.store'
-import { useCurrencyStore } from '../../stores/currency.store'
 import ReceiptUpload from '../receiptScanner/ReceiptUpload.vue'
 import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
 import BaseCard from '../ui/BaseCard.vue'
@@ -44,9 +44,15 @@ const editingTransaction = ref<Transaction | null>(null)
 // pendientes" de Movimientos si el usuario no vuelve a abrir Inicio).
 const pendingDrafts = ref<Draft[]>([])
 
-const currencyStore = useCurrencyStore()
+const authStore = useAuthStore()
 const walletsStore = useWalletsStore()
-const { convert } = useCurrency()
+// Misma moneda que ya usa AnalyticsMain.vue para sus totales (no
+// currencyStore.displayCurrency, el selector manual de BalanceCard.vue) - el
+// backend calcula getPeriodSummary() fijo a User.default_currency, asi que la
+// etiqueta debe coincidir con eso. Efecto visible e intencional: el selector
+// USD/EUR/USDT deja de afectar estas dos cajas, solo sigue afectando balances.
+const displayCurrency = computed(() => authStore.user?.defaultCurrency ?? 'USD')
+const { periodSummary, fetchPeriodSummary } = useAnalytics()
 // Paso 2 del tour guiado de Inicio (ver BalanceCard.vue/useOnboardingTour.ts) -
 // pedido explicito del usuario: al tocar "Continuar" en el paso del balance,
 // sigue esta box.
@@ -87,52 +93,14 @@ const expenseTransactions = computed(() => monthTransactions.value.filter((t) =>
 // VEF se sumaba tal cual (monto crudo) junto con gastos en wallets USD/EUR/
 // USDT, y el total se mostraba con la moneda de visualizacion actual como si
 // TODO hubiera estado en esa moneda - ej. "5.560 VEF de gasto" aparecia como
-// "$5,560.00". Una Transaction no trae su propia moneda (solo wallet_id), asi
-// que hay que resolverla por su wallet y convertir ANTES de sumar - mismo
-// criterio que BalanceCard.vue usa para el balance total, solo que agrupando
-// por moneda antes de convertir (una llamada por moneda distinta presente
-// este mes, no una por transaccion).
-function walletCurrency(walletId: string): string {
-  return walletsStore.wallets.find((wallet) => wallet.id === walletId)?.currency ?? currencyStore.displayCurrency
-}
-
-async function sumConverted(transactions: Transaction[]): Promise<number> {
-  const target = currencyStore.displayCurrency
-  const subtotalByCurrency = new Map<string, number>()
-  for (const transaction of transactions) {
-    const currency = walletCurrency(transaction.walletId)
-    subtotalByCurrency.set(currency, (subtotalByCurrency.get(currency) ?? 0) + transaction.amount)
-  }
-
-  let total = 0
-  for (const [currency, subtotal] of subtotalByCurrency) {
-    if (currency === target) {
-      total += subtotal
-      continue
-    }
-    try {
-      const result = await convert(subtotal, currency, target)
-      total += result.convertedAmount
-    } catch {
-      // Best-effort, mismo criterio que BalanceCard.vue: si la conversion de
-      // ese grupo de moneda falla, no cuenta en el total en vez de romper
-      // el resto del calculo.
-    }
-  }
-  return total
-}
-
-const income = ref(0)
-const expenses = ref(0)
-
-async function recomputeTotals() {
-  income.value = await sumConverted(incomeTransactions.value)
-  expenses.value = await sumConverted(expenseTransactions.value)
-}
-
-watch([incomeTransactions, expenseTransactions, () => currencyStore.displayCurrency, () => walletsStore.wallets], recomputeTotals, {
-  immediate: true,
-})
+// "$5,560.00". Antes esta caja recalculaba su propio total agrupando por
+// moneda y convirtiendo con la tasa EN VIVO (ignorando la fecha real de cada
+// movimiento) - un camino totalmente distinto al que ya usa Analisis
+// (get_period_summary, tasa historica congelada por transaccion). Ahora las
+// dos cajas simplemente piden el mismo resumen que ya usa Analisis, para que
+// Inicio/Movimientos/Analisis muestren siempre el mismo numero.
+const income = computed(() => periodSummary.value?.totalIncome ?? 0)
+const expenses = computed(() => periodSummary.value?.totalExpense ?? 0)
 
 const sheetTitle = computed(() => (activeSheet.value === 'income' ? 'Ingresos de este mes' : 'Gastos de este mes'))
 const sheetTransactions = computed(() =>
@@ -143,6 +111,7 @@ onMounted(() => {
   transactionsStore.fetchTransactions().catch((error) => {
     loadError.value = error instanceof Error ? error.message : 'No se pudieron cargar los movimientos del mes.'
   })
+  fetchPeriodSummary()
 })
 
 function openSheet(type: 'income' | 'expense') {
@@ -163,6 +132,7 @@ function closeAddForm() {
 async function onDeleteTransaction(transactionId: string) {
   try {
     await transactionsStore.removeTransaction(transactionId)
+    fetchPeriodSummary()
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : 'No se pudo eliminar el movimiento.'
   }
@@ -170,6 +140,7 @@ async function onDeleteTransaction(transactionId: string) {
 
 function onTransactionCreated(transaction: Transaction) {
   transactionsStore.recordCreated(transaction)
+  fetchPeriodSummary()
   closeAddForm()
 }
 
@@ -187,6 +158,7 @@ function onEditTransaction(transaction: Transaction) {
 
 function onTransactionUpdated(transaction: Transaction) {
   transactionsStore.recordUpdated(transaction)
+  fetchPeriodSummary()
   closeAddForm()
 }
 
@@ -196,6 +168,7 @@ function onDraftCreated(draft: Draft) {
 
 function onDraftConfirmed(transaction: Transaction, draftId: string) {
   transactionsStore.recordCreated(transaction)
+  fetchPeriodSummary()
   // Bug real: filtraba por transaction.id, pero draft y transaction son
   // entidades distintas con ids distintos - la tarjeta nunca desaparecia
   // despues de confirmar (ver DraftReviewCard.vue, que ahora emite el
@@ -232,7 +205,7 @@ function onDraftDiscarded(draftId: string) {
       <!-- Ingresos usa texto neutro (no verde): la paleta de Berry es
            negro+rojo, sin un segundo tono para "positivo" (ver style.css). -->
       <p class="summary-amount">
-        <AnimatedCurrency :value="income" :currency="currencyStore.displayCurrency" direction="up" />
+        <AnimatedCurrency :value="income" :currency="displayCurrency" direction="up" />
       </p>
     </BaseCard>
 
@@ -256,7 +229,7 @@ function onDraftDiscarded(draftId: string) {
         <p class="summary-label">Gastos</p>
       </div>
       <p class="summary-amount expense">
-        <AnimatedCurrency :value="expenses" :currency="currencyStore.displayCurrency" direction="down" />
+        <AnimatedCurrency :value="expenses" :currency="displayCurrency" direction="down" />
       </p>
     </BaseCard>
 
