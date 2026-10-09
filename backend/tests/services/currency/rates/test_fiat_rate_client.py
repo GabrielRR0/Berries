@@ -20,9 +20,10 @@ class _FakeResponse:
 def test_fetch_fiat_rates_uses_the_fallback_without_an_app_id(monkeypatch):
     monkeypatch.setattr(settings, "open_exchange_rates_app_id", "")
 
-    rates = fetch_fiat_rates()
+    rates, is_estimated = fetch_fiat_rates()
 
     assert rates["EUR"] == Decimal("0.92")
+    assert is_estimated is True
 
 
 def test_fetch_fiat_rates_fallback_never_includes_vef(monkeypatch):
@@ -32,7 +33,7 @@ def test_fetch_fiat_rates_fallback_never_includes_vef(monkeypatch):
     resolverse acá, ni siquiera como fallback."""
     monkeypatch.setattr(settings, "open_exchange_rates_app_id", "")
 
-    rates = fetch_fiat_rates()
+    rates, _is_estimated = fetch_fiat_rates()
 
     assert "VEF" not in rates
 
@@ -41,10 +42,11 @@ def test_fetch_fiat_rates_calls_the_real_api_with_an_app_id(monkeypatch):
     monkeypatch.setattr(settings, "open_exchange_rates_app_id", "una-key-real")
     monkeypatch.setattr(httpx, "get", lambda *a, **kw: _FakeResponse({"rates": {"EUR": 0.92, "COP": 4123.5}}))
 
-    rates = fetch_fiat_rates()
+    rates, is_estimated = fetch_fiat_rates()
 
     assert rates["EUR"] == Decimal("0.92")
     assert rates["COP"] == Decimal("4123.5")
+    assert is_estimated is False
 
 
 def test_fetch_fiat_rates_sends_the_configured_app_id(monkeypatch):

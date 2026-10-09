@@ -4,11 +4,11 @@ from decimal import Decimal
 
 from sqlalchemy import DateTime, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.core.encryption import EncryptedDecimal, EncryptedString
-from app.models.shared.column_types import CreatedAt, UserFk, UuidPk, WalletFk
+from app.models.shared.column_types import CreatedAt, NullableCurrencyFk, UserFk, UuidPk, WalletFk
 
 
 class Transaction(Base):
@@ -29,6 +29,19 @@ class Transaction(Base):
     # las filas ya traidas (occurred_at/type/wallet_id siguen sin encriptar justamente
     # para poder seguir filtrando esos por SQL).
     amount: Mapped[Decimal] = mapped_column(EncryptedDecimal, nullable=False)
+    # Snapshot de wallet.currency_id al crear/editar la transacción - un asiento ya
+    # ocurrido es un registro histórico inmutable y debe bastarse a sí mismo para saber
+    # en qué moneda estaba, sin volver a mirar la wallet (que en teoría podría borrarse
+    # o, a futuro, cambiar de moneda). Nullable porque las transactions creadas antes de
+    # este campo no lo tienen todavía - ver backfill_reference_amounts en
+    # transaction_service.py, que lo rellena desde wallet_id para filas viejas.
+    currency_id: Mapped[NullableCurrencyFk]
+    currency_ref: Mapped["Currency | None"] = relationship("Currency")
+
+    @property
+    def currency(self) -> str | None:
+        return self.currency_ref.code if self.currency_ref else None
+
     # Valor congelado en USD al momento de crear la transacción (ver create_transaction)
     # - pedido explícito del usuario: para una wallet en una moneda nacional con
     # inflación fuerte (VEF, COP, ARS...), quiere un registro FIJO de "cuánto era eso
@@ -38,6 +51,10 @@ class Transaction(Base):
     # inmutable). NULL cuando la wallet ya estaba en USD (el propio "amount" ya es la
     # referencia, guardar el mismo valor dos veces no aporta nada).
     reference_amount_usd: Mapped[Decimal | None] = mapped_column(EncryptedDecimal, nullable=True)
+    # Tasa congelada junto con reference_amount_usd, en orientación "moneda de la
+    # wallet por USD" (ej. Bs por USD) - para poder mostrarle al usuario a qué tasa se
+    # calculó, no solo el resultado ya convertido. Mismo criterio de NULL que arriba.
+    reference_rate: Mapped[Decimal | None] = mapped_column(EncryptedDecimal, nullable=True)
     category: Mapped[str] = mapped_column(EncryptedString, nullable=False)
     description: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
     # Cuándo ocurrió la transacción (settable por el usuario), no cuándo se registró.

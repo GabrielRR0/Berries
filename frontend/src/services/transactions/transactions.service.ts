@@ -23,7 +23,9 @@ interface TransactionWire {
   wallet_id: string
   type: string
   amount: number | string
+  currency?: string | null
   reference_amount_usd: number | string | null
+  reference_rate?: number | string | null
   category: string
   description: string | null
   occurred_at: string
@@ -63,7 +65,9 @@ function mapTransaction(wire: TransactionWire): Transaction {
     walletId: wire.wallet_id,
     type: wire.type as TransactionType,
     amount: Number(wire.amount),
+    currency: wire.currency ?? null,
     referenceAmountUsd: wire.reference_amount_usd === null ? null : Number(wire.reference_amount_usd),
+    referenceRate: wire.reference_rate == null ? null : Number(wire.reference_rate),
     category: wire.category,
     description: wire.description,
     occurredAt: wire.occurred_at,

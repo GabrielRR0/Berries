@@ -54,9 +54,15 @@ function walletName(walletId: string): string {
 // ARS...) quiere ver "cuanto era eso ese dia" de forma fija, no recalculada con la
 // tasa de HOY cada vez que se abre la lista. null cuando la wallet ya esta en USD (el
 // monto principal YA es la referencia, mostrar el mismo numero dos veces no aporta).
+// Ahora tambien muestra la tasa/fecha usadas (referenceRate/occurredAt) cuando el
+// backend las trae - pedido explicito del usuario: "que se entienda a que tasa se
+// calcula", no solo el monto ya convertido.
 function referenceLabel(transaction: Transaction): string | null {
   if (transaction.referenceAmountUsd === null) return null
-  return `≈ ${formatCurrency(transaction.referenceAmountUsd, 'USD')} al momento`
+  const base = `≈ ${formatCurrency(transaction.referenceAmountUsd, 'USD')} al momento`
+  if (transaction.referenceRate == null) return base
+  const rateLabel = formatCurrency(transaction.referenceRate, currencyFor(transaction))
+  return `${base} (tasa: ${rateLabel} por USD, ${formatDate(transaction.occurredAt)})`
 }
 
 interface TransferListItem {

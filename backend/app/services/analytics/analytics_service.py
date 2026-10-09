@@ -1,7 +1,8 @@
 """Capa de agregación de solo lectura sobre `Transaction` (sección 3.7 de la spec:
 resúmenes financieros). No crea ninguna tabla propia — todo se calcula on-demand a
 partir del ledger y las wallets ya existentes, siempre acotado al usuario dueño de la
-sesión (nunca se agrega across usuarios).
+sesión (nunca se agrega across usuarios). Nota: `_WalletCurrencyConverter.amount_of()`
+puede escribir (un self-heal puntual, ver su docstring) - no es 100% de solo lectura.
 
 `amount`/`category` están encriptados a nivel de columna (ver app/core/encryption.py) -
 el ciphertext no es sumable ni agrupable en SQL (cada valor se cifra con un IV
@@ -11,26 +12,24 @@ sobre las filas ya traídas y decodificadas por el ORM. Los filtros de user_id/t
 fecha SÍ siguen resolviéndose en SQL (esas columnas quedaron sin encriptar a
 propósito, ver transaction_model.py).
 
-Conversión de moneda (bug real reportado por el usuario, con captura): `Transaction` no
-guarda su propia moneda (solo `wallet_id`) - antes esto sumaba `amount` crudo de TODAS
-las wallets del usuario sin importar su moneda, así que alguien con una wallet en VEF y
-otra en USD veía, por ejemplo, "5.560 VEF de gasto" mostrado como "$5,560.00" (como si
-fuera USD). Ahora cada fila se convierte a `User.default_currency` (la wallet.currency
-de origen, resuelta vía `_WalletCurrencyConverter`) antes de sumar/agrupar - todo
-`get_*` de este módulo devuelve montos ya en esa única moneda.
-
-Segunda vuelta del mismo bug, tambien reportada por el usuario: convertir con la tasa
-de HOY un gasto de hace varios meses en una moneda con inflación fuerte (ej. VEF)
-reescribe su valor histórico cada vez que la tasa se mueve (3.000 VEF de hace un mes
-valían más dólares que hoy). _WalletCurrencyConverter ahora resuelve la tasa vigente en
-la fecha de CADA transacción (transaction.occurred_at, vía
-currency_service.get_conversion_rate_at), no la tasa actual - así "Últimos 6 meses"/
-"Ahorro acumulado" no le cambian el pasado a un mes ya cerrado."""
+Conversión de moneda - fuente única de verdad (ver currency_service.py, regla
+IAS 21/ASC 830 documentada ahí): cada `Transaction` ya sabe su propia moneda
+(`transaction.currency`, snapshot congelado al crear/editar) y, si no es USD, ya trae
+`reference_amount_usd` - el valor en USD congelado UNA vez con la tasa vigente en
+`occurred_at`, la fecha real de la transacción. `_WalletCurrencyConverter` lee ese valor
+directo en vez de recalcular una tasa histórica en cada consulta - esto es lo que
+garantiza que Análisis, Inicio, Movimientos y la etiqueta "≈$X al momento" de cada fila
+muestren SIEMPRE el mismo número para la misma transacción, en vez de tres cálculos
+independientes que podían no coincidir entre sí (bug real reportado por el usuario).
+Solo el salto final USD -> `target_currency` (la moneda de despliegue, si no es USD) usa
+una tasa EN VIVO - USD/EUR/USDT no tienen el problema de inflación que motiva congelar
+la tasa histórica, así que ese último tramo puede resolverse con la tasa de hoy sin
+distorsionar nada."""
 
 import re
 import uuid
 from collections import defaultdict
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -47,43 +46,69 @@ from app.schemas.analytics.analytics_schemas import (
     PeriodSummaryResponse,
 )
 from app.services.analytics.errors import InvalidPeriodError
-from app.services.currency.currency_service import get_conversion_rate_at
+from app.services.currency.currency_service import get_conversion_rate, reference_fields_in_usd
 
 _OTHER_CATEGORY_LABEL = "Otros"
 
 
 class _WalletCurrencyConverter:
-    """Convierte el monto de una transacción a `target_currency`, resolviendo la
-    moneda de origen a partir de su wallet_id y la TASA vigente en la fecha de esa
-    transacción (nunca la tasa de hoy - ver docstring del módulo). Memoiza tanto el
-    mapa wallet->moneda como la tasa por (moneda, día) - una consulta de wallets + una
-    tasa por cada combinación distinta de moneda/día encontrada, nunca una tasa por
-    transacción individual - se crea UNA vez por llamada pública de este módulo y se
-    reusa en todas sus sumas/agrupaciones internas."""
+    """Convierte el monto de una transacción a `target_currency`, leyendo el valor ya
+    congelado por transaction_service.py (`transaction.reference_amount_usd`) en vez de
+    recalcular una tasa histórica en cada consulta - ver docstring del módulo. Memoiza
+    el mapa wallet->moneda (solo como respaldo, ver más abajo) y la tasa USD->target
+    (una sola, no por transacción/día - el salto final es siempre en vivo). Se crea UNA
+    vez por llamada pública de este módulo y se reusa en todas sus sumas/agrupaciones
+    internas."""
 
     def __init__(self, db: Session, user_id: uuid.UUID, target_currency: str) -> None:
         self._db = db
         self._target_currency = target_currency
-        self._rate_by_currency_and_day: dict[tuple[str, date], Decimal] = {}
+        self._usd_to_target_rate: Decimal | None = None
         wallets = db.scalars(
             select(Wallet).options(joinedload(Wallet.currency_ref)).where(Wallet.user_id == user_id)
         )
         self._currency_by_wallet_id: dict[uuid.UUID, str] = {wallet.id: wallet.currency for wallet in wallets}
 
+    def _usd_to_target(self) -> Decimal:
+        if self._target_currency == "USD":
+            return Decimal("1")
+        if self._usd_to_target_rate is None:
+            self._usd_to_target_rate = get_conversion_rate(self._db, "USD", self._target_currency)
+        return self._usd_to_target_rate
+
     def amount_of(self, transaction: Transaction) -> Decimal:
-        # Una wallet borrada despues de crear la transaccion (si alguna vez fuera
-        # posible) cae a target_currency (tasa 1) en vez de reventar - mismo
-        # criterio "best-effort" que BalanceCard.vue en el frontend.
-        currency = self._currency_by_wallet_id.get(transaction.wallet_id, self._target_currency)
+        # transaction.currency (snapshot propio) es la fuente normal; el mapa por
+        # wallet_id queda solo como respaldo para filas viejísimas que el backfill
+        # todavía no alcanzó a poblar (currency_id NULL) - ver
+        # transaction_service.backfill_reference_amounts.
+        currency = transaction.currency or self._currency_by_wallet_id.get(
+            transaction.wallet_id, self._target_currency
+        )
         if currency == self._target_currency:
             return transaction.amount
 
-        cache_key = (currency, transaction.occurred_at.date())
-        if cache_key not in self._rate_by_currency_and_day:
-            self._rate_by_currency_and_day[cache_key] = get_conversion_rate_at(
-                self._db, currency, self._target_currency, transaction.occurred_at
-            )
-        return transaction.amount * self._rate_by_currency_and_day[cache_key]
+        if currency == "USD":
+            usd_value = transaction.amount
+        else:
+            usd_value = transaction.reference_amount_usd
+            if usd_value is None:
+                # Self-heal: fila que el backfill no alcanzó a cubrir (ej. wallet
+                # borrada entre medio) o cuya conversión falló en su momento -
+                # calcular UNA vez con la fecha real de la transacción y persistir,
+                # en vez de tratarla como 0 (eso sí sería el mismo tipo de "suma que
+                # no cuadra" que motivó todo este cambio) o reventar el request.
+                usd_value, rate = reference_fields_in_usd(
+                    self._db, transaction.amount, currency, transaction.occurred_at
+                )
+                if usd_value is None:
+                    return Decimal("0")
+                transaction.reference_amount_usd = usd_value
+                transaction.reference_rate = rate
+                self._db.commit()
+
+        if self._target_currency == "USD":
+            return usd_value
+        return usd_value * self._usd_to_target()
 
 
 def _default_currency(db: Session, user_id: uuid.UUID) -> str:
@@ -134,9 +159,15 @@ def _transactions_in_range(db: Session, user_id: uuid.UUID, kind: str, start: da
     # IncomeExpenseSummary.vue/TransactionsMain.vue. La comision de una transferencia SI
     # se incluye (se crea con source="manual", ver transfer_service.py) porque esa si es
     # un gasto real.
+    #
+    # joinedload(Transaction.currency_ref): _WalletCurrencyConverter.amount_of() lee
+    # transaction.currency por fila - sin precargar la relación, cada acceso dispararía
+    # su propio SELECT perezoso (N+1) en vez de traer todo en esta única consulta.
     return list(
         db.scalars(
-            select(Transaction).where(
+            select(Transaction)
+            .options(joinedload(Transaction.currency_ref))
+            .where(
                 Transaction.user_id == user_id,
                 Transaction.type == kind,
                 Transaction.source != "transfer",

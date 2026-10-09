@@ -307,7 +307,10 @@ def test_update_transaction_rejects_another_users_transaction(db):
 
 
 # --- backfill_reference_amounts (pedido explícito del usuario, con captura real: en
-# Movimientos vio transactions viejas en VEF sin ningún valor de referencia) ---------
+# Movimientos vio transactions viejas en VEF sin ningún valor de referencia; ahora
+# también reconcilia valores ya existentes calculados con el fallback roto de
+# get_rate_at, corregido en esta misma tanda de cambios - ver "Qué pasa con los
+# usuarios/datos que ya existen en producción" del plan) -----------------------------
 
 
 def test_backfill_reference_amounts_fills_null_values_for_non_usd_wallets(db):
@@ -316,12 +319,14 @@ def test_backfill_reference_amounts_fills_null_values_for_non_usd_wallets(db):
     transaction = create_transaction(db, user.id, wallet.id, "expense", Decimal("3650"), "Mercado")
     # Simula una fila "vieja" (creada antes de que reference_amount_usd existiera).
     transaction.reference_amount_usd = None
+    transaction.reference_rate = None
     db.commit()
 
-    updated_count = backfill_reference_amounts(db)
+    report = backfill_reference_amounts(db)
 
     db.refresh(transaction)
-    assert updated_count == 1
+    assert report["reference_filled"] == 1
+    assert report["reference_reconciled"] == 0
     # round(...,2): la tasa VEF->USD se guarda en una columna Numeric(24,10) - crear la
     # transaction ya insertó una fila para calcular el fallback, y releerla acá pierde
     # precisión mucho más allá del centavo (invisible en la UI, pero rompe una
@@ -336,10 +341,11 @@ def test_backfill_reference_amounts_skips_usd_wallets(db):
     transaction.reference_amount_usd = None
     db.commit()
 
-    updated_count = backfill_reference_amounts(db)
+    report = backfill_reference_amounts(db)
 
     db.refresh(transaction)
-    assert updated_count == 0
+    assert report["reference_filled"] == 0
+    assert report["reference_reconciled"] == 0
     assert transaction.reference_amount_usd is None
 
 
@@ -353,8 +359,9 @@ def test_backfill_reference_amounts_is_idempotent(db):
     first_run = backfill_reference_amounts(db)
     second_run = backfill_reference_amounts(db)
 
-    assert first_run == 1
-    assert second_run == 0  # ya no queda ninguna fila en NULL
+    assert first_run["reference_filled"] == 1
+    assert second_run["reference_filled"] == 0  # ya no queda ninguna fila en NULL
+    assert second_run["reference_reconciled"] == 0  # el valor ya rellenado coincide, no se vuelve a tocar
 
 
 def test_backfill_reference_amounts_uses_each_transactions_own_historical_date(db):
@@ -375,6 +382,69 @@ def test_backfill_reference_amounts_uses_each_transactions_own_historical_date(d
 
     db.refresh(transaction)
     assert transaction.reference_amount_usd == Decimal("500") / Decimal("50")
+
+
+def test_backfill_reference_amounts_fills_currency_id_for_old_rows(db):
+    user = _user(db)
+    wallet = create_wallet(db, user.id, "Banco Vnz", "VEF")
+    transaction = create_transaction(db, user.id, wallet.id, "expense", Decimal("3650"), "Mercado")
+    # Simula una fila creada antes de que currency_id existiera.
+    transaction.currency_id = None
+    db.commit()
+
+    report = backfill_reference_amounts(db)
+
+    db.refresh(transaction)
+    assert report["currency_id_filled"] == 1
+    assert transaction.currency_id == wallet.currency_id
+
+
+def test_backfill_reference_amounts_reconciles_a_value_frozen_with_the_old_broken_fallback(db):
+    """Caso central del plan: una fila cuyo reference_amount_usd YA tiene un valor,
+    pero fue calculado con el fallback roto de get_rate_at (la tasa de "ahora" en el
+    momento de crearla, mal etiquetada como histórica) - debe corregirse, no dejarse
+    intacta, y quedar reportada en `changes` en vez de sobrescribirse en silencio."""
+    user = _user(db)
+    wallet = create_wallet(db, user.id, "Banco Vnz", "VEF")
+    transaction = create_transaction(db, user.id, wallet.id, "expense", Decimal("500"), "Mercado")
+    # Simula el valor que el bug viejo habría congelado - deliberadamente distinto del
+    # que la lógica ya corregida (get_rate_at con la fila real de abajo) calcularía.
+    transaction.reference_amount_usd = Decimal("999999")
+    db.commit()
+
+    vef = get_currency_by_code(db, "VEF")
+    usd = get_currency_by_code(db, "USD")
+    db.add(
+        ExchangeRate(
+            base_currency_id=vef.id,
+            quote_currency_id=usd.id,
+            rate=Decimal("1") / Decimal("50"),
+            fetched_at=transaction.occurred_at - timedelta(days=1),
+        )
+    )
+    db.commit()
+
+    report = backfill_reference_amounts(db)
+
+    db.refresh(transaction)
+    assert report["reference_reconciled"] == 1
+    assert len(report["changes"]) == 1
+    assert report["changes"][0]["transaction_id"] == str(transaction.id)
+    assert transaction.reference_amount_usd == Decimal("500") / Decimal("50")
+
+
+def test_backfill_reference_amounts_dry_run_does_not_persist_changes(db):
+    user = _user(db)
+    wallet = create_wallet(db, user.id, "Banco Vnz", "VEF")
+    transaction = create_transaction(db, user.id, wallet.id, "expense", Decimal("3650"), "Mercado")
+    transaction.reference_amount_usd = None
+    db.commit()
+
+    report = backfill_reference_amounts(db, dry_run=True)
+
+    assert report["reference_filled"] == 1
+    db.refresh(transaction)
+    assert transaction.reference_amount_usd is None  # dry-run: nada se guardó
 
 
 def test_list_transactions_filters_by_wallet_category_and_date(db):

@@ -41,13 +41,26 @@ const rows = computed<CategoryRow[]>(() => {
     const localMax = Math.max(1, ...totals)
     const latest = totals.at(-1) ?? 0
     const previous = totals.length >= 2 ? totals.at(-2)! : null
+    // El backend rellena con 0 cualquier mes sin movimientos (nunca omite un
+    // mes de la ventana) - eso significa que "el mes anterior fue 0" es
+    // indistinguible de "esta categoria todavia no existia" con solo mirar
+    // `previous`. Bug real reportado por el usuario, con captura: TODAS las
+    // categorias de una cuenta nueva mostraban "+$X vs mes anterior" a la vez
+    // (delta = latest - 0 en cada una), como si todas hubieran subido un
+    // 100%, cuando en realidad ninguna tenia historial todavia. Se distingue
+    // mirando si HUBO algun monto real en algun mes anterior al ultimo -
+    // si nunca lo hubo, es una categoria nueva (sin tendencia que mostrar
+    // todavia), no una suba real desde cero.
+    const hasPriorActivity = totals.slice(0, -1).some((total) => total > 0)
 
     let deltaLabel: string | null = null
     let deltaFlagged = false
-    if (previous !== null) {
+    if (previous !== null && hasPriorActivity) {
       const delta = latest - previous
       deltaFlagged = props.type === 'expense' && delta > 0
       deltaLabel = `${delta >= 0 ? '+' : ''}${formatCurrency(delta, props.currency)} vs mes anterior`
+    } else if (previous === 0 && !hasPriorActivity && latest > 0) {
+      deltaLabel = 'Nueva este mes'
     }
 
     return {

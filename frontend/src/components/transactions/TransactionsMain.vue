@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useCurrency } from '../../composables/currency/useCurrency'
-import { useCurrencyStore } from '../../stores/currency.store'
+import { useAnalytics } from '../../composables/analytics/useAnalytics'
+import { useAuthStore } from '../../stores/auth.store'
 import { useTransactionsStore } from '../../stores/transactions.store'
 import { useWalletsStore } from '../../stores/wallets.store'
 import { listDrafts } from '../../services/transactions/transactions.service'
 import type { Draft, Transaction } from '../../services/transactions/interfaces/transactions.interface'
 import type { TransferEditTarget } from '../../services/wallets/interfaces/wallets.interface'
+import { toPeriodKey } from '../../utils/formatters/formatPeriod'
 import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
 import ReceiptUpload from '../receiptScanner/ReceiptUpload.vue'
@@ -40,8 +41,13 @@ import type { TransactionsFilterState } from './interfaces/TransactionsFilterShe
 const router = useRouter()
 const walletsStore = useWalletsStore()
 const transactionsStore = useTransactionsStore()
-const currencyStore = useCurrencyStore()
-const { convert } = useCurrency()
+const authStore = useAuthStore()
+// Misma moneda que ya usa AnalyticsMain.vue (no currencyStore.displayCurrency, el
+// selector manual de BalanceCard.vue) - el backend calcula getPeriodSummary() fijo a
+// User.default_currency, la etiqueta debe coincidir con eso. Efecto intencional: el
+// selector USD/EUR/USDT deja de afectar estas cajas, solo balances.
+const displayCurrency = computed(() => authStore.user?.defaultCurrency ?? 'USD')
+const { periodSummary, fetchPeriodSummary } = useAnalytics()
 
 const drafts = ref<Draft[]>([])
 const loadError = ref<string | null>(null)
@@ -89,73 +95,21 @@ function isInMonth(occurredAt: string, year: number, month: number): boolean {
   return date.getFullYear() === year && date.getMonth() === month
 }
 
-// source !== 'transfer' excluye las dos patas que crea una transferencia
-// entre wallets propias (ver transfer_service.py del backend) de las boxes
-// de Ingresos/Gastos - mover plata de una cuenta a otra no es ingreso ni
-// gasto real. La transferencia SI sigue apareciendo en filteredTransactions
-// (el Historial de abajo, pedido explicito del usuario) - solo se excluye
-// de estos dos totales.
-const monthTransactions = computed(() =>
-  transactionsStore.transactions.filter(
-    (t) => isInMonth(t.occurredAt, activeMonth.value.year, activeMonth.value.month) && t.source !== 'transfer',
-  ),
-)
-
 // Bug real reportado por el usuario, con captura (mismo bug que ya se habia
 // arreglado en IncomeExpenseSummary.vue de Inicio, pero en este archivo
-// aparte - Movimientos tiene su propio calculo, nunca paso por ese fix): un
+// aparte - Movimientos tenia su propio calculo, nunca paso por ese fix): un
 // gasto en una wallet en VEF se sumaba tal cual (monto crudo) junto con
 // gastos en wallets USD/EUR/USDT, y el total se mostraba con la moneda de
 // visualizacion actual como si TODO hubiera estado en esa moneda - ej.
-// "31.187 VEF de gasto" aparecia como "31.187,00 €". Una Transaction no trae
-// su propia moneda (solo wallet_id), asi que hay que resolverla por su
-// wallet y convertir ANTES de sumar - agrupando por moneda presente este mes
-// (una llamada por moneda distinta, no una por transaccion).
-function walletCurrency(walletId: string): string {
-  return walletsStore.wallets.find((wallet) => wallet.id === walletId)?.currency ?? currencyStore.displayCurrency
-}
+// "31.187 VEF de gasto" aparecia como "31.187,00 €". Ahora esta caja pide el
+// mismo resumen que ya usa Analisis (get_period_summary, tasa historica
+// congelada por transaccion) para el mes activo del pager, en vez de
+// recalcular su propio total con la tasa EN VIVO - asi Movimientos/Inicio/
+// Analisis siempre muestran el mismo numero.
+const monthIncome = computed(() => periodSummary.value?.totalIncome ?? 0)
+const monthExpenses = computed(() => periodSummary.value?.totalExpense ?? 0)
 
-async function sumConverted(transactions: Transaction[]): Promise<number> {
-  const target = currencyStore.displayCurrency
-  const subtotalByCurrency = new Map<string, number>()
-  for (const transaction of transactions) {
-    const currency = walletCurrency(transaction.walletId)
-    subtotalByCurrency.set(currency, (subtotalByCurrency.get(currency) ?? 0) + transaction.amount)
-  }
-
-  let total = 0
-  for (const [currency, subtotal] of subtotalByCurrency) {
-    if (currency === target) {
-      total += subtotal
-      continue
-    }
-    try {
-      const result = await convert(subtotal, currency, target)
-      total += result.convertedAmount
-    } catch {
-      // Best-effort, mismo criterio que BalanceCard.vue/IncomeExpenseSummary.vue: si
-      // la conversion de ese grupo de moneda falla, no cuenta en el total en vez de
-      // romper el resto del calculo.
-    }
-  }
-  return total
-}
-
-const monthIncome = ref(0)
-const monthExpenses = ref(0)
-
-async function recomputeMonthTotals() {
-  const income = monthTransactions.value.filter((t) => t.type === 'income')
-  const expenses = monthTransactions.value.filter((t) => t.type === 'expense')
-  monthIncome.value = await sumConverted(income)
-  monthExpenses.value = await sumConverted(expenses)
-}
-
-watch(
-  [monthTransactions, () => currencyStore.displayCurrency, () => walletsStore.wallets],
-  recomputeMonthTotals,
-  { immediate: true },
-)
+watch(activeMonth, (month) => fetchPeriodSummary(toPeriodKey(month.year, month.month)), { immediate: true })
 
 // Chips de categoria dinamicos: Berry no tiene una taxonomia fija (ver
 // TransactionsFilterSheet.vue) - se derivan de las categorias que el
@@ -180,10 +134,11 @@ const filteredTransactions = computed(() => {
     }
 
     // "transfer" filtra por source, no por type (las 2 patas de una
-    // transferencia usan type income/expense pero no son ingreso/gasto
-    // real - ver comentario de monthTransactions arriba). Al elegir
-    // Ingresos/Gastos, las patas de transferencia quedan afuera por el
-    // mismo motivo (mismo criterio que las boxes de resumen).
+    // transferencia usan type income/expense pero no son ingreso/gasto real -
+    // mover plata entre wallets propias no es ni ingreso ni gasto, mismo
+    // criterio que excluye source==="transfer" en get_period_summary del
+    // backend). Al elegir Ingresos/Gastos, las patas de transferencia quedan
+    // afuera por el mismo motivo.
     if (filter.value.type === 'transfer') {
       if (t.source !== 'transfer') return false
     } else if (filter.value.type !== 'all') {
@@ -209,8 +164,13 @@ function onFilterApply(next: TransactionsFilterState) {
   filter.value = next
 }
 
+function currentPeriodKey(): string {
+  return toPeriodKey(activeMonth.value.year, activeMonth.value.month)
+}
+
 function onTransactionCreated(transaction: Transaction) {
   transactionsStore.recordCreated(transaction)
+  fetchPeriodSummary(currentPeriodKey())
   closeCreateSheet()
 }
 
@@ -233,6 +193,7 @@ function onEditTransaction(transaction: Transaction) {
 
 function onTransactionUpdated(transaction: Transaction) {
   transactionsStore.recordUpdated(transaction)
+  fetchPeriodSummary(currentPeriodKey())
   closeCreateSheet()
 }
 
@@ -252,6 +213,7 @@ function closeTransferEditSheet() {
 async function onDeleteTransaction(transactionId: string) {
   try {
     await transactionsStore.removeTransaction(transactionId)
+    fetchPeriodSummary(currentPeriodKey())
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : 'No se pudo eliminar el movimiento.'
   }
@@ -259,6 +221,7 @@ async function onDeleteTransaction(transactionId: string) {
 
 function onDraftConfirmed(transaction: Transaction, draftId: string) {
   transactionsStore.recordCreated(transaction)
+  fetchPeriodSummary(currentPeriodKey())
   drafts.value = drafts.value.filter((draft) => draft.id !== draftId)
 }
 
@@ -298,7 +261,7 @@ function goBack() {
           class="transactions-section"
           :income="monthIncome"
           :expenses="monthExpenses"
-          :currency="currencyStore.displayCurrency"
+          :currency="displayCurrency"
         />
 
         <!-- Solo visible en escritorio (ver @media min-width:1024px abajo) -

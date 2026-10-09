@@ -74,6 +74,36 @@ describe('CategoryMonthlyTrendChart', () => {
     expect(wrapper.findAll('.category-trend-bar')).toHaveLength(3)
   })
 
+  // Bug real reportado por el usuario, con captura: el backend rellena con 0
+  // cualquier mes sin movimientos (nunca omite un mes de la ventana), asi que
+  // "el mes anterior fue 0" es indistinguible de "esta categoria todavia no
+  // existia" con solo mirar el total anterior - TODAS las categorias de una
+  // cuenta nueva mostraban "+$X vs mes anterior" a la vez, como si todas
+  // hubieran subido un 100% desde cero.
+  it('una categoría sin NINGÚN historial previo no muestra un delta como si hubiera subido desde cero', () => {
+    const trend: CategoryMonthlyTrend = {
+      months: ['2026-06', '2026-07', '2026-08'],
+      categories: [{ category: 'Streaming', monthlyTotals: [0, 0, 45] }],
+    }
+
+    const wrapper = mount(CategoryMonthlyTrendChart, { props: { trend, type: 'expense', currency: 'USD' } })
+
+    expect(wrapper.text()).not.toContain('vs mes anterior')
+    expect(wrapper.text()).toContain('Nueva este mes')
+  })
+
+  it('una categoría que SÍ tuvo actividad antes, aunque el mes inmediato anterior fuera 0, muestra el delta real', () => {
+    const trend: CategoryMonthlyTrend = {
+      months: ['2026-06', '2026-07', '2026-08'],
+      categories: [{ category: 'Viajes', monthlyTotals: [300, 0, 150] }],
+    }
+
+    const wrapper = mount(CategoryMonthlyTrendChart, { props: { trend, type: 'expense', currency: 'USD' } })
+
+    expect(wrapper.text()).toContain('+$150.00 vs mes anterior')
+    expect(wrapper.text()).not.toContain('Nueva este mes')
+  })
+
   it('sin datos (trend null) muestra el estado vacío en vez de romper', () => {
     const wrapper = mount(CategoryMonthlyTrendChart, { props: { trend: null, type: 'expense', currency: 'USD' } })
 

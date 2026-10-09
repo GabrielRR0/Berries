@@ -208,6 +208,19 @@ async function onDeleteAccount() {
             <span class="menu-item-label">Análisis</span>
             <span class="menu-item-arrow" aria-hidden="true">›</span>
           </RouterLink>
+
+          <RouterLink to="/tasas" class="menu-item">
+            <IconBadge size="sm">
+              <!-- Sparkline generico (distinto del icono de barras de
+                   Analisis) - misma idea que BalanceTrendBackdrop.vue: una
+                   linea que sube y baja. -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 15l4-3 3 2 5-6 6 4" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </IconBadge>
+            <span class="menu-item-label">Tasas</span>
+            <span class="menu-item-arrow" aria-hidden="true">›</span>
+          </RouterLink>
         </nav>
       </div>
 

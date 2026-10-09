@@ -12,10 +12,13 @@ _FALLBACK_CRYPTO_RATES: dict[str, Decimal] = {
 _ENABLE_REAL_CALL = False  # cambiar a True (o wirearlo a un setting) cuando se conecte de verdad
 
 
-def fetch_crypto_rates() -> dict[str, Decimal]:
-    """Tasas cripto (USDT, ...) relativas a 1 USD."""
+def fetch_crypto_rates() -> tuple[dict[str, Decimal], bool]:
+    """Tasas cripto (USDT, ...) relativas a 1 USD.
+
+    Devuelve (rates, is_estimated). is_estimated=True mientras _ENABLE_REAL_CALL sea
+    False (se usa el placeholder de arriba, no una lectura de mercado)."""
     if not _ENABLE_REAL_CALL:
-        return dict(_FALLBACK_CRYPTO_RATES)
+        return dict(_FALLBACK_CRYPTO_RATES), True
 
     # Llamado real a CoinGecko — queda escrito pero inalcanzable mientras
     # _ENABLE_REAL_CALL sea False.
@@ -26,4 +29,4 @@ def fetch_crypto_rates() -> dict[str, Decimal]:
     )
     response.raise_for_status()
     data = response.json()
-    return {"USDT": Decimal(str(data["tether"]["usd"]))}
+    return {"USDT": Decimal(str(data["tether"]["usd"]))}, False

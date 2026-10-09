@@ -5,28 +5,18 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.currency.exchange_rate_model import ExchangeRate
 from app.models.transactions.transaction_model import Transaction
 from app.models.wallets.wallet_model import Wallet
-from app.services.currency.currency_service import convert_at
+from app.services.currency.currency_service import reference_fields_in_usd
 from app.services.transactions.errors import TransactionValidationError
 
-
-def _reference_amount_in_usd(db: Session, amount: Decimal, currency: str, occurred_at: datetime) -> Decimal | None:
-    """Valor congelado en USD al momento en que OCURRIÓ la transacción (no en el que se
-    registra: un movimiento se puede backdatear, ver TransactionForm.vue) - pedido
-    explícito del usuario: para una wallet en una moneda nacional con inflación fuerte
-    (VEF, COP, ARS...) quiere un registro FIJO de "cuánto era eso ese día", que nunca
-    cambie aunque la tasa de cambio se siga moviendo después. convert_at (no convert)
-    para que un gasto backdateado use SU propia tasa histórica, no la de hoy - mismo
-    criterio que analytics_service.py. None si la wallet ya está en USD (el propio
-    amount ya es la referencia) o si la conversión falla - best-effort, un problema
-    pasajero con la API de tasas no debe impedir registrar el movimiento."""
-    if currency == "USD":
-        return None
-    try:
-        return convert_at(db, amount, currency, "USD", occurred_at)
-    except Exception:
-        return None
+# Tolerancia para decidir si un reference_amount_usd ya guardado "difiere" del
+# recalculado en backfill_reference_amounts - en la práctica la aritmética es toda
+# Decimal (sin floats), así que una diferencia real del bug corregido es varios
+# órdenes de magnitud mayor a esto; existe solo para no reventar por ruido de
+# redondeo si alguna vez lo hay.
+_RECONCILE_TOLERANCE = Decimal("0.000001")
 
 
 def create_transaction(
@@ -57,12 +47,17 @@ def create_transaction(
         wallet.balance += amount
 
     resolved_occurred_at = occurred_at or datetime.now(timezone.utc)
+    reference_amount_usd, reference_rate = reference_fields_in_usd(db, amount, wallet.currency, resolved_occurred_at)
     transaction = Transaction(
         user_id=user_id,
         wallet_id=wallet_id,
+        # Snapshot de una sola vez - un asiento ya ocurrido debe bastarse a sí mismo
+        # para saber en qué moneda estaba, ver transaction_model.py.
+        currency_id=wallet.currency_id,
         type=type,
         amount=amount,
-        reference_amount_usd=_reference_amount_in_usd(db, amount, wallet.currency, resolved_occurred_at),
+        reference_amount_usd=reference_amount_usd,
+        reference_rate=reference_rate,
         category=category,
         description=description,
         occurred_at=resolved_occurred_at,
@@ -155,12 +150,15 @@ def update_transaction(
         new_wallet.balance += amount
 
     transaction.wallet_id = wallet_id
+    transaction.currency_id = new_wallet.currency_id
     transaction.type = type
     transaction.amount = amount
     transaction.category = category
     transaction.description = description
     transaction.occurred_at = occurred_at
-    transaction.reference_amount_usd = _reference_amount_in_usd(db, amount, new_wallet.currency, occurred_at)
+    transaction.reference_amount_usd, transaction.reference_rate = reference_fields_in_usd(
+        db, amount, new_wallet.currency, occurred_at
+    )
 
     db.commit()
     db.refresh(transaction)
@@ -198,35 +196,93 @@ def delete_transaction(db: Session, transaction_id: uuid.UUID, user_id: uuid.UUI
         )
         for sibling in siblings:
             _reverse_and_delete(db, sibling)
+        # La observación de tasa implícita que esa transferencia haya congelado (ver
+        # transfer_service._record_transfer_rate_observation) no debe sobrevivir a la
+        # transferencia que la originó - dejarla sería una tasa "huérfana" en el
+        # historial de una operación que ya no existe.
+        for rate_row in db.scalars(select(ExchangeRate).where(ExchangeRate.transfer_id == transaction.transfer_id)):
+            db.delete(rate_row)
     else:
         _reverse_and_delete(db, transaction)
 
     db.commit()
 
 
-def backfill_reference_amounts(db: Session) -> int:
-    """Rellena reference_amount_usd para transactions que quedaron en NULL - creadas
-    antes de que este campo existiera (ver create_transaction). Pedido explícito del
-    usuario, con captura real: en Movimientos vio transacciones viejas en VEF sin
-    ningún valor de referencia. Usa el occurred_at PROPIO de cada transaction (no
-    "ahora") vía _reference_amount_in_usd/convert_at - reaprovecha el historial real de
-    ExchangeRate que ya exista para esa fecha, o cae a la tasa más vieja disponible si
-    no hay ninguna anterior (mismo criterio que create_transaction/analytics_service.py).
+def backfill_reference_amounts(db: Session, *, dry_run: bool = False) -> dict[str, object]:
+    """Backfill + RECONCILIACIÓN de los campos derivados de moneda de transactions
+    viejas (currency_id/reference_amount_usd/reference_rate) - ver la sección "Qué pasa
+    con los usuarios/datos que ya existen en producción" del plan de arreglo de sumas
+    de moneda. Pedido explícito del usuario, con captura real: en Movimientos vio
+    transacciones viejas en VEF sin ningún valor de referencia, y no quiere que un
+    cambio grande como este deje a clientes viejos con datos desactualizados/rotos, tal
+    como pasó una vez antes.
 
-    Corre sobre TODAS las transactions del sistema (no de un usuario particular) - es
-    un backfill de una sola vez para datos que ya existían antes de este campo, pensado
-    para invocarse desde manage.py, no desde un endpoint de usuario. Idempotente:
-    filtra por reference_amount_usd IS NULL, así que correrlo de nuevo no toca las
-    filas ya rellenadas."""
-    transactions = list(db.scalars(select(Transaction).where(Transaction.reference_amount_usd.is_(None))))
-    updated = 0
+    Tres pasos, todos idempotentes, sobre TODAS las transactions del sistema (no de un
+    usuario en particular) - pensado para invocarse desde manage.py, no desde un
+    endpoint de usuario:
+    1. `currency_id` NULL -> se rellena desde la wallet actual (snapshot de una sola
+       vez, nunca se vuelve a derivar después de esto).
+    2. Para cada transaction no-USD, se recalcula reference_fields_in_usd con la
+       lógica YA CORREGIDA de get_rate_at (usa el occurred_at PROPIO de cada fila, no
+       "ahora"). Si `reference_amount_usd` guardado es NULL, se rellena con lo
+       recalculado.
+    3. Si `reference_amount_usd` YA tenía un valor pero difiere del recalculado (más
+       allá de _RECONCILE_TOLERANCE) - el caso de una fila que se congeló usando el
+       fallback roto de get_rate_at, antes de este arreglo - se SOBRESCRIBE con el
+       valor correcto y la fila queda en el reporte de cambios (`changes`), nunca se
+       pisa en silencio. Si coincide, no se toca nada.
+
+    `dry_run=True` hace todo el trabajo real (incluida la comparación) pero termina en
+    rollback en vez de commit - para correr esto primero contra una copia de
+    producción y revisar el reporte antes de tocar datos reales."""
+    transactions = list(db.scalars(select(Transaction)))
+    currency_id_filled = 0
+    reference_filled = 0
+    changes: list[dict[str, object]] = []
+
     for transaction in transactions:
         wallet = db.get(Wallet, transaction.wallet_id)
-        if wallet is None or wallet.currency == "USD":
+        if wallet is None:
             continue
-        reference = _reference_amount_in_usd(db, transaction.amount, wallet.currency, transaction.occurred_at)
-        if reference is not None:
-            transaction.reference_amount_usd = reference
-            updated += 1
-    db.commit()
-    return updated
+
+        if transaction.currency_id is None:
+            transaction.currency_id = wallet.currency_id
+            currency_id_filled += 1
+
+        if wallet.currency == "USD":
+            continue
+
+        recalculated_amount, recalculated_rate = reference_fields_in_usd(
+            db, transaction.amount, wallet.currency, transaction.occurred_at
+        )
+        if recalculated_amount is None:
+            continue
+
+        if transaction.reference_amount_usd is None:
+            transaction.reference_amount_usd = recalculated_amount
+            transaction.reference_rate = recalculated_rate
+            reference_filled += 1
+        elif abs(transaction.reference_amount_usd - recalculated_amount) > _RECONCILE_TOLERANCE:
+            changes.append(
+                {
+                    "transaction_id": str(transaction.id),
+                    "user_id": str(transaction.user_id),
+                    "currency": wallet.currency,
+                    "old_reference_amount_usd": transaction.reference_amount_usd,
+                    "new_reference_amount_usd": recalculated_amount,
+                }
+            )
+            transaction.reference_amount_usd = recalculated_amount
+            transaction.reference_rate = recalculated_rate
+
+    if dry_run:
+        db.rollback()
+    else:
+        db.commit()
+
+    return {
+        "currency_id_filled": currency_id_filled,
+        "reference_filled": reference_filled,
+        "reference_reconciled": len(changes),
+        "changes": changes,
+    }
