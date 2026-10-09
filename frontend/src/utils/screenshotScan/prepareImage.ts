@@ -101,3 +101,15 @@ export function isGreenAt(canvas: HTMLCanvasElement, box: { x0: number; y0: numb
   if (width <= 0 || height <= 0) return null
   return isGreenInk(context.getImageData(x, y, width, height).data)
 }
+
+// Copia ampliada de un canvas (para releer texto chico, ver upscaleFactorFor en ocrLayout.ts).
+export function scaleCanvas(canvas: HTMLCanvasElement, factor: number): HTMLCanvasElement {
+  const scaled = document.createElement('canvas')
+  scaled.width = Math.round(canvas.width * factor)
+  scaled.height = Math.round(canvas.height * factor)
+  const context = scaled.getContext('2d')
+  if (!context) throw new UnreadableImageError()
+  context.imageSmoothingQuality = 'high'
+  context.drawImage(canvas, 0, 0, scaled.width, scaled.height)
+  return scaled
+}

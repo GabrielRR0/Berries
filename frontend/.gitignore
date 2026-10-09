@@ -15,6 +15,10 @@ dist-ssr
 # Env
 .env
 
+# Datos de idioma de Tesseract: tesseract.js los descarga solo (en el navegador desde su CDN; en Node, en
+# la carpeta donde se ejecuta). Pesan varios MB y no son codigo.
+*.traineddata
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

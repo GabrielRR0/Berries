@@ -211,8 +211,8 @@ export function useBulkCapture(initialWalletId = '') {
         tracked.message =
           result.kind === 'unknown'
             ? 'No se reconoció este tipo de captura. Por ahora se leen listas y estados de cuenta del banco, historial de órdenes P2P de Binance y comprobantes sueltos.'
-            : scope.value === 'all'
-              ? 'No se encontraron movimientos en esta captura.'
+            : result.readCount === 0
+              ? 'No se pudo leer ningún movimiento en esta captura. Prueba con una captura más grande o más nítida, o con otra pantalla del banco.'
               : result.kind === 'p2p_orders' && (scope.value === 'expenses' || scope.value === 'received')
                 ? 'Las órdenes P2P son transferencias entre tus cuentas, no gastos ni ingresos. Elige "Transferencias" o "Todo".'
                 : 'No hay movimientos de ese tipo en esta captura. Prueba con la opción "Todo".'

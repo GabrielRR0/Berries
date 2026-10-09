@@ -675,4 +675,36 @@ describe('useBulkCapture', () => {
       expect(capture.visibleRows.value.filter((row) => row.linkedOrderNumber !== null)).toHaveLength(0)
     })
   })
+  describe('mensajes cuando no hay filas', () => {
+    it('si no se pudo leer nada, no manda a probar la opcion "Todo" (el problema es la lectura, no el filtro)', async () => {
+      // Se reconoce como una lista del banco (por su texto) pero no hay palabras con posicion: no se puede leer ninguna fila.
+      vi.mocked(recognizeScreenshot).mockResolvedValue({
+        text: 'Movimientos 10:25 PM 22.848,00 Bs 09:58 PM 26.600,00 Bs',
+        words: [],
+        width: 1918,
+        height: 889,
+        isGreen: () => null,
+      })
+      const capture = useBulkCapture(BS.id)
+      capture.scope.value = 'expenses'
+
+      await capture.addImages([image('estado.png')])
+
+      const message = capture.images.value[0]!.message
+      expect(message).toContain('No se pudo leer ningún movimiento')
+      expect(message).not.toContain('opción "Todo"')
+    })
+
+    it('si se leyeron filas pero el filtro las dejo fuera, si sugiere probar con "Todo"', async () => {
+      vi.mocked(recognizeScreenshot).mockResolvedValue(layoutOf(BANK_STATEMENT_WORDS, 1918))
+      const capture = useBulkCapture(BS.id)
+      // Solo hay ordenes P2P en esta otra captura; con "solo ingresos" un historial de ventas queda vacio.
+      capture.scope.value = 'received'
+      vi.mocked(recognizeScreenshot).mockResolvedValue(p2pLayout)
+
+      await capture.addImages([image('binance.png')])
+
+      expect(capture.images.value[0]!.message).toContain('son transferencias')
+    })
+  })
 })
