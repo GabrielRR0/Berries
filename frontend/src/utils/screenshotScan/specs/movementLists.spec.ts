@@ -127,8 +127,22 @@ describe('historial de ordenes P2P de Binance', () => {
     expect(parseP2pOrderList(groupSegments(words, 1170), TODAY)).toHaveLength(2)
   })
 
-  it('por defecto las ordenes no se registran (sirven para completar los recibidos)', () => {
-    expect(rows().every((row) => row.action === 'skip')).toBe(true)
+  it('cada orden se propone como transferencia, con los USDT ya conocidos', () => {
+    const parsed = rows()
+
+    expect(parsed.every((row) => row.action === 'transfer')).toBe(true)
+    expect(parsed.map((row) => row.sentAmount)).toEqual([26.48, 10.15, 10.15])
+  })
+
+  it('quita el ruido del OCR junto al apodo (icono de chat e insignia de mensajes)', () => {
+    const noisy = P2P_WORDS.map((word) =>
+      word.text === '5' ? { ...word, text: 'O' } : word,
+    )
+    const [first, second] = parseP2pOrderList(groupSegments(noisy, 1170), TODAY)
+
+    expect(first!.p2p!.counterparty).toBe('Nelasurej')
+    expect(first!.description).toBe('Binance P2P · Nelasurej')
+    expect(second!.p2p!.counterparty).toBe('OikonomiaDigital')
   })
 
   it('el ano es el actual, o el anterior si la fecha caeria en el futuro', () => {
