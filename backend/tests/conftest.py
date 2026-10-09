@@ -84,7 +84,14 @@ def _mock_vef_rate(monkeypatch):
     # default (ningún día nuevo) - los tests que SÍ prueban el backfill lo mockean
     # explícitamente con datos propios.
     monkeypatch.setattr("app.services.currency.currency_service.fetch_vef_rate_history", lambda: [])
+    # La guardia de antiguedad de la serie VEF (ensure_vef_history_covers) guarda estado en
+    # memoria de proceso (enfriamiento y dias ya comprobados): se reinicia entre tests para que
+    # uno no afecte a otro.
+    from app.services.currency.currency_service import reset_vef_history_guard
+
+    reset_vef_history_guard()
     yield
+    reset_vef_history_guard()
 
 
 @pytest.fixture(autouse=True)

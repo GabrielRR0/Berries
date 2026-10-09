@@ -58,7 +58,7 @@ function cleanDescription(raw: string): string {
 // separados con la misma hora ("Cobro comision pag movil" junto a "Operacion pagomovil"); para
 // el usuario es una sola operacion con comision. Si el OCR no leyo la hora de alguna de las dos
 // filas, se une con la fila siguiente: el banco lista la comision justo antes de su operacion.
-function mergeFees(rows: ScanRow[]): ScanRow[] {
+export function mergeFees(rows: ScanRow[]): ScanRow[] {
   const result = [...rows]
   for (const feeRow of rows) {
     if (!isFeeText(feeRow.description) || feeRow.direction !== 'out') continue

@@ -94,21 +94,32 @@ def find_existing_import_keys(db: Session, user_id: uuid.UUID, client_keys: list
     return {sealed_to_client[sealed] for sealed in found if sealed in sealed_to_client}
 
 
-def warm_reference_rates(db: Session, user_id: uuid.UUID, wallet_ids: list[uuid.UUID]) -> None:
-    """Garantiza que exista una tasa a USD para la moneda de cada billetera ANTES de
-    tocar ningun saldo. Motivo: la primera vez que una moneda no-USD (ej. VEF) se
-    convierte, get_fresh_rate guarda la tasa con su propio commit - y ese commit
-    confirmaria a mitad de un lote los cambios de saldo ya hechos, rompiendo el "todo o
-    nada". Best effort, igual que reference_fields_in_usd: si la API de tasas falla, el
-    registro sigue (queda sin valor de referencia)."""
+def warm_reference_rates(
+    db: Session,
+    user_id: uuid.UUID,
+    wallet_ids: list[uuid.UUID],
+    occurred_ats: list[datetime | None] | None = None,
+) -> None:
+    """Garantiza que existan las tasas a USD que se van a necesitar ANTES de tocar ningun
+    saldo: la de ahora y la de cada fecha en que ocurrieron los movimientos (`occurred_ats`).
+    Motivo: la primera vez que una moneda no-USD (ej. VEF) se convierte, o cuando falta el
+    historico de esa fecha (ver ensure_vef_history_covers), se guardan tasas con su propio
+    commit - y ese commit confirmaria a mitad de un lote los cambios de saldo ya hechos,
+    rompiendo el "todo o nada". Best effort, igual que reference_fields_in_usd: si la API de
+    tasas falla, el registro sigue (queda sin valor de referencia)."""
     now = datetime.now(timezone.utc)
+    moments = {now}
+    for occurred_at in occurred_ats or []:
+        if occurred_at is not None:
+            moments.add(occurred_at if occurred_at.tzinfo else occurred_at.replace(tzinfo=timezone.utc))
     currencies = set()
     for wallet_id in set(wallet_ids):
         wallet = db.get(Wallet, wallet_id)
         if wallet is not None and wallet.user_id == user_id:
             currencies.add(wallet.currency)
     for currency in currencies:
-        reference_fields_in_usd(db, Decimal("1"), currency, now)
+        for moment in moments:
+            reference_fields_in_usd(db, Decimal("1"), currency, moment)
 
 
 def create_transactions_bulk(
@@ -118,7 +129,9 @@ def create_transactions_bulk(
 ) -> list[Transaction]:
     """Crea varias transacciones de una sola vez: si una falla (billetera ajena, monto
     invalido) no se crea ninguna. Cada item son los kwargs de create_transaction."""
-    warm_reference_rates(db, user_id, [item["wallet_id"] for item in items])
+    warm_reference_rates(
+        db, user_id, [item["wallet_id"] for item in items], [item.get("occurred_at") for item in items]
+    )
     try:
         created = [create_transaction(db, user_id, commit=False, **item) for item in items]
         db.commit()

@@ -8,6 +8,7 @@ import { useTransactionsStore } from '../../../stores/transactions.store'
 import { useWalletsStore } from '../../../stores/wallets.store'
 import {
   BANK_HISTORICO_WORDS,
+  BANK_STATEMENT_WORDS,
   BANK_WORDS,
   BANK_WEEKDAY_GREEN_Y,
   BANK_WEEKDAY_WORDS,
@@ -609,6 +610,69 @@ describe('useBulkCapture', () => {
       expect(bankRows.every((row) => row.action === 'transfer' && row.linkedOrderNumber === null)).toBe(true)
       // Las 3 ordenes quedan como filas aparte (ninguna se oculta por enlace).
       expect(capture.visibleRows.value.filter((row) => row.source === 'p2p_order')).toHaveLength(3)
+    })
+  })
+  describe('estado de cuenta en tabla', () => {
+    const statementLayout = layoutOf(BANK_STATEMENT_WORDS, 1918)
+
+    it('se lee con su fecha, hora, referencia y comisiones unidas', async () => {
+      vi.mocked(recognizeScreenshot).mockResolvedValue(statementLayout)
+      const capture = useBulkCapture(BS.id)
+
+      await capture.addImages([image('estado-de-cuenta.png')])
+
+      expect(capture.images.value[0]).toMatchObject({ status: 'done', kind: 'bank_statement', rowCount: 9 })
+      expect(capture.images.value[0]!.message).toBe('Estado de cuenta del banco')
+      const byAmount = (amount: number) => capture.visibleRows.value.find((row) => row.amount === amount)!
+      expect(byAmount(5100)).toMatchObject({
+        action: 'expense',
+        fee: 15.3,
+        occurredOn: '2026-09-18',
+        time: '19:48',
+        reference: '0677286173620',
+        walletId: BS.id,
+      })
+      expect(byAmount(16000)).toMatchObject({ action: 'income', occurredOn: '2026-09-20' })
+    })
+
+    it('usa el numero de referencia como huella: subir el mismo estado dos veces marca los duplicados', async () => {
+      vi.mocked(recognizeScreenshot).mockResolvedValue(statementLayout)
+      // El servidor ya conoce todas las huellas.
+      vi.mocked(checkDuplicates).mockImplementation(async (keys) => new Set(keys))
+      const capture = useBulkCapture(BS.id)
+
+      await capture.addImages([image('estado-de-cuenta.png')])
+
+      expect(capture.visibleRows.value).toHaveLength(9)
+      expect(capture.visibleRows.value.every((row) => row.duplicate && row.action === 'skip')).toBe(true)
+      expect(capture.canConfirm.value).toBe(false)
+    })
+
+    it('"solo gastos" con categoria elegida deja todo listo para registrar, con las comisiones aparte', async () => {
+      vi.mocked(recognizeScreenshot).mockResolvedValue(statementLayout)
+      const capture = useBulkCapture(BS.id)
+      capture.scope.value = 'expenses'
+      capture.expenseCategory.value = 'Mercado'
+
+      await capture.addImages([image('estado-de-cuenta.png')])
+      capture.reapplyDefaults()
+      const outcome = await capture.confirm()
+
+      expect(outcome.registered).toBe(4)
+      const [items] = vi.mocked(createTransactionsBulk).mock.calls[0]!
+      expect(items.filter((item) => item.category === 'Mercado').map((item) => item.amount)).toEqual([5100, 500, 2500, 4850])
+      expect(items.filter((item) => item.category === 'Comisión').map((item) => item.amount)).toEqual([15.3, 14, 14, 14.55])
+    })
+
+    it('los abonos se enlazan con las ordenes de Binance por importe y hora como en las demas capturas', async () => {
+      vi.mocked(recognizeScreenshot).mockResolvedValueOnce(statementLayout).mockResolvedValueOnce(p2pLayout)
+      const capture = useBulkCapture(BS.id)
+
+      await capture.addImages([image('estado.png'), image('binance.png')])
+
+      // Ninguna de las ordenes de Binance de la captura (8 y 9 de octubre) coincide con estos abonos de
+      // septiembre: no se enlaza nada por error.
+      expect(capture.visibleRows.value.filter((row) => row.linkedOrderNumber !== null)).toHaveLength(0)
     })
   })
 })

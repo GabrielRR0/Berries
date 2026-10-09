@@ -139,7 +139,7 @@ def confirm_draft(
     como su propio gasto "Comisión" en la misma billetera, todo en un solo commit."""
     draft = _get_draft_owned_by_user(db, draft_id, user_id)
     resolved_occurred_at = occurred_at or draft.occurred_at
-    warm_reference_rates(db, user_id, [wallet_id])
+    warm_reference_rates(db, user_id, [wallet_id], [resolved_occurred_at])
 
     try:
         transaction = create_transaction(

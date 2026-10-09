@@ -9,7 +9,7 @@ en que pasó (convert_at/get_conversion_rate_at/reference_fields_in_usd). Nadie 
 ("¿cuánto vale esto ahora?" vs. "¿cuánto valía esto esa vez?") con respuestas que
 deliberadamente no coinciden para una moneda con inflación fuerte (VEF, COP, ARS)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -24,6 +24,84 @@ from app.services.currency.rates.cache_refresh import get_fresh_rate, get_rate_a
 from app.services.currency.rates.venezuela_rate_client import fetch_vef_rate_history
 
 HISTORICAL_VEF_SOURCE = "dolarapi-oficial-historico"
+
+# El BCV solo publica tasa en dias habiles: un fin de semana (o un puente) deja hasta 3-4 dias sin
+# dato nuevo, y eso es normal. Mas que eso, la tasa guardada mas cercana ya no representa esa
+# fecha (en una moneda con inflacion fuerte, diez dias de diferencia son cientos de bolivares).
+VEF_MAX_RATE_GAP = timedelta(days=3)
+# Para no llamar a la API en cada movimiento: tras un intento (con o sin exito) no se vuelve a
+# intentar durante este tiempo, y los dias ya comprobados no se vuelven a consultar.
+_VEF_BACKFILL_COOLDOWN = timedelta(hours=1)
+_last_vef_backfill_attempt: datetime | None = None
+_vef_days_checked: set[date] = set()
+# Ultimo dia que trajo la serie historica del proveedor en la ultima actualizacion exitosa. La serie
+# llega COMPLETA en una sola respuesta (todos los dias habiles hasta hoy), asi que cualquier fecha
+# hasta ese dia ya esta cubierta y no hace falta volver a preguntar: solo una fecha posterior (un dia
+# nuevo que aun no se habia publicado) justifica otra llamada.
+_vef_history_covered_through: date | None = None
+
+
+def reset_vef_history_guard() -> None:
+    """Reinicia el estado en memoria de la guardia (lo usan los tests; en produccion cada
+    proceso arranca limpio)."""
+    global _last_vef_backfill_attempt, _vef_history_covered_through
+    _last_vef_backfill_attempt = None
+    _vef_history_covered_through = None
+    _vef_days_checked.clear()
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
+def ensure_vef_history_covers(db: Session, at: datetime) -> None:
+    """Garantiza que la serie guardada de la tasa del bolivar cubra la fecha `at`: si la fila
+    mas reciente con fetched_at <= `at` esta a mas de VEF_MAX_RATE_GAP (o no hay ninguna), trae
+    el historico REAL del proveedor (backfill_historical_vef_rates, idempotente: solo agrega los
+    dias que falten) antes de resolver la tasa.
+
+    Bug real: get_rate_at toma la fila mas reciente anterior a la fecha SIN mirar que tan vieja
+    es. Si nadie refresco las tasas en 10 dias (el cron diario solo corre en Vercel, no en local),
+    un gasto del 8 de octubre se congelaba con la tasa del 28 de septiembre (857,01 en vez de
+    874,73). Antes el hueco solo se curaba con `manage.py backfill:vef-rate-history` o con el cron.
+
+    Es una ayuda de mejor esfuerzo: si el proveedor no responde, se sigue con lo que haya (nunca
+    debe impedir registrar un movimiento). Hace commit al insertar, asi que quien registra varios
+    movimientos a la vez debe llamarla ANTES de tocar saldos (ver warm_reference_rates)."""
+    global _last_vef_backfill_attempt
+    at_utc = _as_utc(at)
+    if at_utc.date() in _vef_days_checked:
+        return
+    # La ultima actualizacion ya trajo todos los dias hasta esa fecha: no se vuelve a preguntar.
+    if _vef_history_covered_through is not None and at_utc.date() <= _vef_history_covered_through:
+        return
+
+    usd = get_currency_by_code(db, "USD")
+    vef = get_currency_by_code(db, "VEF")
+    latest = db.scalar(
+        select(ExchangeRate.fetched_at)
+        .where(
+            ExchangeRate.base_currency_id == vef.id,
+            ExchangeRate.quote_currency_id == usd.id,
+            ExchangeRate.fetched_at <= at_utc,
+        )
+        .order_by(ExchangeRate.fetched_at.desc())
+        .limit(1)
+    )
+    if latest is not None and at_utc - _as_utc(latest) <= VEF_MAX_RATE_GAP:
+        _vef_days_checked.add(at_utc.date())
+        return
+
+    now = datetime.now(timezone.utc)
+    if _last_vef_backfill_attempt is not None and now - _last_vef_backfill_attempt < _VEF_BACKFILL_COOLDOWN:
+        return
+    _last_vef_backfill_attempt = now
+    try:
+        backfill_historical_vef_rates(db)
+    except Exception:
+        # Proveedor caido o respuesta inesperada: se sigue con la tasa mas cercana que haya.
+        return
+    _vef_days_checked.add(at_utc.date())
 
 
 def _rate_to_usd(db: Session, currency: str) -> Decimal:
@@ -64,6 +142,8 @@ def get_conversion_rate_at(db: Session, from_currency: str, to_currency: str, at
     últimos N meses" no reescriba el pasado cada vez que la tasa se mueve."""
     if from_currency == to_currency:
         return Decimal("1")
+    if "VEF" in (from_currency, to_currency):
+        ensure_vef_history_covers(db, at)
     rate_to_usd = Decimal("1") if from_currency == "USD" else get_rate_at(db, from_currency, "USD", at)
     rate_from_usd = Decimal("1") if to_currency == "USD" else get_rate_at(db, "USD", to_currency, at)
     return rate_to_usd * rate_from_usd
@@ -163,8 +243,13 @@ def backfill_historical_vef_rates(db: Session, months: int = 12) -> int:
         )
     }
 
+    global _vef_history_covered_through
+    series = fetch_vef_rate_history()
+    if series:
+        _vef_history_covered_through = max(day for day, _ in series)
+
     inserted = 0
-    for day, promedio in fetch_vef_rate_history():
+    for day, promedio in series:
         # promedio = "cuántos VEF equivalen a 1 USD" (ej. 850) - la convención de
         # ExchangeRate.rate es "cuántas unidades de quote equivalen a 1 de base" (ver
         # _fetch_rate_from_client en cache_refresh.py, la fuente de verdad de esta
