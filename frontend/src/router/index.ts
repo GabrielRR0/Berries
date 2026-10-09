@@ -45,6 +45,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/movimientos/captura',
+      name: 'movimientos-captura',
+      component: () => import('../components/screenshotScan/BulkCaptureView.vue'),
+      meta: { requiresAuth: true, hideTabBar: true },
+    },
+    {
       path: '/cuentas',
       name: 'cuentas',
       component: () => import('../components/wallets/WalletsMain.vue'),

@@ -47,6 +47,10 @@ const DRAFT: Draft = {
   parsedCategory: 'Gym',
   parsedDescription: 'gasté 41 USDT para pagar el gimnasio',
   suggestedWalletId: null,
+  txnType: null,
+  occurredAt: null,
+  fee: null,
+  reference: null,
   status: 'pending',
   createdAt: '2026-08-28T00:00:00Z',
 }

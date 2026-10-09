@@ -8,6 +8,7 @@ import BaseCard from '../ui/BaseCard.vue'
 import BottomSheet from '../ui/BottomSheet.vue'
 import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import CreateWalletForm from './CreateWalletForm.vue'
+import CaptureEntryButton from '../screenshotScan/CaptureEntryButton.vue'
 import TransferForm from './TransferForm.vue'
 import WalletCard from './WalletCard.vue'
 
@@ -77,6 +78,7 @@ async function onDeleteWallet(walletId: string) {
             <path d="M20 17H7M7 17l3 3M7 17l3-3" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </button>
+        <CaptureEntryButton />
       </div>
 
       <p v-if="walletsStore.error" class="wallets-error" role="alert">{{ walletsStore.error }}</p>
