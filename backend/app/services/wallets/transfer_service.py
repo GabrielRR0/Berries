@@ -9,6 +9,7 @@ from sqlalchemy import select
 from app.models.currency.exchange_rate_model import ExchangeRate
 from app.models.transactions.transaction_model import Transaction
 from app.models.wallets.wallet_model import Wallet
+from app.services.transactions.import_key import seal_import_key
 from app.services.wallets.errors import CurrencyMismatchError, InsufficientBalanceError, TransferNotFoundError
 from app.services.wallets.wallet_service import get_wallet_owned_by_user
 
@@ -76,6 +77,10 @@ def _delete_transfer_rate_observations(db: Session, transfer_id: uuid.UUID) -> N
         db.delete(row)
 
 
+def _with_note(description: str, note: str | None) -> str:
+    return f"{description} · {note}" if note else description
+
+
 def execute_transfer(
     db: Session,
     user_id: uuid.UUID,
@@ -85,6 +90,8 @@ def execute_transfer(
     fee: Decimal = Decimal("0"),
     converted_amount: Decimal | None = None,
     occurred_at: datetime | None = None,
+    import_key: str | None = None,
+    note: str | None = None,
 ) -> tuple[Wallet, Wallet]:
     """Debita `from_wallet` y acredita `to_wallet` de forma atómica (un solo commit al
     final) para que un crash a mitad de camino no deje un lado actualizado y el otro no.
@@ -136,10 +143,13 @@ def execute_transfer(
             type="expense",
             amount=amount,
             category=TRANSFER_CATEGORY,
-            description=f"Transferencia a {to_wallet.name}",
+            description=_with_note(f"Transferencia a {to_wallet.name}", note),
             occurred_at=resolved_occurred_at,
             source="transfer",
             transfer_id=transfer_id,
+            # Solo la pata de salida lleva la clave: basta para detectar que la transferencia
+            # ya se registro, sin duplicarla en cada fila del ledger.
+            import_key=seal_import_key(user_id, import_key) if import_key else None,
         )
     )
     db.add(
@@ -149,7 +159,7 @@ def execute_transfer(
             type="income",
             amount=credit_amount,
             category=TRANSFER_CATEGORY,
-            description=f"Transferencia desde {from_wallet.name}",
+            description=_with_note(f"Transferencia desde {from_wallet.name}", note),
             occurred_at=resolved_occurred_at,
             source="transfer",
             transfer_id=transfer_id,

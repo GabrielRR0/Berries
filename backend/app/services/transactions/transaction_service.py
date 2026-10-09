@@ -10,6 +10,7 @@ from app.models.transactions.transaction_model import Transaction
 from app.models.wallets.wallet_model import Wallet
 from app.services.currency.currency_service import reference_fields_in_usd
 from app.services.transactions.errors import TransactionValidationError
+from app.services.transactions.import_key import seal_import_key
 
 # Tolerancia para decidir si un reference_amount_usd ya guardado "difiere" del
 # recalculado en backfill_reference_amounts - en la práctica la aritmética es toda
@@ -30,6 +31,7 @@ def create_transaction(
     occurred_at: datetime | None = None,
     source: str = "manual",
     commit: bool = True,
+    import_key: str | None = None,
 ) -> Transaction:
     """Crea la transacción y aplica su delta de saldo al wallet en la misma unidad de
     trabajo (un solo commit) — expense resta, income suma.
@@ -67,6 +69,7 @@ def create_transaction(
         description=description,
         occurred_at=resolved_occurred_at,
         source=source,
+        import_key=seal_import_key(user_id, import_key) if import_key else None,
     )
     db.add(transaction)
     if commit:
@@ -75,6 +78,20 @@ def create_transaction(
         db.flush()
     db.refresh(transaction)
     return transaction
+
+
+def find_existing_import_keys(db: Session, user_id: uuid.UUID, client_keys: list[str]) -> set[str]:
+    """De los identificadores que manda el cliente, los que ya corresponden a un movimiento
+    registrado por este usuario (ver seal_import_key)."""
+    if not client_keys:
+        return set()
+    sealed_to_client = {seal_import_key(user_id, key): key for key in client_keys}
+    found = db.scalars(
+        select(Transaction.import_key).where(
+            Transaction.user_id == user_id, Transaction.import_key.in_(list(sealed_to_client))
+        )
+    )
+    return {sealed_to_client[sealed] for sealed in found if sealed in sealed_to_client}
 
 
 def warm_reference_rates(db: Session, user_id: uuid.UUID, wallet_ids: list[uuid.UUID]) -> None:

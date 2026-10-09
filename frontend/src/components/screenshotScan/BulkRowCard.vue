@@ -106,7 +106,10 @@ function numberOrNull(event: Event): number | null {
       <li v-for="issue in issues" :key="issue">{{ issue }}</li>
     </ul>
 
-    <p v-if="row.action === 'skip'" class="row-skipped-note">No se registrará. Elige otra opción para incluirla.</p>
+    <p v-if="row.action === 'skip'" class="row-skipped-note">
+      <template v-if="row.duplicate">Ya lo registraste antes, por eso se omite. Elige otra opción para registrarlo de todos modos.</template>
+      <template v-else>No se registrará. Elige otra opción para incluirla.</template>
+    </p>
 
     <button
       v-if="row.action !== 'skip'"

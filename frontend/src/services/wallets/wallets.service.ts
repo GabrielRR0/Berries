@@ -109,6 +109,8 @@ export async function transferBetweenWallets(params: TransferParams): Promise<Tr
   if (params.fee !== undefined) payload.fee = params.fee
   if (params.convertedAmount !== undefined) payload.converted_amount = params.convertedAmount
   if (params.occurredAt !== undefined) payload.occurred_at = params.occurredAt
+  if (params.importKey !== undefined) payload.import_key = params.importKey
+  if (params.note !== undefined) payload.note = params.note
 
   const response = await fetch(`${API_BASE_URL}/api/wallets/transfer`, {
     method: 'POST',

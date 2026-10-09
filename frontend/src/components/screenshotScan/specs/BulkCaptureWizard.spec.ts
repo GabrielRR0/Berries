@@ -2,7 +2,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { recognizeScreenshot } from '../../../services/screenshotScan/screenshot-scan.service'
-import { createDraftsBulk, createTransactionsBulk } from '../../../services/transactions/transactions.service'
+import { checkDuplicates, createDraftsBulk, createTransactionsBulk } from '../../../services/transactions/transactions.service'
 import { useTransactionsStore } from '../../../stores/transactions.store'
 import { useWalletsStore } from '../../../stores/wallets.store'
 import { BANK_WORDS, isGreen, layoutOf } from '../../../utils/screenshotScan/specs/listFixtures'
@@ -12,6 +12,7 @@ vi.mock('../../../services/screenshotScan/screenshot-scan.service', () => ({ rec
 vi.mock('../../../services/transactions/transactions.service', () => ({
   createTransactionsBulk: vi.fn(),
   createDraftsBulk: vi.fn(),
+  checkDuplicates: vi.fn(),
   listTransactions: vi.fn(),
 }))
 vi.mock('../../../services/categories/categories.service', () => ({
@@ -33,6 +34,9 @@ async function pickImage(wrapper: ReturnType<typeof mount>) {
     configurable: true,
   })
   await input.trigger('change')
+  // La lectura espera la consulta de duplicados (usa crypto.subtle, asincrono de verdad), asi
+  // que se espera a que termine en vez de un solo flushPromises.
+  await vi.waitFor(() => expect(wrapper.text()).not.toContain('Leyendo la captura...'))
   await flushPromises()
 }
 
@@ -56,6 +60,7 @@ describe('BulkCaptureWizard', () => {
     vi.mocked(recognizeScreenshot).mockReset().mockResolvedValue(layoutOf(BANK_WORDS, 924, isGreen))
     vi.mocked(createTransactionsBulk).mockReset().mockResolvedValue([])
     vi.mocked(createDraftsBulk).mockReset().mockResolvedValue([])
+    vi.mocked(checkDuplicates).mockReset().mockResolvedValue(new Set())
   })
 
   afterEach(() => {
@@ -130,5 +135,115 @@ describe('BulkCaptureWizard', () => {
 
     expect(createDraftsBulk).toHaveBeenCalledTimes(1)
     expect(wrapper.emitted('done')?.[0]?.[0]).toMatchObject({ pendings: 5, failures: [] })
+  })
+  describe('primer paso: opciones antes de subir las capturas', () => {
+    it('ofrece elegir que registrar, las comisiones y la categoria por defecto', () => {
+      const wrapper = mount(BulkCaptureWizard)
+
+      expect(wrapper.text()).toContain('¿Qué quieres registrar?')
+      expect(wrapper.text()).toContain('Solo gastos')
+      expect(wrapper.text()).toContain('Solo ingresos')
+      expect(wrapper.text()).toContain('Transferencias')
+      expect(wrapper.text()).toContain('Tomar en cuenta las comisiones')
+      expect(wrapper.text()).toContain('Categoría (opcional)')
+      expect(wrapper.text()).toContain('Para los gastos')
+      expect(wrapper.text()).toContain('Para los ingresos')
+    })
+
+    it('con "Solo gastos" ya no se pide la categoria de los recibidos (y al reves)', async () => {
+      const wrapper = mount(BulkCaptureWizard)
+      const pill = (label: string) => wrapper.findAll('.pill').find((item) => item.text() === label)!
+
+      await pill('Solo gastos').trigger('click')
+      expect(wrapper.text()).toContain('Para los gastos')
+      expect(wrapper.text()).not.toContain('Para los ingresos')
+
+      await pill('Solo ingresos').trigger('click')
+      expect(wrapper.text()).toContain('Para los ingresos')
+      expect(wrapper.text()).not.toContain('Para los gastos')
+    })
+
+    it('"Transferencias" no pide categorias (no son gastos ni ingresos)', async () => {
+      const wrapper = mount(BulkCaptureWizard)
+
+      await wrapper.findAll('.pill').find((item) => item.text() === 'Transferencias')!.trigger('click')
+
+      expect(wrapper.text()).not.toContain('Categoría (opcional)')
+      expect(wrapper.text()).toContain('los movimientos del banco quedan pendientes de enlazar con su orden')
+    })
+
+    it('el texto de ayuda de cada opcion deja claro que una transferencia no es un gasto ni un ingreso', async () => {
+      const wrapper = mount(BulkCaptureWizard)
+      const pick = (label: string) => wrapper.findAll('.pill').find((item) => item.text() === label)!.trigger('click')
+
+      await pick('Solo gastos')
+      expect(wrapper.text()).toContain('ni las transferencias (como las órdenes P2P)')
+
+      await pick('Solo ingresos')
+      expect(wrapper.text()).toContain('ni las transferencias (como las órdenes P2P)')
+
+      await pick('Transferencias')
+      expect(wrapper.text()).toContain('transferencia entre tu billetera en USDT y la de bolívares')
+    })
+
+    it('con una sola billetera en bolivares la elige sola y lo dice', () => {
+      const wrapper = mount(BulkCaptureWizard)
+
+      expect(wrapper.text()).toContain('Elegimos la única billetera posible')
+      expect(wrapper.find('.wallet-tile.active').text()).toContain('BDV')
+    })
+
+    it('con dos billeteras en bolivares no elige ninguna', () => {
+      useWalletsStore().wallets = [BS, { ...BS, id: 'w-bs2', name: 'Banesco' }]
+      const wrapper = mount(BulkCaptureWizard)
+
+      expect(wrapper.find('.wallet-tile.active').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('Elegimos la única billetera posible')
+    })
+
+    it('elegir una billetera a mano la marca y quita el aviso de seleccion automatica', async () => {
+      useWalletsStore().wallets = [BS, USD]
+      const wrapper = mount(BulkCaptureWizard)
+
+      await wrapper.findAll('.wallet-tile').find((tile) => tile.text().includes('Efectivo'))!.trigger('click')
+
+      expect(wrapper.find('.wallet-tile.active').text()).toContain('Efectivo')
+      expect(wrapper.text()).not.toContain('Elegimos la única billetera posible')
+    })
+  })
+  describe('detalle de las transferencias', () => {
+    const pick = (wrapper: ReturnType<typeof mount>, label: string) =>
+      wrapper.findAll('.pill').find((item) => item.text() === label)!.trigger('click')
+
+    it('el tipo de transferencia solo se pregunta al elegir "Transferencias"', async () => {
+      const wrapper = mount(BulkCaptureWizard)
+      expect(wrapper.text()).not.toContain('¿Qué tipo de transferencia?')
+
+      await pick(wrapper, 'Solo gastos')
+      expect(wrapper.text()).not.toContain('¿Qué tipo de transferencia?')
+
+      await pick(wrapper, 'Transferencias')
+      expect(wrapper.text()).toContain('¿Qué tipo de transferencia?')
+      expect(wrapper.text()).toContain('P2P de Binance')
+      expect(wrapper.text()).toContain('Otra transferencia')
+    })
+
+    it('P2P de Binance viene elegido y explica que se enlaza con las ordenes', async () => {
+      const wrapper = mount(BulkCaptureWizard)
+
+      await pick(wrapper, 'Transferencias')
+
+      expect(wrapper.text()).toContain('quedan pendientes de enlazar con su orden')
+    })
+
+    it('"Otra transferencia" explica el caso de dolares dados a un amigo que los cambia a USDT', async () => {
+      const wrapper = mount(BulkCaptureWizard)
+      await pick(wrapper, 'Transferencias')
+
+      await pick(wrapper, 'Otra transferencia')
+
+      expect(wrapper.text()).toContain('le diste dólares de Facebank a un amigo que te los cambió a USDT')
+      expect(wrapper.text()).not.toContain('quedan pendientes de enlazar con su orden')
+    })
   })
 })

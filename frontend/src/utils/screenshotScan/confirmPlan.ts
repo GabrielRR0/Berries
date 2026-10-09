@@ -29,6 +29,21 @@ export function rowIssues(row: ScanRow): string[] {
   return issues
 }
 
+// Nota que se agrega a la descripcion de una transferencia: la orden P2P y la contraparte, o
+// la referencia del banco. Es lo que permite rastrear la operacion despues.
+function transferNote(row: ScanRow): string | undefined {
+  const parts: string[] = []
+  if (row.p2p) {
+    parts.push(row.p2p.orderNumber ? `Orden P2P ${row.p2p.orderNumber}` : 'Orden P2P')
+    if (row.p2p.counterparty) parts.push(row.p2p.counterparty)
+  } else {
+    if (row.description.trim()) parts.push(row.description.trim())
+    if (row.reference) parts.push(`Ref. ${row.reference}`)
+  }
+  const note = parts.join(' · ').slice(0, 200)
+  return note === '' ? undefined : note
+}
+
 function describe(row: ScanRow): string | undefined {
   const text = [row.description.trim(), row.reference ? `Ref. ${row.reference}` : null].filter(Boolean).join(' · ')
   return text === '' ? undefined : text
@@ -51,8 +66,10 @@ export interface ConfirmPlan {
 // Traduce las decisiones del usuario a las llamadas al backend: gastos e ingresos
 // (con su comision como gasto aparte) van juntos en un solo lote, los pendientes se
 // guardan como borradores y las transferencias se hacen una por una.
+// `importKeys` (id de fila -> hash, ver rowFingerprint.ts) marca cada movimiento registrado
+// para poder detectar despues que ya existe; es opcional.
 // Solo debe llamarse con filas sin problemas (rowIssues vacio).
-export function buildConfirmPlan(rows: ScanRow[]): ConfirmPlan {
+export function buildConfirmPlan(rows: ScanRow[], importKeys: ReadonlyMap<string, string> = new Map()): ConfirmPlan {
   const plan: ConfirmPlan = { transactions: [], drafts: [], transfers: [], skipped: 0 }
 
   for (const row of rows) {
@@ -92,6 +109,8 @@ export function buildConfirmPlan(rows: ScanRow[]): ConfirmPlan {
           fee: row.fee > 0 ? row.fee : undefined,
           convertedAmount: isIncoming ? row.amount : row.sentAmount!,
           occurredAt,
+          importKey: importKeys.get(row.id),
+          note: transferNote(row),
         },
       })
       continue
@@ -105,6 +124,7 @@ export function buildConfirmPlan(rows: ScanRow[]): ConfirmPlan {
       description: describe(row),
       occurredAt,
       source: 'screenshot',
+      importKey: importKeys.get(row.id),
     })
     if (row.fee > 0 && row.action === 'expense') {
       plan.transactions.push({

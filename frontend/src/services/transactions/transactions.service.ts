@@ -123,6 +123,7 @@ export async function createTransaction(params: CreateTransactionParams): Promis
   if (params.description !== undefined) payload.description = params.description
   if (params.occurredAt !== undefined) payload.occurred_at = params.occurredAt
   if (params.source !== undefined) payload.source = params.source
+  if (params.importKey !== undefined) payload.import_key = params.importKey
 
   const response = await fetch(`${API_BASE_URL}/api/transactions`, {
     method: 'POST',
@@ -278,6 +279,7 @@ export async function createTransactionsBulk(items: CreateTransactionParams[]): 
       description: item.description,
       occurred_at: item.occurredAt,
       source: item.source ?? 'screenshot',
+      import_key: item.importKey,
     })),
   }
 
@@ -370,4 +372,22 @@ export async function confirmDraftAsTransfer(draftId: string, params: ConfirmDra
   }
 
   return mapDraft((await response.json()) as DraftWire)
+}
+
+// De los identificadores (hash) de movimientos importados, cuales ya estan registrados. Es una
+// ayuda opcional: si la consulta falla, el registro sigue sin avisar de duplicados.
+export async function checkDuplicates(keys: string[]): Promise<Set<string>> {
+  if (keys.length === 0) return new Set()
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/transactions/duplicates`, {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ keys }),
+    })
+    if (!response.ok) return new Set()
+    const body = (await response.json()) as { duplicates: string[] }
+    return new Set(body.duplicates)
+  } catch {
+    return new Set()
+  }
 }

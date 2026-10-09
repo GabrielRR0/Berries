@@ -1,3 +1,4 @@
+import { LIST_AMOUNT_MIN_RIGHT_EDGE } from './dictionary/bankListFormats'
 import { FEE_CATEGORY } from './dictionary/feeWords'
 import { LIST_AMOUNT_PATTERN, LIST_CURRENCY, LIST_HAS_CURRENCY, LIST_TIME_PATTERN } from './dictionary/listPatterns'
 import { isFeeText, matchesReceived, resolveDateHeader, suggestCategory } from './movementDictionary'
@@ -17,10 +18,24 @@ export interface BankListOptions {
   defaultDate: string | null
   // Mide si el monto esta escrito en verde (recibido). Null = no se pudo medir.
   isGreen: (box: OcrBox) => boolean | null
+  // Ancho de la imagen; sin el se usa el borde derecho del texto mas a la derecha.
+  imageWidth?: number
+  // false en formatos donde el color no distingue recibido de pagado (ver
+  // dictionary/bankListFormats.ts): ahi la direccion sale solo del texto o de `fallbackDirection`.
+  colorCodesDirection?: boolean
+  // Direccion a usar cuando nada la indica (lo que el usuario dijo que va a registrar).
+  // Sin valor, se asume gasto y la fila se marca para confirmar.
+  fallbackDirection?: 'in' | 'out'
+  // false = no tomar en cuenta las comisiones: se descartan en vez de unirse a su operacion.
+  includeFees?: boolean
 }
 
-function isAmountSegment(segment: Segment): boolean {
-  return LIST_HAS_CURRENCY.test(segment.text) && LIST_AMOUNT_PATTERN.test(segment.text.trim())
+function isAmountSegment(segment: Segment, rightEdge: number): boolean {
+  return (
+    LIST_HAS_CURRENCY.test(segment.text) &&
+    LIST_AMOUNT_PATTERN.test(segment.text.trim()) &&
+    segment.x1 >= rightEdge * LIST_AMOUNT_MIN_RIGHT_EDGE
+  )
 }
 
 function isTimeSegment(segment: Segment): boolean {
@@ -64,7 +79,9 @@ export function parseBankList(segments: Segment[], options: BankListOptions): Sc
   const lineSizes = new Map<number, number>()
   for (const segment of ordered) lineSizes.set(segment.line, (lineSizes.get(segment.line) ?? 0) + 1)
 
-  const amounts = ordered.filter(isAmountSegment)
+  // Los montos de la lista van pegados al borde derecho; el saldo de la cabecera no.
+  const rightEdge = options.imageWidth ?? Math.max(...ordered.map((segment) => segment.x1), 0)
+  const amounts = ordered.filter((segment) => isAmountSegment(segment, rightEdge))
   const times = ordered.filter((segment) => isTimeSegment(segment))
   const used = new Set<Segment>([...amounts, ...times])
 
@@ -80,7 +97,7 @@ export function parseBankList(segments: Segment[], options: BankListOptions): Sc
         continue
       }
     }
-    if (!isAmountSegment(segment)) continue
+    if (!amounts.includes(segment)) continue
 
     const amountHeight = segment.y1 - segment.y0
     const time = times.find(
@@ -109,13 +126,24 @@ export function parseBankList(segments: Segment[], options: BankListOptions): Sc
     const amount = amountToken ? parseLocalizedNumber(amountToken, 'es') : null
     if (amount === null || amount <= 0) continue
 
-    const green = options.isGreen(segment)
+    const colorCodes = options.colorCodesDirection ?? true
+    const green = colorCodes ? options.isGreen(segment) : null
     const receivedByText = matchesReceived(description)
-    const direction = receivedByText || green === true ? 'in' : 'out'
+
+    let direction: 'in' | 'out'
+    if (receivedByText || green === true) direction = 'in'
+    else if (green === false) direction = 'out'
+    else direction = options.fallbackDirection ?? 'out'
 
     const flags: string[] = []
     if (receivedByText && green === false) flags.push('El texto dice recibido, pero el monto no está en verde. Revisa.')
-    if (green === null && !receivedByText) flags.push('Revisa si es un gasto o dinero recibido.')
+    if (!receivedByText && green === null && options.fallbackDirection === undefined) {
+      flags.push(
+        colorCodes
+          ? 'Revisa si es un gasto o dinero recibido.'
+          : 'Esta pantalla no distingue gastos de recibidos: confirma cuál es.',
+      )
+    }
     if (!currentDate) flags.push('Falta la fecha.')
 
     rows.push(
@@ -133,7 +161,13 @@ export function parseBankList(segments: Segment[], options: BankListOptions): Sc
     )
   }
 
-  const merged = mergeFees(rows)
+  let merged = mergeFees(rows)
+  if (options.includeFees === false) {
+    // Sin comisiones: se descartan las filas de comision que no se unieron a nada y se
+    // limpian las que si.
+    merged = merged.filter((row) => !(isFeeText(row.description) && row.direction === 'out'))
+    for (const row of merged) row.fee = 0
+  }
   // Una comision sin operacion a la que unirse se registra como su propio gasto.
   for (const row of merged) {
     if (isFeeText(row.description) && row.direction === 'out' && row.category === '') row.category = FEE_CATEGORY

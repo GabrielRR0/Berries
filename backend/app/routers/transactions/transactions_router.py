@@ -12,6 +12,8 @@ from app.schemas.transactions.transaction_schemas import (
     DraftConfirmTransferRequest,
     DraftResponse,
     DraftUpdateRequest,
+    DuplicateCheckRequest,
+    DuplicateCheckResponse,
     TransactionBulkCreateRequest,
     TransactionCreateRequest,
     TransactionResponse,
@@ -31,6 +33,7 @@ from app.services.wallets.errors import CurrencyMismatchError, InsufficientBalan
 from app.services.transactions.transaction_service import (
     create_transaction,
     create_transactions_bulk,
+    find_existing_import_keys,
     delete_transaction,
     list_transactions_for_user,
     update_transaction,
@@ -56,6 +59,7 @@ async def create(
             description=payload.description,
             occurred_at=payload.occurred_at,
             source=payload.source,
+            import_key=payload.import_key,
         )
     except TransactionValidationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -73,6 +77,16 @@ async def create_bulk(
     except TransactionValidationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return [TransactionResponse.model_validate(t) for t in transactions]
+
+
+@router.post("/duplicates", response_model=DuplicateCheckResponse)
+async def check_duplicates(
+    payload: DuplicateCheckRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DuplicateCheckResponse:
+    found = find_existing_import_keys(db, current_user.id, payload.keys)
+    return DuplicateCheckResponse(duplicates=[key for key in payload.keys if key in found])
 
 
 @router.get("", response_model=list[TransactionResponse])

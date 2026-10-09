@@ -21,6 +21,10 @@ export interface TransferParams {
   // del usuario: poder backdatear una transferencia igual que un movimiento
   // manual.
   occurredAt?: string
+  // Solo para transferencias que vienen de una captura: hash para detectar que ya se
+  // registraron, y una nota (ej. la orden P2P y la contraparte) que se agrega a la descripcion.
+  importKey?: string
+  note?: string
 }
 
 export interface TransferResult {
