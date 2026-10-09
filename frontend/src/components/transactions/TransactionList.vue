@@ -239,9 +239,12 @@ function confirmDelete(id: string) {
             <template v-if="!isTransfer(item.transaction)">{{ item.transaction.type === 'expense' ? '-' : '+' }}</template
             >{{ formatCurrency(item.transaction.amount, currencyFor(item.transaction)) }}
           </p>
-          <p v-if="referenceLabel(item.transaction)" class="transaction-reference">{{ referenceLabel(item.transaction) }}</p>
         </div>
       </div>
+
+      <p v-if="item.kind === 'single' && referenceLabel(item.transaction)" class="transaction-reference">
+        {{ referenceLabel(item.transaction) }}
+      </p>
 
       <!-- Alto fijo (.transaction-footer) - pedido explicito del usuario:
            la version anterior crecia en altura al mostrar el confirm, lo
@@ -395,13 +398,18 @@ function confirmDelete(id: string) {
   color: var(--text-muted);
 }
 
+/* Hasta dos lineas: las descripciones de movimientos importados desde una captura son largas
+   ("Operacion pagomovil bdv · Ref. 007608296806") y en un telefono no caben en una sola. */
 .transaction-description {
   margin-top: 0.125rem;
   font-size: 0.75rem;
   color: var(--text-muted);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .transaction-amount-group {
@@ -416,6 +424,7 @@ function confirmDelete(id: string) {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-h);
+  white-space: nowrap;
 }
 
 /* Valor congelado en USD al momento de la transaccion (ver reference_amount_usd del
@@ -423,9 +432,14 @@ function confirmDelete(id: string) {
    (VEF, COP, ARS...) quiere ver a simple vista cuanto era eso ese dia, sin abrir el
    detalle. Solo aparece cuando la wallet no estaba ya en USD (ver referenceLabel). */
 .transaction-reference {
+  margin-top: 0.5rem;
   font-size: 0.6875rem;
+  line-height: 1.4;
   color: var(--text-muted);
-  white-space: nowrap;
+  /* Va en su propia fila, a todo el ancho de la card, y puede partirse en varias lineas: antes
+     iba dentro del bloque del monto con nowrap y, en un telefono, lo ensanchaba hasta aplastar
+     el texto de la izquierda y salirse de la card. */
+  overflow-wrap: anywhere;
 }
 
 .transaction-amount.expense {

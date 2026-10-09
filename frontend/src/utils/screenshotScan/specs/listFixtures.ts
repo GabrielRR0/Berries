@@ -186,6 +186,40 @@ export const BANK_HISTORICO_WORDS: OcrWord[] = [
   ...line('Inicio Transfer... Pagos Servicios Divisas Tarjeta', 40, 890, 1865, 1900),
 ]
 
+// "Movimientos" con DOS dias con filas y un TERCER encabezado ("VIERNES, 2 DE OCTUBRE") al final sin
+// ninguna fila visible debajo: no genera nada. Lunes 5 y sabado 3 de octubre de 2026.
+export const BANK_TWO_DATES_WORDS: OcrWord[] = [
+  ...line('Movimientos', 172, 472, 155, 200),
+  ...line('LUNES, 5 DE OCTUBRE', 30, 335, 527, 553),
+  ...line('Cobro comision pag movil', 117, 443, 601, 625),
+  ...line('bdv a bdv', 117, 241, 639, 663),
+  ...line('21,00 Bs', 787, 900, 601, 627),
+  ...line('03:04 PM', 798, 900, 637, 661),
+  ...line('Operacion pagomovil bdv', 117, 441, 779, 803),
+  ...line('7.000,00 Bs', 745, 900, 761, 787),
+  ...line('03:04 PM', 798, 900, 797, 821),
+  ...line('Operacion pagomovil bdv', 117, 441, 937, 961),
+  ...line('10.000,00 Bs', 729, 900, 919, 945),
+  ...line('03:03 PM', 798, 900, 955, 979),
+  ...line('Operacion pagomovil bdv', 117, 441, 1096, 1120),
+  ...line('8.000,00 Bs', 745, 900, 1078, 1104),
+  ...line('02:59 PM', 798, 900, 1114, 1138),
+  ...line('SABADO, 3 DE OCTUBRE', 30, 365, 1223, 1249),
+  ...line('Cobro comision pag movil', 117, 443, 1298, 1322),
+  ...line('bdv a bdv', 117, 241, 1336, 1360),
+  ...line('57,00 Bs', 787, 900, 1298, 1324),
+  ...line('07:38 PM', 798, 900, 1334, 1358),
+  ...line('Operacion pagomovil bdv', 117, 441, 1476, 1500),
+  ...line('19.000,00 Bs', 729, 900, 1458, 1484),
+  ...line('07:38 PM', 798, 900, 1494, 1518),
+  ...line('Abono recibido otr bcos', 117, 417, 1635, 1659),
+  ...line('20.000,00 Bs', 729, 900, 1617, 1643),
+  ...line('07:25 PM', 798, 900, 1653, 1677),
+  ...line('VIERNES, 2 DE OCTUBRE', 30, 362, 1762, 1788),
+]
+// Montos en verde (recibidos): 10.000, 8.000 y 20.000.
+export const BANK_TWO_DATES_GREEN_Y = [919, 1078, 1617]
+
 // Una captura ya leida, como la devuelve el servicio de OCR: texto + palabras + color.
 export function layoutOf(words: OcrWord[], width: number, isGreenAt: (box: OcrBox) => boolean | null = () => null) {
   const lines = new Map<number, string[]>()

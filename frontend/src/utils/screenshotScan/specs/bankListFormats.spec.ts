@@ -5,6 +5,8 @@ import { resolveDateHeader } from '../movementDictionary'
 import { classifyImageKind, rowsFromImage } from '../rowsFromImage'
 import {
   BANK_HISTORICO_WORDS,
+  BANK_TWO_DATES_GREEN_Y,
+  BANK_TWO_DATES_WORDS,
   BANK_HOY_AYER_GREEN_Y,
   BANK_HOY_AYER_WORDS,
   BANK_WEEKDAY_GREEN_Y,
@@ -126,5 +128,62 @@ describe('"Historico de operaciones" del inicio de la app', () => {
     })
 
     expect(rows.map((row) => row.amount)).not.toContain(3848.1)
+  })
+})
+
+describe('captura con varias fechas (dos con movimientos y una tercera sin filas)', () => {
+  const layout = layoutOf(BANK_TWO_DATES_WORDS, 924, greenAt(BANK_TWO_DATES_GREEN_Y))
+
+  it('cada fila toma la fecha de su encabezado', () => {
+    const { rows } = rowsFromImage(layout, { today: TODAY, defaultDate: null })
+
+    expect(rows.map((row) => [row.amount, row.occurredOn, row.time])).toEqual([
+      [7000, '2026-10-05', '15:04'],
+      [10000, '2026-10-05', '15:03'],
+      [8000, '2026-10-05', '14:59'],
+      [19000, '2026-10-03', '19:38'],
+      [20000, '2026-10-03', '19:25'],
+    ])
+  })
+
+  it('une cada comision con su operacion dentro de su propio dia', () => {
+    const { rows } = rowsFromImage(layout, { today: TODAY, defaultDate: null })
+
+    expect(rows.map((row) => [row.amount, row.fee, row.direction])).toEqual([
+      [7000, 21, 'out'],
+      [10000, 0, 'in'],
+      [8000, 0, 'in'],
+      [19000, 57, 'out'],
+      [20000, 0, 'in'],
+    ])
+  })
+
+  it('el tercer encabezado, sin filas debajo, se ignora y no inventa movimientos', () => {
+    const { rows } = rowsFromImage(layout, { today: TODAY, defaultDate: null })
+
+    expect(rows).toHaveLength(5)
+    expect(rows.some((row) => row.occurredOn === '2026-10-02')).toBe(false)
+    expect(rows.every((row) => row.flags.length === 0)).toBe(true)
+  })
+
+  it('solo gastos y solo ingresos respetan cada dia', () => {
+    const expenses = rowsFromImage(layout, { today: TODAY, defaultDate: null, scope: 'expenses' }).rows
+    const received = rowsFromImage(layout, { today: TODAY, defaultDate: null, scope: 'received' }).rows
+
+    expect(expenses.map((row) => [row.amount, row.occurredOn])).toEqual([
+      [7000, '2026-10-05'],
+      [19000, '2026-10-03'],
+    ])
+    expect(received.map((row) => [row.amount, row.occurredOn])).toEqual([
+      [10000, '2026-10-05'],
+      [8000, '2026-10-05'],
+      [20000, '2026-10-03'],
+    ])
+  })
+
+  it('la fecha por defecto no pisa las fechas de los encabezados', () => {
+    const { rows } = rowsFromImage(layout, { today: TODAY, defaultDate: '2026-10-08' })
+
+    expect(rows.every((row) => row.occurredOn !== '2026-10-08')).toBe(true)
   })
 })

@@ -193,6 +193,30 @@ describe('TransactionList', () => {
     expect(text).toContain('por USD')
   })
 
+  // Bug real en un telefono: la tasa ("≈ $0.08 al momento (tasa: Bs. 857,01 por USD, 08 oct. 2026)")
+  // iba DENTRO del bloque del monto, que no se encoge; ese bloque se ensanchaba hasta aplastar el
+  // texto de la izquierda (la fecha se partia en "08 / oct. / 2026") y el monto se salia de la card.
+  // Ahora la tasa va en su propia fila y el bloque del monto solo contiene el monto.
+  it('la tasa va en su propia fila, fuera del bloque del monto, para no romper la card en pantallas chicas', () => {
+    const walletVef = { id: 'wallet-3', name: 'Banco Vnz', currency: 'VEF', balance: 0, createdAt: '2026-08-01T00:00:00Z' }
+    const expenseInVef = { ...MANUAL_EXPENSE, walletId: walletVef.id, referenceAmountUsd: 26.66, referenceRate: 857.01 }
+    const wrapper = mount(TransactionList, {
+      props: { transactions: [expenseInVef], wallets: [...WALLETS, walletVef] },
+    })
+
+    const amountGroup = wrapper.find('.transaction-amount-group')
+    expect(amountGroup.find('.transaction-reference').exists()).toBe(false)
+    expect(amountGroup.findAll('p')).toHaveLength(1)
+    expect(wrapper.find('.transaction-main').find('.transaction-reference').exists()).toBe(false)
+    expect(wrapper.find('li > .transaction-reference').exists()).toBe(true)
+  })
+
+  it('una transferencia fusionada no intenta mostrar la tasa de una pata', () => {
+    const wrapper = mount(TransactionList, { props: { transactions: [TRANSFER_FROM_LEG], wallets: WALLETS } })
+
+    expect(wrapper.find('li > .transaction-reference').exists()).toBe(false)
+  })
+
   // Si un filtro externo (busqueda, categoria) deja visible solo UNA pata de
   // una transferencia, se muestra suelta en vez de forzar una fusion a
   // medias - mismo tratamiento neutro que la card fusionada.

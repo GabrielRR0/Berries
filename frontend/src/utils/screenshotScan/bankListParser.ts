@@ -42,31 +42,53 @@ function isTimeSegment(segment: Segment): boolean {
   return LIST_TIME_PATTERN.test(segment.text.trim())
 }
 
-// Une la comision con la operacion que la origino. El banco las lista como dos
-// movimientos separados con la misma hora ("Cobro comision pag movil" junto a
-// "Operacion pagomovil"); para el usuario es una sola operacion con comision.
+// El OCR lee los iconos de la lista (las flechas de entrada y salida) como caracteres sueltos
+// y a veces pierde media linea: ", q Operacion pagomovil bdv", "Cobro comision pag movil 4".
+// Se quitan los caracteres sueltos del inicio y del final del texto (una palabra real tiene
+// al menos dos caracteres).
+function cleanDescription(raw: string): string {
+  const tokens = raw.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean)
+  while (tokens.length > 1 && tokens[0]!.length <= 1) tokens.shift()
+  while (tokens.length > 1 && tokens[tokens.length - 1]!.length <= 1) tokens.pop()
+  // Un unico token suelto no dice nada.
+  return tokens.length === 1 && tokens[0]!.length <= 1 ? '' : tokens.join(' ')
+}
+
+// Une la comision con la operacion que la origino. El banco las lista como dos movimientos
+// separados con la misma hora ("Cobro comision pag movil" junto a "Operacion pagomovil"); para
+// el usuario es una sola operacion con comision. Si el OCR no leyo la hora de alguna de las dos
+// filas, se une con la fila siguiente: el banco lista la comision justo antes de su operacion.
 function mergeFees(rows: ScanRow[]): ScanRow[] {
   const result = [...rows]
   for (const feeRow of rows) {
     if (!isFeeText(feeRow.description) || feeRow.direction !== 'out') continue
+    const feeIndex = result.indexOf(feeRow)
 
-    let partnerIndex = -1
+    let partner: ScanRow | null = null
     let bestDistance = Infinity
     result.forEach((candidate, index) => {
       if (candidate === feeRow || isFeeText(candidate.description)) return
       if (candidate.direction !== 'out') return
       if (candidate.occurredOn !== feeRow.occurredOn || candidate.time === null || candidate.time !== feeRow.time) return
-      const distance = Math.abs(index - result.indexOf(feeRow))
+      const distance = Math.abs(index - feeIndex)
       if (distance < bestDistance) {
         bestDistance = distance
-        partnerIndex = index
+        partner = candidate
       }
     })
 
-    if (partnerIndex !== -1) {
-      const partner = result[partnerIndex]!
-      partner.fee = Math.round((partner.fee + feeRow.amount) * 100) / 100
-      result.splice(result.indexOf(feeRow), 1)
+    if (!partner) {
+      const next = result[feeIndex + 1]
+      const timeUnknown = feeRow.time === null || next?.time === null
+      if (next && !isFeeText(next.description) && next.direction === 'out' && next.occurredOn === feeRow.occurredOn && timeUnknown) {
+        partner = next
+      }
+    }
+
+    if (partner) {
+      const target: ScanRow = partner
+      target.fee = Math.round((target.fee + feeRow.amount) * 100) / 100
+      result.splice(feeIndex, 1)
     }
   }
   return result
@@ -109,18 +131,18 @@ export function parseBankList(segments: Segment[], options: BankListOptions): Sc
 
     const top = segment.y0 - amountHeight * 0.6
     const bottom = (time?.y1 ?? segment.y1) + amountHeight * 0.3
-    const description = ordered
-      .filter(
-        (candidate) =>
-          !used.has(candidate) &&
-          candidate.x1 <= segment.x0 &&
-          centerY(candidate) >= top &&
-          centerY(candidate) <= bottom,
-      )
-      .map((candidate) => candidate.text)
-      .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim()
+    const description = cleanDescription(
+      ordered
+        .filter(
+          (candidate) =>
+            !used.has(candidate) &&
+            candidate.x1 <= segment.x0 &&
+            centerY(candidate) >= top &&
+            centerY(candidate) <= bottom,
+        )
+        .map((candidate) => candidate.text)
+        .join(' '),
+    )
 
     const amountToken = segment.text.match(/\d[\d.,]*/)?.[0]
     const amount = amountToken ? parseLocalizedNumber(amountToken, 'es') : null
