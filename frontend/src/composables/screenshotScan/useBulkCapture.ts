@@ -38,6 +38,8 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
 }
 
+const UNMATCHED_ORDER_FLAG = 'No hay un abono igual en la captura del banco. Se registrará como transferencia por sí sola.'
+
 const KIND_LABEL: Record<ImageKind, string> = {
   p2p_orders: 'Historial de órdenes P2P',
   bank_list: 'Lista de movimientos del banco',
@@ -104,6 +106,15 @@ export function useBulkCapture(initialWalletId = '') {
     // Solo los recibidos/gastos que el usuario no toco entran al enlace automatico.
     const eligible = rows.value.filter((row) => row.source === 'p2p_order' || !touched.has(row.id))
     matchP2pOrders(eligible)
+
+    // Si hay una captura del banco y una orden no encontro su abono, se avisa (puede ser de
+    // otro dia o de otra cuenta); la orden sigue siendo una transferencia valida por si sola.
+    const hasBankRows = rows.value.some((row) => row.source === 'bank')
+    for (const row of rows.value) {
+      if (row.source !== 'p2p_order' || row.linkedOrderNumber !== null) continue
+      row.flags = row.flags.filter((flag) => flag !== UNMATCHED_ORDER_FLAG)
+      if (hasBankRows) row.flags.push(UNMATCHED_ORDER_FLAG)
+    }
     applyRowDefaults(rows.value, { wallets: walletsStore.wallets, selectedWalletId: selectedWalletId.value })
   }
 

@@ -23,6 +23,22 @@ function resolveYear(month: number, day: number, today: Date): number {
   return candidate > today ? today.getFullYear() - 1 : today.getFullYear()
 }
 
+// Apodo de la contraparte sin el ruido que el OCR agrega junto a el: el icono de chat se
+// lee como un caracter suelto ("Nelasurej O") y la insignia de mensajes sin leer como un
+// numero corto ("OikonomiaDigital 10").
+function cleanCounterparty(raw: string): string | null {
+  const tokens = raw
+    .replace(/[^\p{L}\p{N}_.\-\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+  while (tokens.length > 1) {
+    const last = tokens[tokens.length - 1]!
+    if (last.length === 1 || /^\d{1,3}$/.test(last)) tokens.pop()
+    else break
+  }
+  return tokens.join(' ') || null
+}
+
 function linesOf(segments: Segment[]): string[] {
   const byLine = new Map<number, Segment[]>()
   for (const segment of segments) byLine.set(segment.line, [...(byLine.get(segment.line) ?? []), segment])
@@ -72,12 +88,7 @@ export function parseP2pOrderList(segments: Segment[], today: Date): ScanRow[] {
     // Ultima linea de la tarjeta: apodo de la contraparte y fecha de creacion.
     const footer = block.find((line) => P2P_FOOTER_STAMP.test(line)) ?? ''
     const stamp = footer.match(P2P_FOOTER_STAMP)
-    const counterparty =
-      footer
-        .replace(P2P_FOOTER_STAMP, '')
-        .replace(/\b\d{1,3}\b\s*$/, '')
-        .replace(/[^\p{L}\p{N}_.\-\s]/gu, '')
-        .trim() || null
+    const counterparty = cleanCounterparty(footer.replace(P2P_FOOTER_STAMP, ''))
 
     let occurredOn: string | null = null
     if (stamp) {
@@ -103,9 +114,11 @@ export function parseP2pOrderList(segments: Segment[], today: Date): ScanRow[] {
         description: `Binance P2P${counterparty ? ` · ${counterparty}` : ''}`,
         reference: orderNumber,
         flags,
-        // Estas filas sirven sobre todo para completar el recibido del banco; si
-        // no se enlazan con ninguno, por defecto no se registran.
-        action: 'skip',
+        // Cada orden se propone como la transferencia USDT <-> Bs que es, con los USDT ya
+        // conocidos. Si despues se enlaza con un abono del banco (ver matchP2pOrders.ts), la
+        // transferencia pasa a ese abono y esta fila se oculta para no contarla dos veces.
+        action: 'transfer',
+        sentAmount: usdt,
         p2p: { usdt, price: priceToken, orderNumber, counterparty },
       }),
     )

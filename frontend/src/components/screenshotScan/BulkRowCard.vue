@@ -106,8 +106,18 @@ function numberOrNull(event: Event): number | null {
       <li v-for="issue in issues" :key="issue">{{ issue }}</li>
     </ul>
 
-    <button v-if="row.action !== 'skip'" type="button" class="edit-toggle" @click="editing = !editing">
-      {{ editing ? 'Cerrar' : issues.length > 0 ? 'Completar' : 'Editar' }}
+    <p v-if="row.action === 'skip'" class="row-skipped-note">No se registrará. Elige otra opción para incluirla.</p>
+
+    <button
+      v-if="row.action !== 'skip'"
+      type="button"
+      class="edit-toggle"
+      :class="{ 'edit-toggle--quiet': issues.length === 0 }"
+      :aria-expanded="editing"
+      @click="editing = !editing"
+    >
+      {{ editing ? 'Cerrar' : issues.length > 0 ? 'Completar los datos que faltan' : 'Editar' }}
+      <span aria-hidden="true">{{ editing ? '▴' : '▾' }}</span>
     </button>
 
     <div v-if="editing && row.action !== 'skip'" class="row-editor">
@@ -201,8 +211,16 @@ function numberOrNull(event: Event): number | null {
   gap: 0.5rem;
 }
 
-.row-card--skipped {
-  opacity: 0.55;
+/* Una fila omitida atenua solo su contenido: los botones de abajo siguen a todo color para
+   que se vea que se puede cambiar de opcion o editar. */
+.row-card--skipped .row-top,
+.row-card--skipped .row-note {
+  opacity: 0.5;
+}
+
+.row-skipped-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .row-card--issue {
@@ -295,16 +313,40 @@ function numberOrNull(event: Event): number | null {
   font-weight: 600;
 }
 
+/* Se ve como un boton (no como un texto suelto): es la accion principal cuando a la fila
+   le falta algo. */
 .edit-toggle {
-  align-self: flex-start;
-  padding: 0;
-  border: none;
-  background: none;
+  align-self: stretch;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.625rem 1rem;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  background: var(--accent-muted);
   color: var(--accent);
   font: inherit;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 700;
   cursor: pointer;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.edit-toggle:hover {
+  opacity: 0.85;
+}
+
+.edit-toggle:active {
+  transform: scale(0.98);
+}
+
+.edit-toggle--quiet {
+  border-color: var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--text-h);
 }
 
 .row-editor {

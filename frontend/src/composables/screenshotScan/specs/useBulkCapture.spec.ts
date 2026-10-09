@@ -83,10 +83,46 @@ describe('useBulkCapture', () => {
       fromWalletId: USDT.id,
       toWalletId: BS.id,
     })
-    // Las ordenes ya enlazadas no se muestran; solo queda la tercera, sin pareja y omitida.
+    // Las ordenes ya enlazadas no se muestran; solo queda la tercera, sin pareja: sigue
+    // siendo una transferencia valida por si sola y se avisa que no hay abono igual.
     const orders = capture.visibleRows.value.filter((row) => row.source === 'p2p_order')
     expect(orders).toHaveLength(1)
-    expect(orders[0]!.action).toBe('skip')
+    expect(orders[0]!.action).toBe('transfer')
+    expect(orders[0]!.flags.join(' ')).toContain('No hay un abono igual')
+  })
+
+  it('con solo el historial P2P, cada orden ya es una transferencia USDT a Bs lista para registrar', async () => {
+    vi.mocked(recognizeScreenshot).mockResolvedValue(p2pLayout)
+    const capture = useBulkCapture(BS.id)
+
+    await capture.addImages([image('binance.png')])
+
+    expect(capture.images.value[0]).toMatchObject({ status: 'done', kind: 'p2p_orders', rowCount: 3 })
+    const [first, second, third] = capture.visibleRows.value
+    expect(first).toMatchObject({
+      action: 'transfer',
+      sentAmount: 26.48,
+      amount: 26600,
+      fromWalletId: USDT.id,
+      toWalletId: BS.id,
+    })
+    expect(second).toMatchObject({ action: 'transfer', sentAmount: 10.15 })
+    // Sin la captura del banco no hay aviso de "abono no encontrado".
+    expect(first!.flags.join(' ')).not.toContain('No hay un abono igual')
+    // Las dos primeras tienen todo; a la tercera le falta la fecha (su tarjeta estaba cortada).
+    expect(capture.issuesByRow.value.get(first!.id)).toEqual([])
+    expect(capture.issuesByRow.value.get(second!.id)).toEqual([])
+    expect(capture.issuesByRow.value.get(third!.id)).toEqual(['Falta la fecha'])
+    expect(capture.canConfirm.value).toBe(false)
+
+    capture.updateRow(third!.id, { occurredOn: '2026-10-08' })
+    expect(capture.canConfirm.value).toBe(true)
+
+    const outcome = await capture.confirm()
+
+    expect(outcome.transfers).toBe(3)
+    const params = vi.mocked(useWalletsStore().transfer).mock.calls.map(([item]) => item)
+    expect(params[0]).toMatchObject({ fromWalletId: USDT.id, toWalletId: BS.id, amount: 26.48, convertedAmount: 26600 })
   })
 
   it('registra gastos con su comision, transferencias y deja fuera lo omitido', async () => {
@@ -97,6 +133,8 @@ describe('useBulkCapture', () => {
     for (const row of capture.visibleRows.value.filter((item) => item.action === 'expense')) {
       capture.updateRow(row.id, { category: 'Mercado' })
     }
+    // La orden sin abono ni fecha (la tercera) el usuario decide omitirla.
+    capture.setAction(capture.visibleRows.value.find((row) => row.source === 'p2p_order')!.id, 'skip')
     expect(capture.canConfirm.value).toBe(true)
 
     const outcome = await capture.confirm()
@@ -157,6 +195,7 @@ describe('useBulkCapture', () => {
     for (const row of capture.visibleRows.value.filter((item) => item.action === 'expense')) {
       capture.updateRow(row.id, { category: 'Mercado' })
     }
+    capture.setAction(capture.visibleRows.value.find((row) => row.source === 'p2p_order')!.id, 'skip')
 
     const outcome = await capture.confirm()
 
