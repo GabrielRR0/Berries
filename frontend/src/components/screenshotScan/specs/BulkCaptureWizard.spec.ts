@@ -27,7 +27,9 @@ vi.mock('../../../services/categories/categories.service', () => ({
 const BS = { id: 'w-bs', name: 'BDV', currency: 'VEF', balance: 90000, createdAt: '2026-01-01T00:00:00Z' }
 const USD = { id: 'w-usd', name: 'Efectivo', currency: 'USD', balance: 50, createdAt: '2026-01-01T00:00:00Z' }
 
-async function pickImage(wrapper: ReturnType<typeof mount>) {
+type Wrapper = ReturnType<typeof mount>
+
+async function pickImage(wrapper: Wrapper) {
   const input = wrapper.find('input[type="file"]')
   Object.defineProperty(input.element, 'files', {
     value: [new File(['x'], 'captura.png', { type: 'image/png' })],
@@ -40,8 +42,36 @@ async function pickImage(wrapper: ReturnType<typeof mount>) {
   await flushPromises()
 }
 
-function continueButton(wrapper: ReturnType<typeof mount>) {
+function continueButton(wrapper: Wrapper) {
   return wrapper.find('.wizard-next')
+}
+
+// Textos que identifican cada paso (el titulo de la pregunta).
+const TITLE = {
+  wallet: '¿De qué billetera son?',
+  kind: '¿Qué quieres registrar?',
+  details: 'Fecha y comisiones',
+  expenseCategory: 'Categoría de los gastos',
+  incomeCategory: 'Categoría de los ingresos',
+  captures: 'Sube tus capturas',
+  review: 'Revisa los movimientos',
+  confirm: 'Confirma el registro',
+}
+
+// Avanza con "Continuar" hasta llegar a un paso (un limite evita un bucle si nunca llega).
+async function goTo(wrapper: Wrapper, title: string) {
+  for (let attempt = 0; attempt < 10 && !wrapper.text().includes(title); attempt++) {
+    await continueButton(wrapper).trigger('click')
+  }
+  expect(wrapper.text()).toContain(title)
+}
+
+function pill(wrapper: Wrapper, label: string) {
+  return wrapper.findAll('.pill').find((item) => item.text() === label)!
+}
+
+function titlesInOrder(wrapper: Wrapper): string[] {
+  return wrapper.findAll('.wizard-title').map((node) => node.text())
 }
 
 describe('BulkCaptureWizard', () => {
@@ -67,125 +97,112 @@ describe('BulkCaptureWizard', () => {
     vi.useRealTimers()
   })
 
-  it('arranca preguntando de que billetera son los movimientos y que dia', () => {
-    const wrapper = mount(BulkCaptureWizard)
-
-    expect(wrapper.text()).toContain('¿De qué billetera son?')
-    expect(wrapper.text()).toContain('BDV')
-    expect(wrapper.text()).toContain('Ayer')
-    expect(wrapper.findAll('.wizard-progress-segment.filled')).toHaveLength(1)
-  })
-
-  it('recorre los pasos: billetera, captura, revision y confirmacion', async () => {
-    const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
-
-    await continueButton(wrapper).trigger('click')
-    expect(wrapper.text()).toContain('Sube tus capturas')
-    expect(wrapper.text()).toContain('historial de órdenes P2P de')
-    expect(continueButton(wrapper).attributes('disabled')).toBeDefined()
-
-    await pickImage(wrapper)
-    expect(wrapper.text()).toContain('Lista de movimientos del banco · 5 movimientos')
-    expect(continueButton(wrapper).attributes('disabled')).toBeUndefined()
-
-    await continueButton(wrapper).trigger('click')
-    expect(wrapper.text()).toContain('Revisa los movimientos')
-    expect(wrapper.findAll('.row-card')).toHaveLength(5)
-    // Faltan las categorias de los gastos: no se puede continuar.
-    expect(wrapper.text()).toContain('Falta la categoría')
-    expect(continueButton(wrapper).attributes('disabled')).toBeDefined()
-  })
-
-  it('se puede volver atras y la barra de progreso lo refleja', async () => {
-    const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
-    await continueButton(wrapper).trigger('click')
-    expect(wrapper.findAll('.wizard-progress-segment.filled')).toHaveLength(2)
-
-    await wrapper.find('.wizard-back').trigger('click')
-
-    expect(wrapper.text()).toContain('¿De qué billetera son?')
-    expect(wrapper.findAll('.wizard-progress-segment.filled')).toHaveLength(1)
-  })
-
-  it('el primer paso no tiene boton de atras (se sale con el de la cabecera de la vista)', () => {
-    const wrapper = mount(BulkCaptureWizard)
-
-    expect(wrapper.find('.wizard-back').exists()).toBe(false)
-  })
-
-  it('al dejar todo omitido o pendiente se puede confirmar y avisa al terminar', async () => {
-    const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
-    await continueButton(wrapper).trigger('click')
-    await pickImage(wrapper)
-    await continueButton(wrapper).trigger('click')
-
-    // Cada fila como pendiente: no exige categoria.
-    for (const card of wrapper.findAll('.row-card')) {
-      const chip = card.findAll('.action-chip').find((item) => item.text() === 'Pendiente')!
-      await chip.trigger('click')
-    }
-    expect(continueButton(wrapper).attributes('disabled')).toBeUndefined()
-
-    await continueButton(wrapper).trigger('click')
-    expect(wrapper.text()).toContain('Confirma el registro')
-    expect(wrapper.text()).toContain('5 pendientes')
-
-    await continueButton(wrapper).trigger('click')
-    await flushPromises()
-
-    expect(createDraftsBulk).toHaveBeenCalledTimes(1)
-    expect(wrapper.emitted('done')?.[0]?.[0]).toMatchObject({ pendings: 5, failures: [] })
-  })
-  describe('primer paso: opciones antes de subir las capturas', () => {
-    it('ofrece elegir que registrar, las comisiones y la categoria por defecto', () => {
+  describe('un paso por pregunta', () => {
+    it('cada paso muestra una sola cosa: el primero solo la billetera', () => {
       const wrapper = mount(BulkCaptureWizard)
 
-      expect(wrapper.text()).toContain('¿Qué quieres registrar?')
-      expect(wrapper.text()).toContain('Solo gastos')
-      expect(wrapper.text()).toContain('Solo ingresos')
-      expect(wrapper.text()).toContain('Transferencias')
+      expect(titlesInOrder(wrapper)).toEqual([TITLE.wallet])
+      expect(wrapper.text()).toContain('BDV')
+      expect(wrapper.text()).not.toContain(TITLE.kind)
+      expect(wrapper.text()).not.toContain('¿De qué día?')
+      expect(wrapper.text()).not.toContain('Tomar en cuenta las comisiones')
+      expect(wrapper.text()).not.toContain('Categoría')
+    })
+
+    it('recorre un paso a la vez: billetera, que registrar, fecha y comisiones, categorias y capturas', async () => {
+      const wrapper = mount(BulkCaptureWizard)
+
+      for (const key of ['wallet', 'kind', 'details', 'expenseCategory', 'incomeCategory', 'captures'] as const) {
+        expect(titlesInOrder(wrapper)).toEqual([TITLE[key]])
+        if (key !== 'captures') await continueButton(wrapper).trigger('click')
+      }
+    })
+
+    it('el paso de fecha y comisiones tiene solo esas dos cosas', async () => {
+      const wrapper = mount(BulkCaptureWizard)
+      await goTo(wrapper, TITLE.details)
+
+      expect(wrapper.text()).toContain('¿De qué día?')
+      expect(wrapper.text()).toContain('Hoy')
+      expect(wrapper.text()).toContain('Ayer')
       expect(wrapper.text()).toContain('Tomar en cuenta las comisiones')
-      expect(wrapper.text()).toContain('Categoría (opcional)')
-      expect(wrapper.text()).toContain('Para los gastos')
-      expect(wrapper.text()).toContain('Para los ingresos')
+      expect(wrapper.text()).not.toContain('Solo gastos')
+      expect(wrapper.text()).not.toContain('Categoría')
     })
 
-    it('con "Solo gastos" ya no se pide la categoria de los recibidos (y al reves)', async () => {
-      const wrapper = mount(BulkCaptureWizard)
-      const pill = (label: string) => wrapper.findAll('.pill').find((item) => item.text() === label)!
-
-      await pill('Solo gastos').trigger('click')
-      expect(wrapper.text()).toContain('Para los gastos')
-      expect(wrapper.text()).not.toContain('Para los ingresos')
-
-      await pill('Solo ingresos').trigger('click')
-      expect(wrapper.text()).toContain('Para los ingresos')
-      expect(wrapper.text()).not.toContain('Para los gastos')
-    })
-
-    it('"Transferencias" no pide categorias (no son gastos ni ingresos)', async () => {
+    it('la barra de progreso tiene un segmento por paso y avanza', async () => {
       const wrapper = mount(BulkCaptureWizard)
 
-      await wrapper.findAll('.pill').find((item) => item.text() === 'Transferencias')!.trigger('click')
+      // billetera, que registrar, fecha, categoria de gastos, de ingresos, capturas, revision y confirmacion
+      expect(wrapper.findAll('.wizard-progress-segment')).toHaveLength(8)
+      expect(wrapper.findAll('.wizard-progress-segment.filled')).toHaveLength(1)
 
-      expect(wrapper.text()).not.toContain('Categoría (opcional)')
-      expect(wrapper.text()).toContain('los movimientos del banco quedan pendientes de enlazar con su orden')
+      await continueButton(wrapper).trigger('click')
+      expect(wrapper.findAll('.wizard-progress-segment.filled')).toHaveLength(2)
     })
 
-    it('el texto de ayuda de cada opcion deja claro que una transferencia no es un gasto ni un ingreso', async () => {
+    it('se puede volver atras y la barra lo refleja', async () => {
       const wrapper = mount(BulkCaptureWizard)
-      const pick = (label: string) => wrapper.findAll('.pill').find((item) => item.text() === label)!.trigger('click')
+      await goTo(wrapper, TITLE.details)
+      expect(wrapper.findAll('.wizard-progress-segment.filled')).toHaveLength(3)
 
-      await pick('Solo gastos')
-      expect(wrapper.text()).toContain('ni las transferencias (como las órdenes P2P)')
+      await wrapper.find('.wizard-back').trigger('click')
 
-      await pick('Solo ingresos')
-      expect(wrapper.text()).toContain('ni las transferencias (como las órdenes P2P)')
-
-      await pick('Transferencias')
-      expect(wrapper.text()).toContain('transferencia entre tu billetera en USDT y la de bolívares')
+      expect(titlesInOrder(wrapper)).toEqual([TITLE.kind])
+      expect(wrapper.findAll('.wizard-progress-segment.filled')).toHaveLength(2)
     })
 
+    it('el primer paso no tiene boton de atras (se sale con el de la cabecera de la vista)', () => {
+      const wrapper = mount(BulkCaptureWizard)
+
+      expect(wrapper.find('.wizard-back').exists()).toBe(false)
+    })
+  })
+
+  describe('pasos que se saltan solos', () => {
+    it('si se llego desde una billetera no se pregunta cual', async () => {
+      const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
+
+      expect(titlesInOrder(wrapper)).toEqual([TITLE.kind])
+      expect(wrapper.find('.wizard-back').exists()).toBe(false)
+      expect(wrapper.findAll('.wizard-progress-segment')).toHaveLength(7)
+    })
+
+    it('con "Solo gastos" no se pide la categoria de los ingresos', async () => {
+      const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
+      await pill(wrapper, 'Solo gastos').trigger('click')
+
+      await goTo(wrapper, TITLE.expenseCategory)
+      await continueButton(wrapper).trigger('click')
+
+      expect(titlesInOrder(wrapper)).toEqual([TITLE.captures])
+      expect(wrapper.text()).not.toContain(TITLE.incomeCategory)
+    })
+
+    it('con "Solo ingresos" no se pide la categoria de los gastos', async () => {
+      const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
+      await pill(wrapper, 'Solo ingresos').trigger('click')
+
+      await goTo(wrapper, TITLE.details)
+      await continueButton(wrapper).trigger('click')
+
+      expect(titlesInOrder(wrapper)).toEqual([TITLE.incomeCategory])
+    })
+
+    it('con "Transferencias" no se piden categorias: de fecha y comisiones se pasa a las capturas', async () => {
+      const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
+      await pill(wrapper, 'Transferencias').trigger('click')
+      // kind, details, captures, review, confirm
+      expect(wrapper.findAll('.wizard-progress-segment')).toHaveLength(5)
+
+      await goTo(wrapper, TITLE.details)
+      await continueButton(wrapper).trigger('click')
+
+      expect(titlesInOrder(wrapper)).toEqual([TITLE.captures])
+    })
+  })
+
+  describe('paso: billetera', () => {
     it('con una sola billetera en bolivares la elige sola y lo dice', () => {
       const wrapper = mount(BulkCaptureWizard)
 
@@ -202,7 +219,6 @@ describe('BulkCaptureWizard', () => {
     })
 
     it('elegir una billetera a mano la marca y quita el aviso de seleccion automatica', async () => {
-      useWalletsStore().wallets = [BS, USD]
       const wrapper = mount(BulkCaptureWizard)
 
       await wrapper.findAll('.wallet-tile').find((tile) => tile.text().includes('Efectivo'))!.trigger('click')
@@ -211,39 +227,127 @@ describe('BulkCaptureWizard', () => {
       expect(wrapper.text()).not.toContain('Elegimos la única billetera posible')
     })
   })
-  describe('detalle de las transferencias', () => {
-    const pick = (wrapper: ReturnType<typeof mount>, label: string) =>
-      wrapper.findAll('.pill').find((item) => item.text() === label)!.trigger('click')
+
+  describe('paso: que registrar', () => {
+    it('ofrece las cuatro opciones con su explicacion', async () => {
+      const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
+
+      for (const label of ['Todo', 'Solo gastos', 'Solo ingresos', 'Transferencias']) {
+        expect(pill(wrapper, label).exists()).toBe(true)
+      }
+      expect(wrapper.text()).toContain('se detecta solo qué es cada movimiento')
+
+      await pill(wrapper, 'Solo gastos').trigger('click')
+      expect(wrapper.text()).toContain('ni las transferencias (como las órdenes P2P)')
+
+      await pill(wrapper, 'Solo ingresos').trigger('click')
+      expect(wrapper.text()).toContain('ni las transferencias (como las órdenes P2P)')
+
+      await pill(wrapper, 'Transferencias').trigger('click')
+      expect(wrapper.text()).toContain('No es un gasto ni un ingreso')
+    })
 
     it('el tipo de transferencia solo se pregunta al elegir "Transferencias"', async () => {
-      const wrapper = mount(BulkCaptureWizard)
+      const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
       expect(wrapper.text()).not.toContain('¿Qué tipo de transferencia?')
 
-      await pick(wrapper, 'Solo gastos')
+      await pill(wrapper, 'Solo gastos').trigger('click')
       expect(wrapper.text()).not.toContain('¿Qué tipo de transferencia?')
 
-      await pick(wrapper, 'Transferencias')
+      await pill(wrapper, 'Transferencias').trigger('click')
       expect(wrapper.text()).toContain('¿Qué tipo de transferencia?')
       expect(wrapper.text()).toContain('P2P de Binance')
       expect(wrapper.text()).toContain('Otra transferencia')
     })
 
     it('P2P de Binance viene elegido y explica que se enlaza con las ordenes', async () => {
-      const wrapper = mount(BulkCaptureWizard)
+      const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
 
-      await pick(wrapper, 'Transferencias')
+      await pill(wrapper, 'Transferencias').trigger('click')
 
       expect(wrapper.text()).toContain('quedan pendientes de enlazar con su orden')
     })
 
     it('"Otra transferencia" explica el caso de dolares dados a un amigo que los cambia a USDT', async () => {
-      const wrapper = mount(BulkCaptureWizard)
-      await pick(wrapper, 'Transferencias')
+      const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
+      await pill(wrapper, 'Transferencias').trigger('click')
 
-      await pick(wrapper, 'Otra transferencia')
+      await pill(wrapper, 'Otra transferencia').trigger('click')
 
       expect(wrapper.text()).toContain('le diste dólares de Facebank a un amigo que te los cambió a USDT')
       expect(wrapper.text()).not.toContain('quedan pendientes de enlazar con su orden')
+    })
+  })
+
+  describe('pasos: categorias', () => {
+    it('el boton avisa que se puede seguir sin categoria y cambia al elegir una', async () => {
+      const wrapper = mount(BulkCaptureWizard)
+      await goTo(wrapper, TITLE.expenseCategory)
+
+      expect(continueButton(wrapper).text()).toBe('Continuar sin categoría')
+
+      await wrapper.find('input[type="text"]').setValue('Mercado')
+      expect(continueButton(wrapper).text()).toBe('Continuar')
+    })
+
+    it('la categoria elegida llega a los gastos leidos', async () => {
+      const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
+      await pill(wrapper, 'Solo gastos').trigger('click')
+      await goTo(wrapper, TITLE.expenseCategory)
+      await wrapper.find('input[type="text"]').setValue('Mercado')
+      await goTo(wrapper, TITLE.captures)
+
+      await pickImage(wrapper)
+      await continueButton(wrapper).trigger('click')
+
+      expect(wrapper.text()).toContain(TITLE.review)
+      expect(wrapper.text()).not.toContain('Falta la categoría')
+      expect(continueButton(wrapper).attributes('disabled')).toBeUndefined()
+    })
+  })
+
+  describe('capturas, revision y confirmacion', () => {
+    it('recorre los pasos hasta la revision y exige completar lo que falta', async () => {
+      const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
+
+      await goTo(wrapper, TITLE.captures)
+      expect(wrapper.text()).toContain('historial de órdenes P2P de')
+      expect(continueButton(wrapper).attributes('disabled')).toBeDefined()
+
+      await pickImage(wrapper)
+      expect(wrapper.text()).toContain('Lista de movimientos del banco · 5 movimientos')
+      expect(continueButton(wrapper).attributes('disabled')).toBeUndefined()
+
+      await continueButton(wrapper).trigger('click')
+      expect(wrapper.text()).toContain(TITLE.review)
+      expect(wrapper.findAll('.row-card')).toHaveLength(5)
+      // Sin categoria elegida antes, faltan las de los gastos: no se puede continuar.
+      expect(wrapper.text()).toContain('Falta la categoría')
+      expect(continueButton(wrapper).attributes('disabled')).toBeDefined()
+    })
+
+    it('al dejar todo pendiente se puede confirmar y avisa al terminar', async () => {
+      const wrapper = mount(BulkCaptureWizard, { props: { initialWalletId: BS.id } })
+      await goTo(wrapper, TITLE.captures)
+      await pickImage(wrapper)
+      await continueButton(wrapper).trigger('click')
+
+      // Cada fila como pendiente: no exige categoria.
+      for (const card of wrapper.findAll('.row-card')) {
+        const chip = card.findAll('.action-chip').find((item) => item.text() === 'Pendiente')!
+        await chip.trigger('click')
+      }
+      expect(continueButton(wrapper).attributes('disabled')).toBeUndefined()
+
+      await continueButton(wrapper).trigger('click')
+      expect(wrapper.text()).toContain(TITLE.confirm)
+      expect(wrapper.text()).toContain('5 pendientes')
+
+      await continueButton(wrapper).trigger('click')
+      await flushPromises()
+
+      expect(createDraftsBulk).toHaveBeenCalledTimes(1)
+      expect(wrapper.emitted('done')?.[0]?.[0]).toMatchObject({ pendings: 5, failures: [] })
     })
   })
 })
