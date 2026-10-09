@@ -131,6 +131,9 @@ function keepScope(rows: ScanRow[], scope: ScanScope): ScanRow[] {
 export interface RowsFromImage {
   kind: ImageKind
   rows: ScanRow[]
+  // Cuantas filas se leyeron de la imagen ANTES de aplicar "solo gastos" / "solo ingresos": con 0 no se
+  // pudo leer nada (la captura no se entendio); con mas de 0 y ninguna en `rows`, el filtro las dejo fuera.
+  readCount: number
 }
 
 export function rowsFromImage(layout: LayoutInput, options: RowsFromImageOptions): RowsFromImage {
@@ -144,12 +147,13 @@ export function rowsFromImage(layout: LayoutInput, options: RowsFromImageOptions
       defaultDate: options.defaultDate,
       includeFees: options.includeFees,
     })
-    if (rows.length > 0) return { kind, rows: keepScope(rows, options.scope ?? 'all') }
+    if (rows.length > 0) return { kind, rows: keepScope(rows, options.scope ?? 'all'), readCount: rows.length }
     // Parecia una tabla pero no se pudieron ubicar sus columnas: se prueban los otros lectores.
     kind = classifyImageKind(layout.text, { allowStatement: false })
   }
   if (kind === 'p2p_orders') {
-    return { kind, rows: parseP2pOrderList(groupSegments(layout.words, layout.width), options.today) }
+    const rows = parseP2pOrderList(groupSegments(layout.words, layout.width), options.today)
+    return { kind, rows, readCount: rows.length }
   }
   if (kind === 'bank_list') {
     const scope = options.scope ?? 'all'
@@ -164,10 +168,11 @@ export function rowsFromImage(layout: LayoutInput, options: RowsFromImageOptions
       fallbackDirection: scope === 'received' ? 'in' : scope === 'expenses' ? 'out' : undefined,
       includeFees: options.includeFees,
     })
-    return { kind, rows: keepScope(rows, scope) }
+    return { kind, rows: keepScope(rows, scope), readCount: rows.length }
   }
   if (kind === 'single') {
-    return { kind, rows: keepScope(rowsFromSingleScan(scanText(layout.text)), options.scope ?? 'all') }
+    const rows = rowsFromSingleScan(scanText(layout.text))
+    return { kind, rows: keepScope(rows, options.scope ?? 'all'), readCount: rows.length }
   }
-  return { kind, rows: [] }
+  return { kind, rows: [], readCount: 0 }
 }

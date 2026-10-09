@@ -14,7 +14,7 @@ import { isFeeText, suggestCategory } from './movementDictionary'
 import { makeRow, to24h } from './movementRows'
 import type { ScanRow } from './movementRows'
 import { centerY } from './ocrLayout'
-import type { OcrWord } from './ocrLayout'
+import type { OcrRegion, OcrWord } from './ocrLayout'
 import { parseLocalizedNumber } from './numbers'
 import { normalizeForMatch } from './textLines'
 
@@ -184,6 +184,51 @@ function checkBalanceChain(entries: Entry[]): void {
 
 const NUMERIC = /\d/
 
+// Region (en coordenadas de la imagen) de la columna de descripcion de una tabla ya reconocida. Tesseract
+// lee mal las celdas de varias lineas cuando va con el resto de la pagina ("Eo BDV", "OM DON FAG"); si se
+// relee esta columna sola, como un bloque, el texto sale casi perfecto. Null si no hay tabla o columna.
+// Tesseract falla (error de memoria de WASM) con una region con decimales o que se sale de la imagen:
+// por eso las medidas son enteros y se recortan a los limites.
+export function statementDescriptionRegion(words: OcrWord[], imageWidth: number, imageHeight: number): OcrRegion | null {
+  const columns = findColumns(words)
+  const start = columns?.starts.description
+  if (!columns || start === undefined) return null
+
+  const margin = imageWidth * 0.004
+  const nextStart = Math.min(...Object.values(columns.starts).filter((other): other is number => other !== undefined && other > start))
+  const left = Math.max(0, Math.floor(start - margin))
+  const right = Math.min(imageWidth, Math.ceil(Number.isFinite(nextStart) ? nextStart - margin : start + imageWidth * 0.15))
+  const top = Math.max(0, Math.floor(columns.headerBottom + 2))
+  const bottom = Math.min(imageHeight, Math.ceil(Math.max(...words.map((word) => word.y1)) + 10))
+  if (right <= left || bottom <= top) return null
+  return { left, top, width: right - left, height: bottom - top }
+}
+
+// Cuantas cifras finales de la referencia comparten una comision y su operacion (ej. 0210086173620 y
+// 0677286173620 terminan igual): el banco las genera de la misma operacion.
+const REFERENCE_SUFFIX_DIGITS = 7
+
+// Une cada comision con su operacion por la referencia: misma fecha y hora y las mismas cifras finales
+// en la referencia; la de menor monto es la comision. Es independiente de lo que el OCR haya leido en la
+// descripcion (que es lo mas fragil), asi que funciona aunque el texto salga deformado.
+function pairFeesByReference(rows: ScanRow[]): ScanRow[] {
+  const groups = new Map<string, ScanRow[]>()
+  for (const row of rows) {
+    if (row.direction !== 'out' || !row.reference || !row.time || !row.occurredOn) continue
+    const key = `${row.occurredOn}|${row.time}|${row.reference.slice(-REFERENCE_SUFFIX_DIGITS)}`
+    groups.set(key, [...(groups.get(key) ?? []), row])
+  }
+
+  const merged = new Set<ScanRow>()
+  for (const group of groups.values()) {
+    if (group.length !== 2) continue
+    const [fee, operation] = [...group].sort((a, b) => a.amount - b.amount) as [ScanRow, ScanRow]
+    operation.fee = Math.round((operation.fee + fee.amount) * 100) / 100
+    merged.add(fee)
+  }
+  return rows.filter((row) => !merged.has(row))
+}
+
 export function parseBankStatement(words: OcrWord[], options: BankStatementOptions): ScanRow[] {
   const columns = findColumns(words)
   if (!columns) return []
@@ -283,7 +328,8 @@ export function parseBankStatement(words: OcrWord[], options: BankStatementOptio
 
   checkBalanceChain(entries)
 
-  let merged = mergeFees(entries.map((entry) => entry.row))
+  // Primero por referencia (no depende del texto leido) y despues por descripcion, para lo que quede.
+  let merged = mergeFees(pairFeesByReference(entries.map((entry) => entry.row)))
   if (options.includeFees === false) {
     merged = merged.filter((row) => !(isFeeText(row.description) && row.direction === 'out'))
     for (const row of merged) row.fee = 0
