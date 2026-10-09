@@ -17,6 +17,7 @@ import BottomSheet from '../ui/BottomSheet.vue'
 import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import MonthPager from '../ui/MonthPager.vue'
 import VoiceEntryButton from '../voiceEntry/VoiceEntryButton.vue'
+import CaptureEntryButton from '../screenshotScan/CaptureEntryButton.vue'
 import TransferForm from '../wallets/TransferForm.vue'
 import DraftReviewCard from './DraftReviewCard.vue'
 import MonthSummaryCards from './MonthSummaryCards.vue'
@@ -225,6 +226,13 @@ function onDraftConfirmed(transaction: Transaction, draftId: string) {
   drafts.value = drafts.value.filter((draft) => draft.id !== draftId)
 }
 
+// Un pendiente completado como transferencia ya movio saldos y creo sus movimientos: se refresca todo.
+function onDraftTransferred(draftId: string) {
+  drafts.value = drafts.value.filter((draft) => draft.id !== draftId)
+  transactionsStore.fetchTransactions({ force: true })
+  fetchPeriodSummary(currentPeriodKey())
+}
+
 function onDraftDiscarded(draftId: string) {
   drafts.value = drafts.value.filter((draft) => draft.id !== draftId)
 }
@@ -279,6 +287,7 @@ function goBack() {
           </button>
           <VoiceEntryButton @created="onDraftCreated" />
           <ReceiptUpload @created="onDraftCreated" />
+          <CaptureEntryButton />
         </div>
 
         <div v-if="drafts.length > 0" class="transactions-section drafts-list">
@@ -287,6 +296,7 @@ function goBack() {
             :key="draft.id"
             :draft="draft"
             @confirmed="onDraftConfirmed"
+            @transferred="onDraftTransferred"
             @discarded="onDraftDiscarded"
           />
         </div>

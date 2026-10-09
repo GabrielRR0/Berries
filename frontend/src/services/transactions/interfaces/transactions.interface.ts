@@ -80,6 +80,12 @@ export interface Draft {
   // ese caso parsedAmount/parsedCurrency ya vienen sobreescritos con el balance real
   // de esa wallet.
   suggestedWalletId: string | null
+  // Solo en pendientes del registro desde capturas (source "screenshot"): el movimiento
+  // ya casi armado que el usuario dejo para completar despues.
+  txnType: TransactionType | null
+  occurredAt: string | null
+  fee: number | null
+  reference: string | null
   status: string
   createdAt: string
 }
@@ -90,4 +96,33 @@ export interface ConfirmDraftParams {
   finalAmount: number
   finalCategory: string
   finalDescription?: string
+  // Sin fecha se usa la del borrador; sin comision no se crea el gasto "Comisión".
+  occurredAt?: string
+  fee?: number
+}
+
+// Un pendiente nuevo (ver createDraftsBulk).
+export interface DraftInput {
+  parsedAmount: number
+  parsedCurrency?: string | null
+  parsedCategory?: string | null
+  parsedDescription?: string | null
+  suggestedWalletId?: string | null
+  txnType?: TransactionType | null
+  occurredAt?: string | null
+  fee?: number | null
+  reference?: string | null
+}
+
+// Edicion parcial de un pendiente: solo se envian las claves presentes.
+export type DraftUpdateParams = Partial<DraftInput>
+
+// Completar un pendiente como transferencia: el monto del borrador es lo que llego al
+// destino y sentAmount lo que salio del origen (el dato que faltaba).
+export interface ConfirmDraftTransferParams {
+  fromWalletId: string
+  toWalletId?: string
+  sentAmount: number
+  fee?: number
+  occurredAt?: string
 }

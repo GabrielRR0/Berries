@@ -42,6 +42,11 @@ function mapDraft(wire: DraftWire): Draft {
     parsedCategory: wire.parsed_category,
     parsedDescription: wire.parsed_description,
     suggestedWalletId: wire.suggested_wallet_id,
+    // Los borradores de voz y recibo no traen los datos del registro desde capturas.
+    txnType: null,
+    occurredAt: null,
+    fee: null,
+    reference: null,
     status: wire.status,
     createdAt: wire.created_at,
   }

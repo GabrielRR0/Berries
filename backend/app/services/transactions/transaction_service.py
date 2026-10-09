@@ -29,9 +29,14 @@ def create_transaction(
     description: str | None = None,
     occurred_at: datetime | None = None,
     source: str = "manual",
+    commit: bool = True,
 ) -> Transaction:
     """Crea la transacción y aplica su delta de saldo al wallet en la misma unidad de
-    trabajo (un solo commit) — expense resta, income suma."""
+    trabajo (un solo commit) — expense resta, income suma.
+
+    commit=False solo hace flush: quien crea varias a la vez (ver
+    create_transactions_bulk) hace un unico commit al final para que un fallo a mitad
+    no deje el lote a medias."""
     if amount <= 0:
         raise TransactionValidationError("El monto debe ser mayor a 0")
     if type not in ("income", "expense"):
@@ -64,9 +69,48 @@ def create_transaction(
         source=source,
     )
     db.add(transaction)
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     db.refresh(transaction)
     return transaction
+
+
+def warm_reference_rates(db: Session, user_id: uuid.UUID, wallet_ids: list[uuid.UUID]) -> None:
+    """Garantiza que exista una tasa a USD para la moneda de cada billetera ANTES de
+    tocar ningun saldo. Motivo: la primera vez que una moneda no-USD (ej. VEF) se
+    convierte, get_fresh_rate guarda la tasa con su propio commit - y ese commit
+    confirmaria a mitad de un lote los cambios de saldo ya hechos, rompiendo el "todo o
+    nada". Best effort, igual que reference_fields_in_usd: si la API de tasas falla, el
+    registro sigue (queda sin valor de referencia)."""
+    now = datetime.now(timezone.utc)
+    currencies = set()
+    for wallet_id in set(wallet_ids):
+        wallet = db.get(Wallet, wallet_id)
+        if wallet is not None and wallet.user_id == user_id:
+            currencies.add(wallet.currency)
+    for currency in currencies:
+        reference_fields_in_usd(db, Decimal("1"), currency, now)
+
+
+def create_transactions_bulk(
+    db: Session,
+    user_id: uuid.UUID,
+    items: list[dict],
+) -> list[Transaction]:
+    """Crea varias transacciones de una sola vez: si una falla (billetera ajena, monto
+    invalido) no se crea ninguna. Cada item son los kwargs de create_transaction."""
+    warm_reference_rates(db, user_id, [item["wallet_id"] for item in items])
+    try:
+        created = [create_transaction(db, user_id, commit=False, **item) for item in items]
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    for transaction in created:
+        db.refresh(transaction)
+    return created
 
 
 def list_transactions_for_user(

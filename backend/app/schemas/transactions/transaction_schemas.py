@@ -68,6 +68,11 @@ class DraftResponse(BaseModel):
     # Solo poblado cuando el dictado menciona una wallet real del usuario junto con una
     # frase de "usé todo el saldo" - ver full_balance_detector.py/voice_entry_service.py.
     suggested_wallet_id: uuid.UUID | None
+    # Solo poblados en borradores del registro desde capturas (source="screenshot").
+    txn_type: str | None
+    occurred_at: datetime | None
+    fee: Decimal | None
+    reference: str | None
     status: str
     created_at: datetime
 
@@ -78,3 +83,53 @@ class DraftConfirmRequest(BaseModel):
     final_amount: Decimal = Field(gt=0)
     final_category: str = Field(min_length=1, max_length=80)
     final_description: str | None = None
+    # Si no se envia, se usa la fecha que traia el borrador (o "ahora" si no tenia).
+    occurred_at: datetime | None = None
+    # Comision cobrada junto con el movimiento: se registra como su propio gasto "Comision".
+    fee: Decimal | None = Field(default=None, ge=0)
+
+
+class TransactionBulkCreateRequest(BaseModel):
+    # Registro desde una captura con varios movimientos: todo o nada.
+    items: list[TransactionCreateRequest] = Field(min_length=1, max_length=100)
+
+
+class DraftCreateItem(BaseModel):
+    source: str = Field(default="screenshot", max_length=10)
+    raw_input: str | None = None
+    parsed_amount: Decimal = Field(gt=0)
+    parsed_currency: str | None = Field(default=None, max_length=10)
+    parsed_category: str | None = Field(default=None, max_length=80)
+    parsed_description: str | None = None
+    suggested_wallet_id: uuid.UUID | None = None
+    txn_type: Literal["income", "expense"] | None = None
+    occurred_at: datetime | None = None
+    fee: Decimal | None = Field(default=None, ge=0)
+    reference: str | None = Field(default=None, max_length=60)
+
+
+class DraftBulkCreateRequest(BaseModel):
+    items: list[DraftCreateItem] = Field(min_length=1, max_length=100)
+
+
+class DraftUpdateRequest(BaseModel):
+    # PATCH parcial: solo se aplican los campos enviados (ver update_draft).
+    parsed_amount: Decimal | None = Field(default=None, gt=0)
+    parsed_currency: str | None = Field(default=None, max_length=10)
+    parsed_category: str | None = Field(default=None, max_length=80)
+    parsed_description: str | None = None
+    suggested_wallet_id: uuid.UUID | None = None
+    txn_type: Literal["income", "expense"] | None = None
+    occurred_at: datetime | None = None
+    fee: Decimal | None = Field(default=None, ge=0)
+    reference: str | None = Field(default=None, max_length=60)
+
+
+class DraftConfirmTransferRequest(BaseModel):
+    # El monto del borrador es lo que llego al destino; sent_amount es lo que salio del
+    # origen (el dato que faltaba cuando el usuario lo dejo pendiente).
+    from_wallet_id: uuid.UUID
+    to_wallet_id: uuid.UUID | None = None
+    sent_amount: Decimal = Field(gt=0)
+    fee: Decimal = Field(default=Decimal("0"), ge=0)
+    occurred_at: datetime | None = None

@@ -1,6 +1,7 @@
+from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import String
+from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -16,7 +17,7 @@ class TransactionDraft(Base):
 
     id: Mapped[UuidPk]
     user_id: Mapped[UserFk]
-    source: Mapped[str] = mapped_column(String(10), nullable=False)  # "voice" | "ocr"
+    source: Mapped[str] = mapped_column(String(10), nullable=False)  # "voice" | "ocr" | "screenshot"
     # Encriptados (ver app/core/encryption.py) - raw_input es literalmente lo que el
     # usuario dijo/escaneó sobre un movimiento suyo ("gasté 20 dólares en comida"), y
     # los parsed_* son el mismo dato ya estructurado - mismo criterio que Transaction.
@@ -39,5 +40,16 @@ class TransactionDraft(Base):
     # parsed_amount/parsed_currency ya vienen sobreescritos con el balance real de esta
     # wallet, y DraftReviewCard.vue la preselecciona en vez de inferir por moneda.
     suggested_wallet_id: Mapped[NullableWalletFk]
+    # Campos que usa el registro desde capturas (source="screenshot"): ahi el borrador es
+    # un movimiento ya casi armado que el usuario dejo "pendiente" por falta de un dato
+    # (ej. cuantos USDT eran los Bs recibidos). Todos nullable: los borradores de voz/OCR
+    # no los traen y el tipo se sigue eligiendo al confirmar.
+    txn_type: Mapped[str | None] = mapped_column(String(10), nullable=True)  # "income" | "expense"
+    # Fecha real del movimiento (la de la captura), no la de creacion del borrador.
+    occurred_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Comision cobrada junto con el movimiento (ej. "cobro comision pag movil").
+    fee: Mapped[Decimal | None] = mapped_column(EncryptedDecimal, nullable=True)
+    # Numero de operacion/referencia del banco, para rastrear el movimiento.
+    reference: Mapped[str | None] = mapped_column(EncryptedString, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")  # pending|confirmed|discarded
     created_at: Mapped[CreatedAt]

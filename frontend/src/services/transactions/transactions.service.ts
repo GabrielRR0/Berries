@@ -7,8 +7,11 @@
 import { useAuthStore } from '../../stores/auth.store'
 import type {
   ConfirmDraftParams,
+  ConfirmDraftTransferParams,
   CreateTransactionParams,
   Draft,
+  DraftInput,
+  DraftUpdateParams,
   ListTransactionsParams,
   Transaction,
   TransactionType,
@@ -43,6 +46,10 @@ interface DraftWire {
   parsed_category: string | null
   parsed_description: string | null
   suggested_wallet_id: string | null
+  txn_type: string | null
+  occurred_at: string | null
+  fee: number | string | null
+  reference: string | null
   status: string
   created_at: string
 }
@@ -87,6 +94,10 @@ function mapDraft(wire: DraftWire): Draft {
     parsedCategory: wire.parsed_category,
     parsedDescription: wire.parsed_description,
     suggestedWalletId: wire.suggested_wallet_id,
+    txnType: (wire.txn_type as TransactionType | null) ?? null,
+    occurredAt: wire.occurred_at ?? null,
+    fee: wire.fee == null ? null : Number(wire.fee),
+    reference: wire.reference ?? null,
     status: wire.status,
     createdAt: wire.created_at,
   }
@@ -221,6 +232,8 @@ export async function confirmDraft(draftId: string, params: ConfirmDraftParams):
     final_category: params.finalCategory,
   }
   if (params.finalDescription !== undefined) payload.final_description = params.finalDescription
+  if (params.occurredAt !== undefined) payload.occurred_at = params.occurredAt
+  if (params.fee !== undefined) payload.fee = params.fee
 
   const response = await fetch(`${API_BASE_URL}/api/transactions/drafts/${draftId}/confirm`, {
     method: 'POST',
@@ -247,6 +260,111 @@ export async function discardDraft(draftId: string): Promise<Draft> {
   if (!response.ok) {
     throw new TransactionsApiError(
       await parseErrorMessage(response, 'No se pudo descartar el borrador.'),
+      response.status,
+    )
+  }
+
+  return mapDraft((await response.json()) as DraftWire)
+}
+
+// Registro desde una captura con varios movimientos: el backend los crea todos o ninguno.
+export async function createTransactionsBulk(items: CreateTransactionParams[]): Promise<Transaction[]> {
+  const payload = {
+    items: items.map((item) => ({
+      wallet_id: item.walletId,
+      type: item.type,
+      amount: item.amount,
+      category: item.category,
+      description: item.description,
+      occurred_at: item.occurredAt,
+      source: item.source ?? 'screenshot',
+    })),
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/transactions/bulk`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    throw new TransactionsApiError(
+      await parseErrorMessage(response, 'No se pudieron registrar los movimientos.'),
+      response.status,
+    )
+  }
+
+  return ((await response.json()) as TransactionWire[]).map(mapTransaction)
+}
+
+function draftPayload(params: Partial<DraftInput>): Record<string, unknown> {
+  const payload: Record<string, unknown> = {}
+  if (params.parsedAmount !== undefined) payload.parsed_amount = params.parsedAmount
+  if (params.parsedCurrency !== undefined) payload.parsed_currency = params.parsedCurrency
+  if (params.parsedCategory !== undefined) payload.parsed_category = params.parsedCategory
+  if (params.parsedDescription !== undefined) payload.parsed_description = params.parsedDescription
+  if (params.suggestedWalletId !== undefined) payload.suggested_wallet_id = params.suggestedWalletId
+  if (params.txnType !== undefined) payload.txn_type = params.txnType
+  if (params.occurredAt !== undefined) payload.occurred_at = params.occurredAt
+  if (params.fee !== undefined) payload.fee = params.fee
+  if (params.reference !== undefined) payload.reference = params.reference
+  return payload
+}
+
+// Pendientes del registro desde capturas: movimientos que el usuario no quiso (o no pudo)
+// cerrar todavia, guardados en el servidor para completarlos despues.
+export async function createDraftsBulk(items: DraftInput[]): Promise<Draft[]> {
+  const response = await fetch(`${API_BASE_URL}/api/transactions/drafts/bulk`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ items: items.map((item) => ({ source: 'screenshot', ...draftPayload(item) })) }),
+  })
+
+  if (!response.ok) {
+    throw new TransactionsApiError(
+      await parseErrorMessage(response, 'No se pudieron guardar los pendientes.'),
+      response.status,
+    )
+  }
+
+  return ((await response.json()) as DraftWire[]).map(mapDraft)
+}
+
+export async function updateDraft(draftId: string, params: DraftUpdateParams): Promise<Draft> {
+  const response = await fetch(`${API_BASE_URL}/api/transactions/drafts/${draftId}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(draftPayload(params)),
+  })
+
+  if (!response.ok) {
+    throw new TransactionsApiError(
+      await parseErrorMessage(response, 'No se pudo editar el pendiente.'),
+      response.status,
+    )
+  }
+
+  return mapDraft((await response.json()) as DraftWire)
+}
+
+export async function confirmDraftAsTransfer(draftId: string, params: ConfirmDraftTransferParams): Promise<Draft> {
+  const payload: Record<string, unknown> = {
+    from_wallet_id: params.fromWalletId,
+    sent_amount: params.sentAmount,
+  }
+  if (params.toWalletId !== undefined) payload.to_wallet_id = params.toWalletId
+  if (params.fee !== undefined) payload.fee = params.fee
+  if (params.occurredAt !== undefined) payload.occurred_at = params.occurredAt
+
+  const response = await fetch(`${API_BASE_URL}/api/transactions/drafts/${draftId}/confirm-transfer`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    throw new TransactionsApiError(
+      await parseErrorMessage(response, 'No se pudo completar la transferencia.'),
       response.status,
     )
   }

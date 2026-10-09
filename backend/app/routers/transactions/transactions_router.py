@@ -7,16 +7,30 @@ from sqlalchemy.orm import Session
 from app.core.deps import get_current_user, get_db
 from app.models.auth.user_model import User
 from app.schemas.transactions.transaction_schemas import (
+    DraftBulkCreateRequest,
     DraftConfirmRequest,
+    DraftConfirmTransferRequest,
     DraftResponse,
+    DraftUpdateRequest,
+    TransactionBulkCreateRequest,
     TransactionCreateRequest,
     TransactionResponse,
     TransactionUpdateRequest,
 )
-from app.services.transactions.drafts.draft_review_service import confirm_draft, discard_draft, list_drafts_for_user
+from app.services.transactions.drafts.draft_review_service import (
+    confirm_draft,
+    confirm_draft_as_transfer,
+    create_drafts_bulk,
+    discard_draft,
+    list_drafts_for_user,
+    update_draft,
+)
 from app.services.transactions.errors import DraftNotFoundError, TransactionValidationError
+from app.services.currency.errors import UnsupportedCurrencyError
+from app.services.wallets.errors import CurrencyMismatchError, InsufficientBalanceError, WalletNotFoundError
 from app.services.transactions.transaction_service import (
     create_transaction,
+    create_transactions_bulk,
     delete_transaction,
     list_transactions_for_user,
     update_transaction,
@@ -46,6 +60,19 @@ async def create(
     except TransactionValidationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return TransactionResponse.model_validate(transaction)
+
+
+@router.post("/bulk", response_model=list[TransactionResponse], status_code=status.HTTP_201_CREATED)
+async def create_bulk(
+    payload: TransactionBulkCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[TransactionResponse]:
+    try:
+        transactions = create_transactions_bulk(db, current_user.id, [item.model_dump() for item in payload.items])
+    except TransactionValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return [TransactionResponse.model_validate(t) for t in transactions]
 
 
 @router.get("", response_model=list[TransactionResponse])
@@ -126,12 +153,72 @@ async def confirm(
             payload.final_category,
             payload.final_description,
             payload.type,
+            occurred_at=payload.occurred_at,
+            fee=payload.fee,
         )
     except DraftNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except TransactionValidationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return TransactionResponse.model_validate(transaction)
+
+
+@router.post("/drafts/bulk", response_model=list[DraftResponse], status_code=status.HTTP_201_CREATED)
+async def create_drafts(
+    payload: DraftBulkCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[DraftResponse]:
+    try:
+        drafts = create_drafts_bulk(db, current_user.id, [item.model_dump() for item in payload.items])
+    except WalletNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except UnsupportedCurrencyError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return [DraftResponse.model_validate(d) for d in drafts]
+
+
+@router.patch("/drafts/{draft_id}", response_model=DraftResponse)
+async def edit_draft(
+    draft_id: uuid.UUID,
+    payload: DraftUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DraftResponse:
+    try:
+        draft = update_draft(db, draft_id, current_user.id, payload.model_dump(exclude_unset=True))
+    except DraftNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except WalletNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (TransactionValidationError, UnsupportedCurrencyError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return DraftResponse.model_validate(draft)
+
+
+@router.post("/drafts/{draft_id}/confirm-transfer", response_model=DraftResponse)
+async def confirm_as_transfer(
+    draft_id: uuid.UUID,
+    payload: DraftConfirmTransferRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> DraftResponse:
+    try:
+        draft = confirm_draft_as_transfer(
+            db,
+            draft_id,
+            current_user.id,
+            payload.from_wallet_id,
+            payload.to_wallet_id,
+            payload.sent_amount,
+            fee=payload.fee,
+            occurred_at=payload.occurred_at,
+        )
+    except (DraftNotFoundError, WalletNotFoundError) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except (TransactionValidationError, InsufficientBalanceError, CurrencyMismatchError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return DraftResponse.model_validate(draft)
 
 
 @router.post("/drafts/{draft_id}/discard", response_model=DraftResponse)

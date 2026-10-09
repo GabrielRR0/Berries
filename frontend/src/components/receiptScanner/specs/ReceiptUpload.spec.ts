@@ -25,6 +25,10 @@ const DRAFT = {
   parsedCategory: 'supermercado',
   parsedDescription: null,
   suggestedWalletId: null,
+  txnType: null,
+  occurredAt: null,
+  fee: null,
+  reference: null,
   status: 'pending',
   createdAt: '2026-08-01T12:00:00Z',
 }
