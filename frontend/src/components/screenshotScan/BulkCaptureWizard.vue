@@ -13,23 +13,42 @@ import ToggleSwitch from '../ui/ToggleSwitch.vue'
 import BulkRowCard from './BulkRowCard.vue'
 
 // Registro desde capturas, paso a paso (misma estructura y animaciones que
-// CreateGoalWizard.vue):
-//  1. Billetera y fecha por defecto.
-//  2. Subir una o varias capturas (lista del banco, historial P2P de Binance o un
-//     comprobante suelto): se leen en el dispositivo.
-//  3. Revisar cada fila: que es (gasto, recibido, transferencia), categoria, o dejarla
-//     pendiente / omitirla.
-//  4. Confirmar: resumen y registro.
+// CreateGoalWizard.vue). Cada paso es una sola pregunta; los que no aplican se saltan solos:
+//  - wallet: de que billetera son (se salta si se llego desde una billetera);
+//  - kind: que se va a registrar (todo, gastos, ingresos, transferencias);
+//  - details: dia por defecto y comisiones;
+//  - expenseCategory / incomeCategory: categoria para todos los gastos / ingresos (solo si aplica);
+//  - captures: subir una o varias capturas (se leen en el dispositivo);
+//  - review: revisar cada fila (que es, categoria, pendiente u omitir);
+//  - confirm: resumen y registro.
+type StepId = 'wallet' | 'kind' | 'details' | 'expenseCategory' | 'incomeCategory' | 'captures' | 'review' | 'confirm'
+
 const props = withDefaults(defineProps<{ initialWalletId?: string }>(), { initialWalletId: '' })
 const emit = defineEmits<{ done: [outcome: ConfirmOutcome]; cancel: [] }>()
 
 const walletsStore = useWalletsStore()
 const capture = useBulkCapture(props.initialWalletId)
 
-const step = ref<1 | 2 | 3 | 4>(1)
+// Las categorias solo hacen falta donde se registran gastos o ingresos (no en transferencias).
+const showExpenseCategory = computed(() => capture.scope.value === 'all' || capture.scope.value === 'expenses')
+const showIncomeCategory = computed(() => capture.scope.value === 'all' || capture.scope.value === 'received')
+
+const steps = computed<StepId[]>(() => {
+  const list: StepId[] = []
+  if (!props.initialWalletId) list.push('wallet')
+  list.push('kind', 'details')
+  if (showExpenseCategory.value) list.push('expenseCategory')
+  if (showIncomeCategory.value) list.push('incomeCategory')
+  list.push('captures', 'review', 'confirm')
+  return list
+})
+
+const stepId = ref<StepId>(steps.value[0]!)
+const stepIndex = computed(() => Math.max(0, steps.value.indexOf(stepId.value)))
+
 const stepTransitionName = ref<'slide-left' | 'slide-right'>('slide-left')
-watch(step, (newStep, oldStep) => {
-  stepTransitionName.value = newStep > oldStep ? 'slide-left' : 'slide-right'
+watch(stepId, (newId, oldId) => {
+  stepTransitionName.value = steps.value.indexOf(newId) > steps.value.indexOf(oldId) ? 'slide-left' : 'slide-right'
 })
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -54,11 +73,18 @@ const SCOPE_OPTIONS = [
   { value: 'transfers', label: 'Transferencias' },
 ]
 
-// Al pasar a las capturas, lo elegido en este paso (billetera, categorias) queda como valor por
-// defecto de las filas que ya se hubieran leido.
-function goToCaptures() {
-  capture.reapplyDefaults()
-  step.value = 2
+function goNext() {
+  const next = steps.value[stepIndex.value + 1]
+  if (!next) return
+  // Al pasar a las capturas, lo elegido antes (billetera, categorias) queda como valor por defecto
+  // de las filas que ya se hubieran leido.
+  if (next === 'captures') capture.reapplyDefaults()
+  stepId.value = next
+}
+
+function goBack() {
+  if (stepIndex.value === 0) emit('cancel')
+  else stepId.value = steps.value[stepIndex.value - 1]!
 }
 
 const todayValue = (() => {
@@ -75,11 +101,6 @@ onBeforeUnmount(() => {
   document.removeEventListener('paste', onPaste)
   capture.reset()
 })
-
-function goBack() {
-  if (step.value === 1) emit('cancel')
-  else step.value = (step.value - 1) as 1 | 2 | 3 | 4
-}
 
 function pickFiles() {
   fileInput.value?.click()
@@ -101,7 +122,7 @@ function onDrop(event: DragEvent) {
 // Ctrl+V en escritorio: pega una captura copiada al portapapeles (solo en los pasos
 // donde se pueden agregar imagenes).
 function onPaste(event: ClipboardEvent) {
-  if (step.value !== 2 && step.value !== 3) return
+  if (stepId.value !== 'captures' && stepId.value !== 'review') return
   const files = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/'))
   if (files.length > 0) void capture.addImages(files)
 }
@@ -147,16 +168,12 @@ const transferKindHint = computed(() =>
     ? 'P2P de Binance: cada orden se registra como una transferencia entre tu billetera en USDT y la de bolívares, y los movimientos del banco quedan pendientes de enlazar con su orden (que trae los USDT).'
     : 'Otra transferencia: por ejemplo, le diste dólares de Facebank a un amigo que te los cambió a USDT. Cada movimiento se registra como una transferencia desde la billetera elegida; tú indicas a cuál billetera llegó y cuánto.',
 )
-
-// Las categorias solo hacen falta donde se registran gastos o ingresos (no en transferencias).
-const showExpenseCategory = computed(() => capture.scope.value === 'all' || capture.scope.value === 'expenses')
-const showIncomeCategory = computed(() => capture.scope.value === 'all' || capture.scope.value === 'received')
 </script>
 
 <template>
   <div class="bulk-wizard">
     <div class="wizard-progress">
-      <span v-for="n in 4" :key="n" class="wizard-progress-segment" :class="{ filled: n <= step }" />
+      <span v-for="(id, index) in steps" :key="id" class="wizard-progress-segment" :class="{ filled: index <= stepIndex }" />
     </div>
 
     <input
@@ -170,11 +187,10 @@ const showIncomeCategory = computed(() => capture.scope.value === 'all' || captu
 
     <div class="wizard-steps-viewport">
       <Transition :name="stepTransitionName">
-        <div v-if="step === 1" key="1" class="wizard-step">
-          <h2 class="wizard-title">Antes de subir las capturas</h2>
-          <p class="wizard-subtitle">Todo es opcional: lo que no elijas lo completas después, fila por fila.</p>
+        <div v-if="stepId === 'wallet'" key="wallet" class="wizard-step">
+          <h2 class="wizard-title">¿De qué billetera son?</h2>
+          <p class="wizard-subtitle">Los movimientos de la captura se registrarán en ella. Puedes cambiarla por movimiento al revisar.</p>
 
-          <h3 class="wizard-section">¿De qué billetera son?</h3>
           <div class="wallet-grid">
             <button
               v-for="item in walletsStore.wallets"
@@ -192,24 +208,16 @@ const showIncomeCategory = computed(() => capture.scope.value === 'all' || captu
           <p v-else-if="capture.walletAutoSelected.value" class="wizard-hint">
             Elegimos la única billetera posible. Puedes cambiarla.
           </p>
-          <p v-else class="wizard-hint">Puedes cambiarla por movimiento al revisar.</p>
 
-          <h3 class="wizard-section">¿De qué día?</h3>
-          <PillToggle
-            :options="DATE_OPTIONS"
-            :model-value="capture.dateChoice.value"
-            @update:model-value="capture.dateChoice.value = $event as 'today' | 'yesterday' | 'custom'"
-          />
-          <input
-            v-if="capture.dateChoice.value === 'custom'"
-            v-model="capture.customDate.value"
-            type="date"
-            class="date-input"
-            :max="todayValue"
-          />
-          <p class="wizard-hint">Se usa cuando la captura no trae el día. Si dice AYER o trae fechas, se respeta lo que dice.</p>
+          <BaseButton class="wizard-next" @click="goNext">Continuar</BaseButton>
+        </div>
 
-          <h3 class="wizard-section">¿Qué quieres registrar?</h3>
+        <div v-else-if="stepId === 'kind'" key="kind" class="wizard-step">
+          <button v-if="stepIndex > 0" type="button" class="wizard-back" aria-label="Atrás" @click="goBack">←</button>
+
+          <h2 class="wizard-title">¿Qué quieres registrar?</h2>
+          <p class="wizard-subtitle">Es opcional: con "Todo" se detecta solo qué es cada movimiento.</p>
+
           <PillToggle
             :options="SCOPE_OPTIONS"
             :model-value="capture.scope.value"
@@ -227,28 +235,66 @@ const showIncomeCategory = computed(() => capture.scope.value === 'all' || captu
             <p class="wizard-hint">{{ transferKindHint }}</p>
           </template>
 
+          <BaseButton class="wizard-next" @click="goNext">Continuar</BaseButton>
+        </div>
+
+        <div v-else-if="stepId === 'details'" key="details" class="wizard-step">
+          <button v-if="stepIndex > 0" type="button" class="wizard-back" aria-label="Atrás" @click="goBack">←</button>
+
+          <h2 class="wizard-title">Fecha y comisiones</h2>
+          <p class="wizard-subtitle">Dos datos que se usan cuando la captura no los trae.</p>
+
+          <h3 class="wizard-section">¿De qué día?</h3>
+          <PillToggle
+            :options="DATE_OPTIONS"
+            :model-value="capture.dateChoice.value"
+            @update:model-value="capture.dateChoice.value = $event as 'today' | 'yesterday' | 'custom'"
+          />
+          <input
+            v-if="capture.dateChoice.value === 'custom'"
+            v-model="capture.customDate.value"
+            type="date"
+            class="date-input"
+            :max="todayValue"
+          />
+          <p class="wizard-hint">Si la captura dice AYER o trae fechas, se respeta lo que dice.</p>
+
+          <h3 class="wizard-section">Comisiones</h3>
           <ToggleSwitch v-model="capture.includeFees.value" label="Tomar en cuenta las comisiones" />
           <p class="wizard-hint">
             Las comisiones ("Cobro comisión...") se registran como un gasto aparte en la categoría Comisión. Desactívalo si no las quieres.
           </p>
 
-          <template v-if="showExpenseCategory || showIncomeCategory">
-            <h3 class="wizard-section">Categoría (opcional)</h3>
-            <div v-if="showExpenseCategory" class="category-block">
-              <span class="category-label">Para los gastos</span>
-              <CategoryField v-model="capture.expenseCategory.value" kind="expense" />
-            </div>
-            <div v-if="showIncomeCategory" class="category-block">
-              <span class="category-label">Para los ingresos</span>
-              <CategoryField v-model="capture.incomeCategory.value" kind="income" />
-            </div>
-            <p class="wizard-hint">Si todos son de lo mismo (por ejemplo, mercado), elígela aquí. Si no, la eliges fila por fila.</p>
-          </template>
-
-          <BaseButton class="wizard-next" @click="goToCaptures">Continuar</BaseButton>
+          <BaseButton class="wizard-next" @click="goNext">Continuar</BaseButton>
         </div>
 
-        <div v-else-if="step === 2" key="2" class="wizard-step">
+        <div v-else-if="stepId === 'expenseCategory'" key="expenseCategory" class="wizard-step">
+          <button v-if="stepIndex > 0" type="button" class="wizard-back" aria-label="Atrás" @click="goBack">←</button>
+
+          <h2 class="wizard-title">Categoría de los gastos</h2>
+          <p class="wizard-subtitle">Opcional. Si todos son de lo mismo (por ejemplo, mercado), elígela aquí. Si no, la eliges fila por fila.</p>
+
+          <CategoryField v-model="capture.expenseCategory.value" kind="expense" />
+
+          <BaseButton class="wizard-next" @click="goNext">
+            {{ capture.expenseCategory.value.trim() ? 'Continuar' : 'Continuar sin categoría' }}
+          </BaseButton>
+        </div>
+
+        <div v-else-if="stepId === 'incomeCategory'" key="incomeCategory" class="wizard-step">
+          <button v-if="stepIndex > 0" type="button" class="wizard-back" aria-label="Atrás" @click="goBack">←</button>
+
+          <h2 class="wizard-title">Categoría de los ingresos</h2>
+          <p class="wizard-subtitle">Opcional. Si todos son de lo mismo, elígela aquí. Si no, la eliges fila por fila.</p>
+
+          <CategoryField v-model="capture.incomeCategory.value" kind="income" />
+
+          <BaseButton class="wizard-next" @click="goNext">
+            {{ capture.incomeCategory.value.trim() ? 'Continuar' : 'Continuar sin categoría' }}
+          </BaseButton>
+        </div>
+
+        <div v-else-if="stepId === 'captures'" key="captures" class="wizard-step">
           <button type="button" class="wizard-back" aria-label="Atrás" @click="goBack">←</button>
 
           <h2 class="wizard-title">Sube tus capturas</h2>
@@ -285,10 +331,10 @@ const showIncomeCategory = computed(() => capture.scope.value === 'all' || captu
           </ul>
           <LoadingIndicator v-if="capture.isReading.value" label="Leyendo..." />
 
-          <BaseButton class="wizard-next" :disabled="!canContinueFromCaptures" @click="step = 3">Continuar</BaseButton>
+          <BaseButton class="wizard-next" :disabled="!canContinueFromCaptures" @click="goNext">Continuar</BaseButton>
         </div>
 
-        <div v-else-if="step === 3" key="3" class="wizard-step">
+        <div v-else-if="stepId === 'review'" key="review" class="wizard-step">
           <button type="button" class="wizard-back" aria-label="Atrás" @click="goBack">←</button>
 
           <h2 class="wizard-title">Revisa los movimientos</h2>
@@ -320,12 +366,12 @@ const showIncomeCategory = computed(() => capture.scope.value === 'all' || captu
           <p v-if="capture.blockedRows.value.length > 0" class="wizard-hint">
             Completa las filas marcadas, déjalas como pendientes u omítelas para continuar.
           </p>
-          <BaseButton class="wizard-next" :disabled="!capture.canConfirm.value || capture.isReading.value" @click="step = 4">
+          <BaseButton class="wizard-next" :disabled="!capture.canConfirm.value || capture.isReading.value" @click="goNext">
             Continuar
           </BaseButton>
         </div>
 
-        <div v-else key="4" class="wizard-step">
+        <div v-else-if="stepId === 'confirm'" key="confirm" class="wizard-step">
           <button type="button" class="wizard-back" aria-label="Atrás" :disabled="capture.isConfirming.value" @click="goBack">←</button>
 
           <h2 class="wizard-title">Confirma el registro</h2>
