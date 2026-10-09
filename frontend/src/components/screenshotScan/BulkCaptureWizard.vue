@@ -5,9 +5,11 @@ import type { ConfirmOutcome } from '../../composables/screenshotScan/useBulkCap
 import { useWalletsStore } from '../../stores/wallets.store'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import { SCREENSHOT_ACCEPT } from '../../utils/screenshotScan/prepareImage'
+import CategoryField from '../transactions/CategoryField.vue'
 import BaseButton from '../ui/BaseButton.vue'
 import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import PillToggle from '../ui/PillToggle.vue'
+import ToggleSwitch from '../ui/ToggleSwitch.vue'
 import BulkRowCard from './BulkRowCard.vue'
 
 // Registro desde capturas, paso a paso (misma estructura y animaciones que
@@ -39,6 +41,25 @@ const DATE_OPTIONS = [
   { value: 'yesterday', label: 'Ayer' },
   { value: 'custom', label: 'Otra fecha' },
 ]
+
+const TRANSFER_KIND_OPTIONS = [
+  { value: 'p2p', label: 'P2P de Binance' },
+  { value: 'other', label: 'Otra transferencia' },
+]
+
+const SCOPE_OPTIONS = [
+  { value: 'all', label: 'Todo' },
+  { value: 'expenses', label: 'Solo gastos' },
+  { value: 'received', label: 'Solo ingresos' },
+  { value: 'transfers', label: 'Transferencias' },
+]
+
+// Al pasar a las capturas, lo elegido en este paso (billetera, categorias) queda como valor por
+// defecto de las filas que ya se hubieran leido.
+function goToCaptures() {
+  capture.reapplyDefaults()
+  step.value = 2
+}
 
 const todayValue = (() => {
   const now = new Date()
@@ -102,6 +123,34 @@ async function onConfirm() {
 
 const wallet = computed(() => walletsStore.wallets.find((item) => item.id === capture.selectedWalletId.value) ?? null)
 const summaryCurrency = computed(() => wallet.value?.currency ?? 'VEF')
+
+// Explica que hace cada opcion de "Que quieres registrar". Una transferencia es dinero que se mueve
+// entre las cuentas del propio usuario (por ejemplo una venta P2P de USDT por bolivares): nunca es un
+// gasto ni un ingreso.
+const scopeHint = computed(() => {
+  switch (capture.scope.value) {
+    case 'expenses':
+      return 'Solo gastos: no se toma en cuenta el dinero recibido ni las transferencias (como las órdenes P2P).'
+    case 'received':
+      return 'Solo ingresos: no se toman en cuenta los gastos ni las transferencias (como las órdenes P2P).'
+    case 'transfers':
+      return 'Transferencias: dinero que mueves entre tus propias cuentas. No es un gasto ni un ingreso.'
+    default:
+      return 'Todo: se detecta solo qué es cada movimiento. Puedes cambiarlo al revisar.'
+  }
+})
+
+// Detalle de la transferencia: P2P de Binance (se enlaza con las ordenes) u otra (por ejemplo, le diste
+// dolares de Facebank a un amigo que te los cambio a USDT).
+const transferKindHint = computed(() =>
+  capture.transferKind.value === 'p2p'
+    ? 'P2P de Binance: cada orden se registra como una transferencia entre tu billetera en USDT y la de bolívares, y los movimientos del banco quedan pendientes de enlazar con su orden (que trae los USDT).'
+    : 'Otra transferencia: por ejemplo, le diste dólares de Facebank a un amigo que te los cambió a USDT. Cada movimiento se registra como una transferencia desde la billetera elegida; tú indicas a cuál billetera llegó y cuánto.',
+)
+
+// Las categorias solo hacen falta donde se registran gastos o ingresos (no en transferencias).
+const showExpenseCategory = computed(() => capture.scope.value === 'all' || capture.scope.value === 'expenses')
+const showIncomeCategory = computed(() => capture.scope.value === 'all' || capture.scope.value === 'received')
 </script>
 
 <template>
@@ -122,9 +171,10 @@ const summaryCurrency = computed(() => wallet.value?.currency ?? 'VEF')
     <div class="wizard-steps-viewport">
       <Transition :name="stepTransitionName">
         <div v-if="step === 1" key="1" class="wizard-step">
-          <h2 class="wizard-title">¿De qué billetera son?</h2>
-          <p class="wizard-subtitle">Los movimientos de la captura se registrarán en esta billetera. Puedes cambiarla por movimiento.</p>
+          <h2 class="wizard-title">Antes de subir las capturas</h2>
+          <p class="wizard-subtitle">Todo es opcional: lo que no elijas lo completas después, fila por fila.</p>
 
+          <h3 class="wizard-section">¿De qué billetera son?</h3>
           <div class="wallet-grid">
             <button
               v-for="item in walletsStore.wallets"
@@ -132,13 +182,17 @@ const summaryCurrency = computed(() => wallet.value?.currency ?? 'VEF')
               type="button"
               class="wallet-tile"
               :class="{ active: item.id === capture.selectedWalletId.value }"
-              @click="capture.selectedWalletId.value = item.id"
+              @click="capture.selectWallet(item.id)"
             >
               <span class="wallet-tile-name">{{ item.name }}</span>
               <span class="wallet-tile-currency">{{ item.currency }}</span>
             </button>
           </div>
           <p v-if="walletsStore.wallets.length === 0" class="wizard-hint">Primero crea una billetera en Cuentas.</p>
+          <p v-else-if="capture.walletAutoSelected.value" class="wizard-hint">
+            Elegimos la única billetera posible. Puedes cambiarla.
+          </p>
+          <p v-else class="wizard-hint">Puedes cambiarla por movimiento al revisar.</p>
 
           <h3 class="wizard-section">¿De qué día?</h3>
           <PillToggle
@@ -155,7 +209,43 @@ const summaryCurrency = computed(() => wallet.value?.currency ?? 'VEF')
           />
           <p class="wizard-hint">Se usa cuando la captura no trae el día. Si dice AYER o trae fechas, se respeta lo que dice.</p>
 
-          <BaseButton class="wizard-next" @click="step = 2">Continuar</BaseButton>
+          <h3 class="wizard-section">¿Qué quieres registrar?</h3>
+          <PillToggle
+            :options="SCOPE_OPTIONS"
+            :model-value="capture.scope.value"
+            @update:model-value="capture.scope.value = $event as 'all' | 'expenses' | 'received' | 'transfers'"
+          />
+          <p class="wizard-hint">{{ scopeHint }}</p>
+
+          <template v-if="capture.scope.value === 'transfers'">
+            <h3 class="wizard-section">¿Qué tipo de transferencia?</h3>
+            <PillToggle
+              :options="TRANSFER_KIND_OPTIONS"
+              :model-value="capture.transferKind.value"
+              @update:model-value="capture.transferKind.value = $event as 'p2p' | 'other'"
+            />
+            <p class="wizard-hint">{{ transferKindHint }}</p>
+          </template>
+
+          <ToggleSwitch v-model="capture.includeFees.value" label="Tomar en cuenta las comisiones" />
+          <p class="wizard-hint">
+            Las comisiones ("Cobro comisión...") se registran como un gasto aparte en la categoría Comisión. Desactívalo si no las quieres.
+          </p>
+
+          <template v-if="showExpenseCategory || showIncomeCategory">
+            <h3 class="wizard-section">Categoría (opcional)</h3>
+            <div v-if="showExpenseCategory" class="category-block">
+              <span class="category-label">Para los gastos</span>
+              <CategoryField v-model="capture.expenseCategory.value" kind="expense" />
+            </div>
+            <div v-if="showIncomeCategory" class="category-block">
+              <span class="category-label">Para los ingresos</span>
+              <CategoryField v-model="capture.incomeCategory.value" kind="income" />
+            </div>
+            <p class="wizard-hint">Si todos son de lo mismo (por ejemplo, mercado), elígela aquí. Si no, la eliges fila por fila.</p>
+          </template>
+
+          <BaseButton class="wizard-next" @click="goToCaptures">Continuar</BaseButton>
         </div>
 
         <div v-else-if="step === 2" key="2" class="wizard-step">
@@ -258,6 +348,9 @@ const summaryCurrency = computed(() => wallet.value?.currency ?? 'VEF')
             </li>
             <li v-if="capture.summary.value.skipped > 0">
               <span>{{ capture.summary.value.skipped }} {{ capture.summary.value.skipped === 1 ? 'omitido' : 'omitidos' }} (no se registran)</span>
+            </li>
+            <li v-if="capture.summary.value.duplicates > 0">
+              <span>{{ capture.summary.value.duplicates }} ya {{ capture.summary.value.duplicates === 1 ? 'estaba registrado' : 'estaban registrados' }} (por eso se omiten)</span>
             </li>
           </ul>
 
@@ -414,6 +507,18 @@ const summaryCurrency = computed(() => wallet.value?.currency ?? 'VEF')
 
 .wallet-tile-currency {
   font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.category-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.category-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
   color: var(--text-muted);
 }
 

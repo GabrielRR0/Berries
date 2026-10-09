@@ -97,6 +97,95 @@ export const P2P_WORDS: OcrWord[] = [
 ]
 
 
+// "Movimientos" con dos dias (HOY y AYER). Hoy es el 9 de octubre de 2026.
+export const BANK_HOY_AYER_WORDS: OcrWord[] = [
+  ...line('Movimientos', 172, 472, 155, 200),
+  ...line('HOY', 30, 88, 513, 538),
+  ...line('Cobro comision pag movil', 117, 443, 588, 612),
+  ...line('bdv a bdv', 117, 241, 626, 650),
+  ...line('14,00 Bs', 787, 900, 588, 614),
+  ...line('11:25 AM', 798, 900, 624, 648),
+  ...line('Operacion pagomovil bdv', 117, 441, 765, 790),
+  ...line('1.200,00 Bs', 747, 900, 747, 773),
+  ...line('11:25 AM', 798, 900, 783, 807),
+  ...line('AYER', 30, 100, 893, 918),
+  ...line('Cobro comision pag movil', 117, 443, 967, 991),
+  ...line('bdv a bdv', 117, 241, 1005, 1029),
+  ...line('68,54 Bs', 787, 900, 967, 993),
+  ...line('10:25 PM', 798, 900, 1003, 1027),
+  ...line('Operacion pagomovil bdv', 117, 441, 1144, 1168),
+  ...line('22.848,00 Bs', 729, 900, 1126, 1152),
+  ...line('10:25 PM', 798, 900, 1162, 1186),
+  ...line('Abono recibido otr bcos', 117, 417, 1303, 1327),
+  ...line('26.600,00 Bs', 729, 900, 1285, 1311),
+  ...line('09:58 PM', 798, 900, 1321, 1345),
+]
+export const BANK_HOY_AYER_GREEN_Y = [1285]
+
+// "Movimientos" con el encabezado "MIERCOLES, 7 DE OCTUBRE" (dia de la semana + fecha escrita).
+export const BANK_WEEKDAY_WORDS: OcrWord[] = [
+  ...line('Movimientos', 172, 472, 155, 200),
+  ...line('MIERCOLES, 7 DE OCTUBRE', 30, 400, 503, 530),
+  ...line('Cobro comision pag movil', 117, 443, 577, 601),
+  ...line('bdv a bdv', 117, 241, 615, 639),
+  ...line('21,00 Bs', 787, 900, 577, 603),
+  ...line('07:57 PM', 798, 900, 613, 637),
+  ...line('Operacion pagomovil bdv', 117, 441, 755, 779),
+  ...line('7.000,00 Bs', 745, 900, 737, 763),
+  ...line('07:57 PM', 798, 900, 773, 797),
+  ...line('Cobro comision pag movil', 117, 443, 895, 919),
+  ...line('bdv a bdv', 117, 241, 933, 957),
+  ...line('60,00 Bs', 787, 900, 895, 921),
+  ...line('07:44 PM', 798, 900, 931, 955),
+  ...line('Operacion pagomovil bdv', 117, 441, 1073, 1097),
+  ...line('20.000,00 Bs', 729, 900, 1055, 1081),
+  ...line('07:44 PM', 798, 900, 1091, 1115),
+  ...line('Operacion pagomovil bdv', 117, 441, 1232, 1256),
+  ...line('20.039,90 Bs', 729, 900, 1214, 1240),
+  ...line('07:39 PM', 798, 900, 1250, 1274),
+  ...line('Cobro comision pag movil', 117, 443, 1372, 1396),
+  ...line('bdv a bdv', 117, 241, 1410, 1434),
+  ...line('120,00 Bs', 770, 900, 1372, 1398),
+  ...line('07:26 PM', 798, 900, 1408, 1432),
+  ...line('Operacion pagomovil bdv', 117, 441, 1549, 1573),
+  ...line('40.000,00 Bs', 729, 900, 1531, 1557),
+  ...line('07:26 PM', 798, 900, 1567, 1591),
+  ...line('Abono recibido otr bcos', 117, 417, 1708, 1732),
+  ...line('40.107,74 Bs', 729, 900, 1690, 1716),
+  ...line('07:22 PM', 798, 900, 1726, 1750),
+]
+export const BANK_WEEKDAY_GREEN_Y = [1214, 1690]
+
+// "Historico de operaciones" del inicio de la app (924 px): sin colores ni flechas, con el saldo
+// de la cuenta arriba ("Bs. 3.848,10") que NO es un movimiento.
+export const BANK_HISTORICO_WORDS: OcrWord[] = [
+  ...line('Inicio', 172, 298, 155, 200),
+  ...line('Saldo Cuenta Corriente', 87, 382, 318, 346),
+  ...line('Bs. 3.848,10', 87, 288, 378, 414),
+  ...line('0102****4075', 87, 273, 443, 471),
+  ...line('Movimientos en línea', 532, 800, 443, 471),
+  ...line('Accesos Directos', 37, 252, 650, 676),
+  ...line('Histórico de operaciones', 24, 388, 938, 972),
+  ...line('Actualizar', 746, 900, 938, 972),
+  ...line('MIERCOLES, 7 DE OCTUBRE', 24, 396, 1038, 1066),
+  ...line('PagomóvilBDV', 112, 304, 1119, 1151),
+  ...line('7.000,00 Bs', 741, 896, 1103, 1133),
+  ...line('07:57 PM', 793, 896, 1141, 1165),
+  ...line('PagomóvilBDV', 112, 304, 1259, 1291),
+  ...line('20.000,00 Bs', 724, 896, 1243, 1273),
+  ...line('07:44 PM', 793, 896, 1281, 1305),
+  ...line('PagomóvilBDV', 112, 304, 1399, 1431),
+  ...line('40.000,00 Bs', 724, 896, 1383, 1413),
+  ...line('07:26 PM', 793, 896, 1421, 1445),
+  ...line('PagomóvilBDV', 112, 304, 1539, 1571),
+  ...line('1.100,00 Bs', 741, 896, 1523, 1553),
+  ...line('06:43 PM', 793, 896, 1561, 1585),
+  ...line('Pago de Servicios', 112, 336, 1688, 1720),
+  ...line('500,00 Bs', 765, 896, 1672, 1702),
+  ...line('06:32 PM', 793, 896, 1710, 1734),
+  ...line('Inicio Transfer... Pagos Servicios Divisas Tarjeta', 40, 890, 1865, 1900),
+]
+
 // Una captura ya leida, como la devuelve el servicio de OCR: texto + palabras + color.
 export function layoutOf(words: OcrWord[], width: number, isGreenAt: (box: OcrBox) => boolean | null = () => null) {
   const lines = new Map<number, string[]>()

@@ -2,7 +2,7 @@
 // NO viven aqui: estan en ./dictionary/*.ts (un archivo por tema) para poder
 // editarlos o ampliarlos sin tocar este codigo.
 import { CATEGORY_HINTS } from './dictionary/categoryHints'
-import { MONTHS_ES, RELATIVE_DAY_PATTERNS } from './dictionary/dateWords'
+import { MONTHS_ES, RELATIVE_DAY_PATTERNS, WEEKDAYS_ES } from './dictionary/dateWords'
 import { PAID_PATTERNS, RECEIVED_PATTERNS } from './dictionary/directionWords'
 import { FEE_PATTERNS } from './dictionary/feeWords'
 import { WALLET_HINTS } from './dictionary/walletHints'
@@ -68,12 +68,17 @@ export function resolveDateHeader(text: string, today: Date): string | null {
   const numeric = parseDateToIso(normalized, 'es')
   if (numeric) return numeric
 
-  const written = normalized.match(/^(\d{1,2})\s+de\s+([a-z]+)(?:\s+de\s+(\d{4}))?$/)
+  // "7 de octubre", "miercoles, 7 de octubre", "7 de octubre de 2026".
+  const withoutWeekday = normalized.replace(new RegExp(`^(${WEEKDAYS_ES.join('|')}),?\\s+`), '')
+  const written = withoutWeekday.match(/^(\d{1,2})\s+de\s+([a-z]+)(?:\s+de\s+(\d{4}))?$/)
   if (written) {
     const month = MONTHS_ES.indexOf(written[2]!)
     if (month === -1) return null
-    const year = written[3] ? Number(written[3]) : today.getFullYear()
-    const date = new Date(year, month, Number(written[1]))
+    const day = Number(written[1])
+    let year = written[3] ? Number(written[3]) : today.getFullYear()
+    // Sin ano, una fecha que caeria en el futuro es del ano anterior (ej. "28 de diciembre" visto en enero).
+    if (!written[3] && new Date(year, month, day) > today) year -= 1
+    const date = new Date(year, month, day)
     return date.getMonth() === month ? toIso(date) : null
   }
   return null

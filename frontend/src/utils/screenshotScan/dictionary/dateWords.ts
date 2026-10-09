@@ -8,6 +8,9 @@ export const RELATIVE_DAY_PATTERNS: { pattern: RegExp; daysAgo: number }[] = [
   { pattern: /^(anteayer|antier)$/, daysAgo: 2 },
 ]
 
+// Dias de la semana que preceden a la fecha en algunos encabezados ("MIERCOLES, 7 DE OCTUBRE").
+export const WEEKDAYS_ES = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
+
 // Meses en espanol (posicion = numero de mes - 1). Para otro idioma, agregar una
 // lista parecida y usarla en resolveDateHeader.
 export const MONTHS_ES = [

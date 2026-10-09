@@ -1,4 +1,5 @@
 import { parseBankList } from './bankListParser'
+import { BANK_LIST_FORMATS, DEFAULT_COLOR_CODES_DIRECTION } from './dictionary/bankListFormats'
 import {
   BOLIVAR_AMOUNT_GLOBAL,
   MIN_LIST_AMOUNTS,
@@ -86,10 +87,33 @@ export interface LayoutInput {
   isGreen: (box: OcrBox) => boolean | null
 }
 
+// Lo que el usuario dice que va a registrar (lo elige antes de subir la captura, es opcional):
+// todo, solo gastos, solo ingresos (recibidos) o transferencias entre sus cuentas (ver applyScanContext.ts).
+export type ScanScope = 'all' | 'expenses' | 'received' | 'transfers'
+
 export interface RowsFromImageOptions {
   today: Date
   // Fecha para las filas que no traen encabezado de dia (la que elige el usuario).
   defaultDate: string | null
+  // Solo gastos, solo recibidos, transferencias o todo. Aqui solo se filtra por direccion en los movimientos
+  // del banco; el resto del contexto (ordenes P2P, pendientes) lo aplica applyScanContext.
+  scope?: ScanScope
+  // false = ignorar las comisiones del banco.
+  includeFees?: boolean
+}
+
+// Reconoce el formato de la lista por su titulo, para saber si el color distingue recibido de pagado.
+function colorCodesDirection(text: string): boolean {
+  const normalized = normalizeForMatch(text)
+  const format = BANK_LIST_FORMATS.find(({ titlePattern }) => titlePattern.test(normalized))
+  return format ? format.colorCodesDirection : DEFAULT_COLOR_CODES_DIRECTION
+}
+
+function keepScope(rows: ScanRow[], scope: ScanScope): ScanRow[] {
+  // En 'transfers' no se filtra: tanto lo recibido como lo pagado puede ser parte de una transferencia.
+  if (scope === 'all' || scope === 'transfers') return rows
+  const wanted = scope === 'expenses' ? 'out' : 'in'
+  return rows.filter((row) => row.source !== 'bank' || row.direction === wanted)
 }
 
 export interface RowsFromImage {
@@ -104,13 +128,22 @@ export function rowsFromImage(layout: LayoutInput, options: RowsFromImageOptions
     return { kind, rows: parseP2pOrderList(groupSegments(layout.words, layout.width), options.today) }
   }
   if (kind === 'bank_list') {
+    const scope = options.scope ?? 'all'
     const rows = parseBankList(groupSegments(layout.words, layout.width), {
       today: options.today,
       defaultDate: options.defaultDate,
       isGreen: layout.isGreen,
+      imageWidth: layout.width,
+      colorCodesDirection: colorCodesDirection(layout.text),
+      // Si el usuario dijo que son solo gastos (o solo recibidos), eso desempata cuando la
+      // pantalla no da ninguna senal de direccion.
+      fallbackDirection: scope === 'received' ? 'in' : scope === 'expenses' ? 'out' : undefined,
+      includeFees: options.includeFees,
     })
-    return { kind, rows }
+    return { kind, rows: keepScope(rows, scope) }
   }
-  if (kind === 'single') return { kind, rows: rowsFromSingleScan(scanText(layout.text)) }
+  if (kind === 'single') {
+    return { kind, rows: keepScope(rowsFromSingleScan(scanText(layout.text)), options.scope ?? 'all') }
+  }
   return { kind, rows: [] }
 }

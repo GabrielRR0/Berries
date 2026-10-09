@@ -49,6 +49,8 @@ export interface CreateTransactionParams {
   description?: string
   occurredAt?: string
   source?: string
+  // Hash del movimiento importado desde una captura: permite detectar que ya se registro.
+  importKey?: string
 }
 
 export interface UpdateTransactionParams {

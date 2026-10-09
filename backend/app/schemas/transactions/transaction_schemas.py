@@ -15,6 +15,9 @@ class TransactionCreateRequest(BaseModel):
     # Si no se envía, el service usa "ahora" — permite registrar algo que pasó antes.
     occurred_at: datetime | None = None
     source: str = Field(default="manual", max_length=20)
+    # Hash del movimiento importado desde una captura (ver import_key.py): permite no
+    # registrarlo dos veces. Opcional.
+    import_key: str | None = Field(default=None, min_length=8, max_length=128)
 
 
 class TransactionUpdateRequest(BaseModel):
@@ -133,3 +136,12 @@ class DraftConfirmTransferRequest(BaseModel):
     sent_amount: Decimal = Field(gt=0)
     fee: Decimal = Field(default=Decimal("0"), ge=0)
     occurred_at: datetime | None = None
+
+
+class DuplicateCheckRequest(BaseModel):
+    keys: list[str] = Field(max_length=300)
+
+
+class DuplicateCheckResponse(BaseModel):
+    # Las claves enviadas que ya corresponden a un movimiento registrado.
+    duplicates: list[str]

@@ -48,6 +48,9 @@ export function matchP2pOrders(rows: ScanRow[]): ScanRow[] {
     best.action = 'transfer'
     best.sentAmount = order.p2p!.usdt
     best.linkedOrderNumber = marker
+    // El abono hereda los datos de la orden (numero, contraparte, USDT): se muestran en su
+    // tarjeta y viajan en la nota y la huella de la transferencia.
+    best.p2p = order.p2p
     best.reference = best.reference ?? order.reference
     best.flags = [...best.flags, `Enlazado con la orden P2P de ${order.p2p!.usdt} USDT.`]
     order.linkedOrderNumber = marker

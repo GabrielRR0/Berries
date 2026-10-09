@@ -66,4 +66,7 @@ class Transaction(Base):
     # tabla "transfers" (esa entidad no existe, es solo la clave que une ambas patas).
     # None para cualquier transaction que no venga de una transferencia.
     transfer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    # Identificador opaco (HMAC, ver services/transactions/import_key.py) de un movimiento
+    # importado desde una captura: permite detectar que ya se registro. NULL en los demas.
+    import_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[CreatedAt]

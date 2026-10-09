@@ -43,6 +43,8 @@ export interface ScanRow {
   p2p: P2POrderInfo | null
   // Numero de la orden P2P con la que se enlazo este recibido (ver matchP2pOrders.ts).
   linkedOrderNumber: string | null
+  // true si ya hay un movimiento registrado igual (ver rowFingerprint.ts).
+  duplicate: boolean
 }
 
 let rowCounter = 0
@@ -70,6 +72,7 @@ export function makeRow(partial: Partial<ScanRow> & Pick<ScanRow, 'source' | 'am
     sentAmount: null,
     p2p: null,
     linkedOrderNumber: null,
+    duplicate: false,
     ...partial,
   }
 }

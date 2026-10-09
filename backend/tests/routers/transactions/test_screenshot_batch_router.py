@@ -257,3 +257,98 @@ def test_confirm_as_transfer_without_destination_is_rejected(client, db):
     )
 
     assert response.status_code == 404
+
+
+def test_duplicates_endpoint_finds_movements_registered_with_the_same_key(client, db):
+    token = _register(client)
+    bs = _wallet(client, token, "BDV", "VEF")
+    _fund(db, bs["id"], "100000")
+    key = "a" * 64
+
+    client.post(
+        "/api/transactions/bulk",
+        json={
+            "items": [
+                {"wallet_id": bs["id"], "type": "expense", "amount": "22848", "category": "Mercado", "import_key": key},
+                {"wallet_id": bs["id"], "type": "expense", "amount": "9000", "category": "Mercado"},
+            ]
+        },
+        headers=_headers(token),
+    )
+
+    response = client.post(
+        "/api/transactions/duplicates",
+        json={"keys": [key, "b" * 64]},
+        headers=_headers(token),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"duplicates": [key]}
+
+
+def test_duplicate_keys_do_not_leak_between_users(client, db):
+    token = _register(client)
+    other_token = _register(client, "otro@example.com")
+    mine = _wallet(client, token, "BDV", "VEF")
+    _fund(db, mine["id"], "1000")
+    key = "c" * 64
+    client.post(
+        "/api/transactions",
+        json={"wallet_id": mine["id"], "type": "expense", "amount": "10", "category": "Mercado", "import_key": key},
+        headers=_headers(token),
+    )
+
+    response = client.post("/api/transactions/duplicates", json={"keys": [key]}, headers=_headers(other_token))
+
+    assert response.json() == {"duplicates": []}
+
+
+def test_import_key_is_stored_sealed_not_in_plain_text(client, db):
+    from sqlalchemy import select
+
+    from app.models.transactions.transaction_model import Transaction
+
+    token = _register(client)
+    bs = _wallet(client, token, "BDV", "VEF")
+    _fund(db, bs["id"], "1000")
+    key = "d" * 64
+    client.post(
+        "/api/transactions",
+        json={"wallet_id": bs["id"], "type": "expense", "amount": "10", "category": "Mercado", "import_key": key},
+        headers=_headers(token),
+    )
+
+    stored = db.scalars(select(Transaction.import_key).where(Transaction.import_key.is_not(None))).all()
+
+    assert len(stored) == 1
+    assert stored[0] != key and len(stored[0]) == 64
+
+
+def test_transfer_with_import_key_and_note_is_detected_as_duplicate_and_keeps_the_note(client, db):
+    token = _register(client)
+    usdt = _wallet(client, token, "Binance", "USDT")
+    bs = _wallet(client, token, "BDV", "VEF")
+    _fund(db, usdt["id"], "100")
+    key = "e" * 64
+
+    response = client.post(
+        "/api/wallets/transfer",
+        json={
+            "from_wallet_id": usdt["id"],
+            "to_wallet_id": bs["id"],
+            "amount": "26.48",
+            "converted_amount": "26600",
+            "import_key": key,
+            "note": "Orden P2P 22941692196588679168 · Nelasurej",
+        },
+        headers=_headers(token),
+    )
+
+    assert response.status_code == 200
+    descriptions = sorted(t["description"] for t in client.get("/api/transactions", headers=_headers(token)).json())
+    assert descriptions == [
+        "Transferencia a BDV · Orden P2P 22941692196588679168 · Nelasurej",
+        "Transferencia desde Binance · Orden P2P 22941692196588679168 · Nelasurej",
+    ]
+    duplicates = client.post("/api/transactions/duplicates", json={"keys": [key]}, headers=_headers(token))
+    assert duplicates.json() == {"duplicates": [key]}

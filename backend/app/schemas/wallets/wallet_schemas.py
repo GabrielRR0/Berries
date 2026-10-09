@@ -33,6 +33,10 @@ class TransferRequest(BaseModel):
     # None = "ahora" (ver execute_transfer) - pedido explicito del usuario: poder
     # backdatear una transferencia igual que un movimiento manual.
     occurred_at: datetime | None = None
+    # Hash del movimiento importado desde una captura (ver import_key.py) y una nota libre
+    # (ej. la orden P2P y la contraparte) que se agrega a la descripcion de la transferencia.
+    import_key: str | None = Field(default=None, min_length=8, max_length=128)
+    note: str | None = Field(default=None, max_length=200)
 
 
 class TransferUpdateRequest(BaseModel):

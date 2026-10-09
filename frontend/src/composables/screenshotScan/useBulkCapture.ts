@@ -1,14 +1,17 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { recognizeScreenshot } from '../../services/screenshotScan/screenshot-scan.service'
-import { createDraftsBulk, createTransactionsBulk } from '../../services/transactions/transactions.service'
+import { checkDuplicates, createDraftsBulk, createTransactionsBulk } from '../../services/transactions/transactions.service'
 import { useTransactionsStore } from '../../stores/transactions.store'
 import { useWalletsStore } from '../../stores/wallets.store'
 import { buildConfirmPlan, rowIssues } from '../../utils/screenshotScan/confirmPlan'
 import { matchP2pOrders } from '../../utils/screenshotScan/matchP2pOrders'
 import type { RowAction, ScanRow } from '../../utils/screenshotScan/movementRows'
-import { applyRowDefaults } from '../../utils/screenshotScan/rowDefaults'
+import { applyScanContext } from '../../utils/screenshotScan/applyScanContext'
+import type { TransferKind } from '../../utils/screenshotScan/applyScanContext'
+import { applyCategoryDefaults, applyRowDefaults } from '../../utils/screenshotScan/rowDefaults'
+import { importKeyFor } from '../../utils/screenshotScan/rowFingerprint'
 import { rowsFromImage } from '../../utils/screenshotScan/rowsFromImage'
-import type { ImageKind } from '../../utils/screenshotScan/rowsFromImage'
+import type { ImageKind, ScanScope } from '../../utils/screenshotScan/rowsFromImage'
 
 export type DateChoice = 'today' | 'yesterday' | 'custom'
 
@@ -38,6 +41,9 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback
 }
 
+const DUPLICATE_FLAG =
+  'Posible duplicado: ya registraste un movimiento igual. Se omite; elige otra opción para registrarlo de todos modos.'
+
 const UNMATCHED_ORDER_FLAG = 'No hay un abono igual en la captura del banco. Se registrará como transferencia por sí sola.'
 
 const KIND_LABEL: Record<ImageKind, string> = {
@@ -55,8 +61,17 @@ export function useBulkCapture(initialWalletId = '') {
   const transactionsStore = useTransactionsStore()
 
   const selectedWalletId = ref(initialWalletId)
+  // true mientras la billetera salio elegida sola (porque era la unica posible).
+  const walletAutoSelected = ref(false)
   const dateChoice = ref<DateChoice>('yesterday')
   const customDate = ref('')
+  // Opciones que se eligen antes de subir las capturas.
+  const scope = ref<ScanScope>('all')
+  // Solo cuando scope es 'transfers': P2P de Binance u otra transferencia entre cuentas propias.
+  const transferKind = ref<TransferKind>('p2p')
+  const includeFees = ref(true)
+  const expenseCategory = ref('')
+  const incomeCategory = ref('')
   const images = ref<CaptureImage[]>([])
   const rows = ref<ScanRow[]>([])
   const isConfirming = ref(false)
@@ -70,6 +85,26 @@ export function useBulkCapture(initialWalletId = '') {
     if (dateChoice.value === 'yesterday') return isoDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1))
     return customDate.value || null
   })
+
+  // Si no se elige billetera, se toma la unica posible: la unica que tiene el usuario o su unica
+  // billetera en bolivares (las capturas de bancos venezolanos estan en bolivares). Con varias hay
+  // que elegir.
+  function autoSelectWallet() {
+    if (selectedWalletId.value) return
+    const wallets = walletsStore.wallets
+    const bolivarWallets = wallets.filter((wallet) => wallet.currency === 'VEF')
+    const only = wallets.length === 1 ? wallets[0] : bolivarWallets.length === 1 ? bolivarWallets[0] : null
+    if (only) {
+      selectedWalletId.value = only.id
+      walletAutoSelected.value = true
+    }
+  }
+  watch(() => walletsStore.wallets, autoSelectWallet, { immediate: true })
+
+  function selectWallet(walletId: string) {
+    selectedWalletId.value = walletId
+    walletAutoSelected.value = false
+  }
 
   // Las ordenes ya enlazadas con un recibido no se muestran: su informacion vive en el recibido.
   const visibleRows = computed(() => rows.value.filter((row) => !(row.source === 'p2p_order' && row.linkedOrderNumber !== null)))
@@ -99,23 +134,48 @@ export function useBulkCapture(initialWalletId = '') {
       transfers: plan.transfers.length,
       pendings: visibleRows.value.filter((row) => row.action === 'pending').length,
       skipped: visibleRows.value.filter((row) => row.action === 'skip').length,
+      duplicates: visibleRows.value.filter((row) => row.duplicate && row.action === 'skip').length,
     }
   })
 
   function relink() {
     // Solo los recibidos/gastos que el usuario no toco entran al enlace automatico.
     const eligible = rows.value.filter((row) => row.source === 'p2p_order' || !touched.has(row.id))
-    matchP2pOrders(eligible)
+    // Una transferencia "otra" (sin Binance) no se enlaza con ordenes P2P.
+    const linkWithOrders = !(scope.value === 'transfers' && transferKind.value === 'other')
+    if (linkWithOrders) matchP2pOrders(eligible)
 
     // Si hay una captura del banco y una orden no encontro su abono, se avisa (puede ser de
     // otro dia o de otra cuenta); la orden sigue siendo una transferencia valida por si sola.
-    const hasBankRows = rows.value.some((row) => row.source === 'bank')
+    const hasBankRows = linkWithOrders && rows.value.some((row) => row.source === 'bank')
     for (const row of rows.value) {
       if (row.source !== 'p2p_order' || row.linkedOrderNumber !== null) continue
       row.flags = row.flags.filter((flag) => flag !== UNMATCHED_ORDER_FLAG)
       if (hasBankRows) row.flags.push(UNMATCHED_ORDER_FLAG)
     }
-    applyRowDefaults(rows.value, { wallets: walletsStore.wallets, selectedWalletId: selectedWalletId.value })
+    reapplyDefaults()
+  }
+
+  // Marca como duplicadas las filas que ya estan registradas (misma huella). Es una ayuda
+  // opcional: si no hay conexion o falla, las filas quedan como estan.
+  async function markDuplicates(candidates: ScanRow[]) {
+    const byKey = new Map<string, ScanRow[]>()
+    for (const row of candidates) {
+      if (row.duplicate || touched.has(row.id)) continue
+      if (row.source === 'p2p_order' && row.linkedOrderNumber !== null) continue
+      const key = await importKeyFor(row)
+      if (key) byKey.set(key, [...(byKey.get(key) ?? []), row])
+    }
+    const existing = await checkDuplicates([...byKey.keys()])
+    for (const [key, matches] of byKey) {
+      if (!existing.has(key)) continue
+      for (const row of matches) {
+        row.duplicate = true
+        row.action = 'skip'
+        row.flags = [...row.flags.filter((flag) => flag !== DUPLICATE_FLAG), DUPLICATE_FLAG]
+        touched.add(row.id)
+      }
+    }
   }
 
   async function addImage(file: File) {
@@ -135,19 +195,31 @@ export function useBulkCapture(initialWalletId = '') {
 
     try {
       const layout = await recognizeScreenshot(file)
-      const result = rowsFromImage(layout, { today: new Date(), defaultDate: defaultDate.value })
+      const result = rowsFromImage(layout, {
+        today: new Date(),
+        defaultDate: defaultDate.value,
+        scope: scope.value,
+        includeFees: includeFees.value,
+      })
+      // El contexto elegido antes de subir (gastos, ingresos, P2P) decide como se toman las filas.
+      const newRows = applyScanContext(result.rows, { scope: scope.value, transferKind: transferKind.value })
       tracked.kind = result.kind
-      tracked.rowCount = result.rows.length
-      if (result.kind === 'unknown' || result.rows.length === 0) {
+      tracked.rowCount = newRows.length
+      if (result.kind === 'unknown' || newRows.length === 0) {
         tracked.status = 'error'
         tracked.message =
           result.kind === 'unknown'
             ? 'No se reconoció este tipo de captura. Por ahora se leen listas de movimientos del banco, historial de órdenes P2P de Binance y comprobantes sueltos.'
-            : 'No se encontraron movimientos en esta captura.'
+            : scope.value === 'all'
+              ? 'No se encontraron movimientos en esta captura.'
+              : result.kind === 'p2p_orders' && (scope.value === 'expenses' || scope.value === 'received')
+                ? 'Las órdenes P2P son transferencias entre tus cuentas, no gastos ni ingresos. Elige "Transferencias" o "Todo".'
+                : 'No hay movimientos de ese tipo en esta captura. Prueba con la opción "Todo".'
         return
       }
-      rows.value.push(...result.rows)
+      rows.value.push(...newRows)
       relink()
+      await markDuplicates(rows.value)
       tracked.status = 'done'
       tracked.message = KIND_LABEL[result.kind]
     } catch (error) {
@@ -197,10 +269,11 @@ export function useBulkCapture(initialWalletId = '') {
     updateRow(id, { action })
   }
 
-  // Cambiar de billetera en el primer paso despues de leer: las filas que no tienen
-  // una propia heredan la nueva.
+  // Cambiar la billetera o las categorias del primer paso despues de leer: las filas que no
+  // tienen una propia heredan la nueva.
   function reapplyDefaults() {
     applyRowDefaults(rows.value, { wallets: walletsStore.wallets, selectedWalletId: selectedWalletId.value })
+    applyCategoryDefaults(rows.value, { expenseCategory: expenseCategory.value, incomeCategory: incomeCategory.value })
   }
 
   function reset() {
@@ -216,7 +289,15 @@ export function useBulkCapture(initialWalletId = '') {
 
     isConfirming.value = true
     try {
-      const plan = buildConfirmPlan(visibleRows.value)
+      // Cada movimiento se registra con su huella (con los datos ya corregidos por el usuario) para
+      // detectar despues que ya existe.
+      const importKeys = new Map<string, string>()
+      for (const row of visibleRows.value) {
+        if (row.action !== 'expense' && row.action !== 'income' && row.action !== 'transfer') continue
+        const key = await importKeyFor(row)
+        if (key) importKeys.set(row.id, key)
+      }
+      const plan = buildConfirmPlan(visibleRows.value, importKeys)
       outcome.skipped = plan.skipped
       const doneIds = new Set<string>()
 
@@ -270,6 +351,13 @@ export function useBulkCapture(initialWalletId = '') {
 
   return {
     selectedWalletId,
+    walletAutoSelected,
+    selectWallet,
+    scope,
+    transferKind,
+    includeFees,
+    expenseCategory,
+    incomeCategory,
     dateChoice,
     customDate,
     defaultDate,
