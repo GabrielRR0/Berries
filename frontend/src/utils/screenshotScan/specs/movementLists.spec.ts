@@ -199,3 +199,28 @@ describe('enlace de recibidos con ordenes P2P', () => {
     expect(bank.find((row) => row.amount === 26600)!.action).toBe('income')
   })
 })
+
+describe('enlace de recibidos con ordenes P2P: nunca sin fecha', () => {
+  it('una orden sin fecha legible no se enlaza con un abono del mismo importe (podria ser de otro dia)', () => {
+    const bank = bankRows()
+    const orders = parseP2pOrderList(groupSegments(P2P_WORDS, 1170), TODAY)
+    const withoutDate = orders[2]!
+    expect(withoutDate.occurredOn).toBeNull()
+
+    // Un abono de 10.000 Bs de OTRO dia, sin ninguna orden con fecha que coincida.
+    const farAway = { ...bank.find((row) => row.amount === 10000)!, occurredOn: '2026-09-20', time: '19:45' }
+    matchP2pOrders([farAway, withoutDate])
+
+    expect(farAway.action).not.toBe('transfer')
+    expect(withoutDate.linkedOrderNumber).toBeNull()
+  })
+
+  it('un abono sin fecha tampoco se enlaza', () => {
+    const orders = parseP2pOrderList(groupSegments(P2P_WORDS, 1170), TODAY)
+    const undated = { ...bankRows().find((row) => row.amount === 26600)!, occurredOn: null, time: null }
+
+    matchP2pOrders([undated, orders[0]!])
+
+    expect(undated.linkedOrderNumber).toBeNull()
+  })
+})

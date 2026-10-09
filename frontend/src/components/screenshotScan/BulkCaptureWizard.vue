@@ -298,7 +298,7 @@ const transferKindHint = computed(() =>
           <button type="button" class="wizard-back" aria-label="Atrás" @click="goBack">←</button>
 
           <h2 class="wizard-title">Sube tus capturas</h2>
-          <p class="wizard-subtitle">Puede ser la lista de movimientos de tu banco, el historial de órdenes P2P de Binance o un comprobante.</p>
+          <p class="wizard-subtitle">Puede ser la lista de movimientos o el estado de cuenta de tu banco, el historial de órdenes P2P de Binance o un comprobante.</p>
 
           <div
             class="dropzone"

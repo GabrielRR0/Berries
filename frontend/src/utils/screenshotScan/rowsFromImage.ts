@@ -1,5 +1,7 @@
 import { parseBankList } from './bankListParser'
+import { parseBankStatement } from './bankStatementParser'
 import { BANK_LIST_FORMATS, DEFAULT_COLOR_CODES_DIRECTION } from './dictionary/bankListFormats'
+import { MIN_STATEMENT_DATES, STATEMENT_DATE_GLOBAL, STATEMENT_KIND_SIGNALS } from './dictionary/bankStatementLabels'
 import {
   BOLIVAR_AMOUNT_GLOBAL,
   MIN_LIST_AMOUNTS,
@@ -18,12 +20,22 @@ import { scanText } from './scanText'
 import { normalizeForMatch } from './textLines'
 import type { ScanResult } from './types'
 
-// Que clase de captura es, mirando el texto: una lista de ordenes P2P, una lista
-// de movimientos del banco, un solo movimiento o algo que no se reconoce.
-export type ImageKind = 'p2p_orders' | 'bank_list' | 'single' | 'unknown'
+// Que clase de captura es, mirando el texto: un estado de cuenta en tabla, una lista de ordenes P2P,
+// una lista de movimientos del banco, un solo movimiento o algo que no se reconoce.
+export type ImageKind = 'bank_statement' | 'p2p_orders' | 'bank_list' | 'single' | 'unknown'
 
-export function classifyImageKind(text: string): ImageKind {
+export function classifyImageKind(text: string, options: { allowStatement?: boolean } = {}): ImageKind {
   const normalized = normalizeForMatch(text)
+
+  // Estado de cuenta en tabla: aparecen sus titulos (Fecha, Descripcion/Concepto, Monto/Importe/Debito...)
+  // y varias fechas de fila (un comprobante suelto trae una sola). Ver dictionary/bankStatementLabels.ts.
+  if (
+    options.allowStatement !== false &&
+    STATEMENT_KIND_SIGNALS.every((signal) => signal.test(normalized)) &&
+    (normalized.match(STATEMENT_DATE_GLOBAL) ?? []).length >= MIN_STATEMENT_DATES
+  ) {
+    return 'bank_statement'
+  }
 
   const orderStarts = (normalized.match(ORDER_START_GLOBAL) ?? []).length
   if (orderStarts >= MIN_ORDER_STARTS || (orderStarts >= 1 && ORDER_HISTORY_TITLE.test(normalized))) {
@@ -122,8 +134,20 @@ export interface RowsFromImage {
 }
 
 export function rowsFromImage(layout: LayoutInput, options: RowsFromImageOptions): RowsFromImage {
-  const kind = classifyImageKind(layout.text)
+  let kind = classifyImageKind(layout.text)
 
+  if (kind === 'bank_statement') {
+    // El estado de cuenta dice explicitamente si cada movimiento es debito o credito: el filtro de
+    // "solo gastos" / "solo ingresos" se aplica directamente.
+    const rows = parseBankStatement(layout.words, {
+      imageWidth: layout.width,
+      defaultDate: options.defaultDate,
+      includeFees: options.includeFees,
+    })
+    if (rows.length > 0) return { kind, rows: keepScope(rows, options.scope ?? 'all') }
+    // Parecia una tabla pero no se pudieron ubicar sus columnas: se prueban los otros lectores.
+    kind = classifyImageKind(layout.text, { allowStatement: false })
+  }
   if (kind === 'p2p_orders') {
     return { kind, rows: parseP2pOrderList(groupSegments(layout.words, layout.width), options.today) }
   }

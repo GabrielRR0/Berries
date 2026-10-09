@@ -47,6 +47,7 @@ const DUPLICATE_FLAG =
 const UNMATCHED_ORDER_FLAG = 'No hay un abono igual en la captura del banco. Se registrará como transferencia por sí sola.'
 
 const KIND_LABEL: Record<ImageKind, string> = {
+  bank_statement: 'Estado de cuenta del banco',
   p2p_orders: 'Historial de órdenes P2P',
   bank_list: 'Lista de movimientos del banco',
   single: 'Un movimiento',
@@ -209,7 +210,7 @@ export function useBulkCapture(initialWalletId = '') {
         tracked.status = 'error'
         tracked.message =
           result.kind === 'unknown'
-            ? 'No se reconoció este tipo de captura. Por ahora se leen listas de movimientos del banco, historial de órdenes P2P de Binance y comprobantes sueltos.'
+            ? 'No se reconoció este tipo de captura. Por ahora se leen listas y estados de cuenta del banco, historial de órdenes P2P de Binance y comprobantes sueltos.'
             : scope.value === 'all'
               ? 'No se encontraron movimientos en esta captura.'
               : result.kind === 'p2p_orders' && (scope.value === 'expenses' || scope.value === 'received')

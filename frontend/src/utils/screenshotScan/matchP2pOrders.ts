@@ -31,11 +31,10 @@ export function matchP2pOrders(rows: ScanRow[]): ScanRow[] {
       if (Math.abs(bankRow.amount - order.amount) > AMOUNT_TOLERANCE) continue
 
       const bankTime = timestamp(bankRow)
-      if (orderTime === null || bankTime === null) {
-        // Sin hora para comparar, el primero con el mismo importe sirve.
-        if (best === null) best = bankRow
-        continue
-      }
+      // Sin la fecha de alguno de los dos lados no se enlaza: un mismo importe (ej. 10.000 Bs) se repite
+      // en muchos dias, y asociar los USDT de una orden con un abono de otro dia registraria mal la
+      // transferencia. Prefiero dejarlo sin enlazar y que el usuario lo complete.
+      if (orderTime === null || bankTime === null) continue
       const gap = Math.abs(bankTime - orderTime)
       if (gap <= MAX_GAP_HOURS * 3_600_000 && gap < bestGap) {
         best = bankRow

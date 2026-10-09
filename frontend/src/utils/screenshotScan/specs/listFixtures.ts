@@ -220,6 +220,88 @@ export const BANK_TWO_DATES_WORDS: OcrWord[] = [
 // Montos en verde (recibidos): 10.000, 8.000 y 20.000.
 export const BANK_TWO_DATES_GREEN_Y = [919, 1078, 1617]
 
+// Estado de cuenta en TABLA ("BDVenlinea personas", 1918 px de ancho): una fila por movimiento con las
+// columnas Fecha, Referencia, Descripcion, Debito / Credito, Monto y Saldo. De lo mas nuevo a lo mas viejo.
+interface StatementRowData {
+  y: number
+  date: string
+  time: string
+  ref: string
+  desc: string[]
+  dc: 'DEBITO' | 'CREDITO'
+  amount: string
+  balance: string
+}
+
+export const STATEMENT_ROWS: StatementRowData[] = [
+  { y: 144, date: '20-09-2026', time: '19:58', ref: '0677241403397', desc: ['OPERACION', 'PAGOMOVIL BDV'], dc: 'CREDITO', amount: '16.000,00', balance: '51.957,86' },
+  { y: 203, date: '20-09-2026', time: '19:52', ref: '0677208897420', desc: ['OPERACION', 'PAGOMOVIL BDV'], dc: 'CREDITO', amount: '20.000,00', balance: '35.957,86' },
+  { y: 262, date: '20-09-2026', time: '19:45', ref: '0677208813375', desc: ['OPERACION', 'PAGOMOVIL BDV'], dc: 'CREDITO', amount: '10.000,00', balance: '15.957,86' },
+  { y: 321, date: '18-09-2026', time: '19:48', ref: '0210086173620', desc: ['COBRO COMISION PAG', 'MOVIL BDV A BDV'], dc: 'DEBITO', amount: '-15,30', balance: '5.957,86' },
+  { y: 380, date: '18-09-2026', time: '19:48', ref: '0677286173620', desc: ['OPERACION', 'PAGOMOVIL BDV'], dc: 'DEBITO', amount: '-5.100,00', balance: '5.973,16' },
+  { y: 439, date: '18-09-2026', time: '18:51', ref: '0210085322989', desc: ['COBRO COMISION PAG', 'MOVIL BDV A BDV'], dc: 'DEBITO', amount: '-14,00', balance: '11.073,16' },
+  { y: 498, date: '18-09-2026', time: '18:51', ref: '0677285322989', desc: ['OPERACION', 'PAGOMOVIL BDV'], dc: 'DEBITO', amount: '-500,00', balance: '11.087,16' },
+  { y: 557, date: '18-09-2026', time: '09:56', ref: '0027277649985', desc: ['COMISION', 'PAGOMOVILBDV'], dc: 'DEBITO', amount: '-14,00', balance: '11.587,16' },
+  { y: 625, date: '18-09-2026', time: '09:56', ref: '0050377649985', desc: ['OPERACION', 'PAGOMOVILBDV', 'OTROS BANCO'], dc: 'DEBITO', amount: '-2.500,00', balance: '11.601,16' },
+  { y: 694, date: '17-09-2026', time: '20:53', ref: '0210074279899', desc: ['COBRO COMISION PAG', 'MOVIL BDV A BDV'], dc: 'DEBITO', amount: '-14,55', balance: '14.101,16' },
+  { y: 753, date: '17-09-2026', time: '20:53', ref: '0677274279899', desc: ['OPERACION', 'PAGOMOVIL BDV'], dc: 'DEBITO', amount: '-4.850,00', balance: '14.115,71' },
+  { y: 812, date: '17-09-2026', time: '19:53', ref: '0677273495969', desc: ['OPERACION', 'PAGOMOVIL BDV'], dc: 'CREDITO', amount: '6.000,00', balance: '18.965,71' },
+  { y: 871, date: '16-09-2026', time: '20:26', ref: '0677260573326', desc: ['OPERACION', 'PAGOMOVIL BDV'], dc: 'CREDITO', amount: '12.697,70', balance: '12.965,71' },
+]
+
+const STATEMENT_HEADER_WORDS: OcrWord[] = [
+  ...line('Fecha', 485, 517, 82, 98),
+  ...line('Referencia', 642, 699, 82, 98),
+  ...line('Descripción', 800, 862, 82, 98),
+  ...line('Débito / Crédito', 957, 1043, 82, 98),
+  ...line('Monto', 1115, 1150, 82, 98),
+  ...line('Saldo', 1273, 1304, 82, 98),
+]
+
+export function statementWords(rows: StatementRowData[] = STATEMENT_ROWS): OcrWord[] {
+  const words: OcrWord[] = [...STATEMENT_HEADER_WORDS]
+  for (const row of rows) {
+    const top = row.y - 8
+    const bottom = row.y + 8
+    words.push(...line(row.date, 485, 566, top, bottom), ...line('-', 572, 578, top, bottom), ...line(row.time, 584, 614, top, bottom))
+    words.push(...line(row.ref, 642, 751, top, bottom))
+    // Cada linea de la descripcion; las de varias lineas se reparten alrededor del centro de la fila.
+    const offsets = row.desc.length === 1 ? [0] : row.desc.length === 2 ? [-10, 9] : [-19, 0, 19]
+    row.desc.forEach((text, index) => {
+      words.push(...line(text, 800, 800 + text.length * 8.2, row.y + offsets[index]! - 8, row.y + offsets[index]! + 8))
+    })
+    words.push(...line(row.dc, 957, 1017, top, bottom))
+    words.push(...line(row.amount, 1115, 1115 + row.amount.length * 8, top, bottom))
+    words.push(...line(row.balance, 1273, 1273 + row.balance.length * 8, top, bottom))
+  }
+  return words
+}
+
+export const BANK_STATEMENT_WORDS: OcrWord[] = statementWords()
+
+// Otros estados de cuenta en tabla, para comprobar que el lector no depende de los titulos exactos de BDV.
+// Cada columna es [titulo, x del inicio]; cada fila es la lista de celdas en el mismo orden.
+export function genericTableWords(
+  columns: [string, number][],
+  rows: { y: number; cells: (string | string[])[] }[],
+  extraHeaderWords: OcrWord[] = [],
+): OcrWord[] {
+  const words: OcrWord[] = [...extraHeaderWords]
+  for (const [title, x] of columns) words.push(...line(title, x, x + title.length * 8, 82, 98))
+  for (const row of rows) {
+    row.cells.forEach((cell, index) => {
+      const x = columns[index]![1]
+      const lines = Array.isArray(cell) ? cell : [cell]
+      const offsets = lines.length === 1 ? [0] : lines.length === 2 ? [-10, 9] : [-19, 0, 19]
+      lines.forEach((text, lineIndex) => {
+        if (text === '') return
+        words.push(...line(text, x, x + text.length * 8, row.y + offsets[lineIndex]! - 8, row.y + offsets[lineIndex]! + 8))
+      })
+    })
+  }
+  return words
+}
+
 // Una captura ya leida, como la devuelve el servicio de OCR: texto + palabras + color.
 export function layoutOf(words: OcrWord[], width: number, isGreenAt: (box: OcrBox) => boolean | null = () => null) {
   const lines = new Map<number, string[]>()
