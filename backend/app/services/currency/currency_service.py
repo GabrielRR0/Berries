@@ -9,6 +9,8 @@ en que pasó (convert_at/get_conversion_rate_at/reference_fields_in_usd). Nadie 
 ("¿cuánto vale esto ahora?" vs. "¿cuánto valía esto esa vez?") con respuestas que
 deliberadamente no coinciden para una moneda con inflación fuerte (VEF, COP, ARS)."""
 
+import logging
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -18,10 +20,14 @@ from sqlalchemy.orm import Session
 from app.models.auth.user_model import User
 from app.models.currency.currency_model import Currency
 from app.models.currency.exchange_rate_model import ExchangeRate
+from app.models.transactions.transaction_model import Transaction
 from app.models.wallets.wallet_model import Wallet
 from app.services.currency.currency_lookup import get_currency_by_code
 from app.services.currency.rates.cache_refresh import get_fresh_rate, get_rate_at
+from app.services.currency.rates.rate_sanity import is_plausible_change
 from app.services.currency.rates.venezuela_rate_client import fetch_vef_rate_history
+
+logger = logging.getLogger(__name__)
 
 HISTORICAL_VEF_SOURCE = "dolarapi-oficial-historico"
 
@@ -83,6 +89,7 @@ def ensure_vef_history_covers(db: Session, at: datetime) -> None:
         .where(
             ExchangeRate.base_currency_id == vef.id,
             ExchangeRate.quote_currency_id == usd.id,
+            ExchangeRate.is_estimated.is_(False),
             ExchangeRate.fetched_at <= at_utc,
         )
         .order_by(ExchangeRate.fetched_at.desc())
@@ -249,7 +256,17 @@ def backfill_historical_vef_rates(db: Session, months: int = 12) -> int:
         _vef_history_covered_through = max(day for day, _ in series)
 
     inserted = 0
-    for day, promedio in series:
+    # Ultimo dia aceptado de la serie: cada dia se compara con el anterior, y uno que salte de golpe (un dato
+    # corrupto del proveedor) se omite en vez de guardarse como real.
+    previous: tuple[date, Decimal] | None = None
+    for day, promedio in sorted(series):
+        if previous is not None and not is_plausible_change(
+            promedio, previous[1], timedelta(days=(day - previous[0]).days)
+        ):
+            logger.warning("Historico VEF: se omite %s (%s) por saltar de golpe frente a %s (%s)", day, promedio, *previous)
+            continue
+        previous = (day, promedio)
+
         # promedio = "cuántos VEF equivalen a 1 USD" (ej. 850) - la convención de
         # ExchangeRate.rate es "cuántas unidades de quote equivalen a 1 de base" (ver
         # _fetch_rate_from_client en cache_refresh.py, la fuente de verdad de esta
@@ -318,3 +335,69 @@ def refresh_all_active_currencies(db: Session) -> list[str]:
         backfill_historical_vef_rates(db)
 
     return codes
+
+
+@dataclass
+class RateAudit:
+    """Resultado de comparar lo guardado con la serie real del proveedor (ver audit_vef_rates)."""
+
+    bad_rates: list[dict] = field(default_factory=list)
+    affected_transactions: list[dict] = field(default_factory=list)
+
+    @property
+    def is_clean(self) -> bool:
+        return not self.bad_rates and not self.affected_transactions
+
+
+def audit_vef_rates(db: Session, tolerance: Decimal = Decimal("0.10")) -> RateAudit:
+    """Detecta datos de tasa del bolivar que ya esten mal: filas de ExchangeRate y movimientos cuyo valor de
+    referencia congelado se aparten mas de `tolerance` (10 % por defecto) de la tasa publicada ese dia por el
+    proveedor. Es de solo lectura. Si encuentra algo, la reparacion es borrar la fila mala y correr
+    `manage.py backfill:reference-amounts`. Pensado para correrse de vez en cuando (`manage.py check:rates`):
+    el chequeo de sensatez al guardar (rate_sanity.py) PREVIENE, esto DETECTA lo que se haya colado.
+
+    Un dia sin dato (fin de semana) se compara con el ultimo dia habil anterior."""
+    history = dict(fetch_vef_rate_history())
+
+    def published_for(day: date) -> Decimal | None:
+        for back in range(7):
+            value = history.get(day - timedelta(days=back))
+            if value is not None:
+                return value
+        return None
+
+    usd = get_currency_by_code(db, "USD")
+    vef = get_currency_by_code(db, "VEF")
+    audit = RateAudit()
+
+    for row in db.scalars(select(ExchangeRate).order_by(ExchangeRate.fetched_at)):
+        if {row.base_currency_id, row.quote_currency_id} != {usd.id, vef.id}:
+            continue
+        bs_per_usd = row.rate if row.base_currency_id == usd.id else Decimal("1") / row.rate
+        published = published_for(row.fetched_at.date())
+        if published is not None and abs(bs_per_usd - published) / published > tolerance:
+            audit.bad_rates.append(
+                {
+                    "id": str(row.id),
+                    "fetched_at": row.fetched_at.isoformat(),
+                    "bs_per_usd": round(bs_per_usd, 4),
+                    "published": published,
+                    "source": row.source,
+                    "is_estimated": row.is_estimated,
+                }
+            )
+
+    for transaction in db.scalars(select(Transaction)):
+        if transaction.reference_rate is None or transaction.currency != "VEF":
+            continue
+        published = published_for(transaction.occurred_at.date())
+        if published is not None and abs(transaction.reference_rate - published) / published > tolerance:
+            audit.affected_transactions.append(
+                {
+                    "id": str(transaction.id),
+                    "occurred_on": transaction.occurred_at.date().isoformat(),
+                    "stored_rate": round(transaction.reference_rate, 2),
+                    "published": published,
+                }
+            )
+    return audit
