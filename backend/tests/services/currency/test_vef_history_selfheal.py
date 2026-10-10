@@ -232,3 +232,52 @@ def test_a_date_after_the_last_published_day_does_ask_again(db, history_calls, m
     get_conversion_rate_at(db, "VEF", "USD", datetime(2026, 10, 13, 12, 0, tzinfo=timezone.utc))
 
     assert history_calls == [1, 1]
+
+
+def _store_rate(db, bs_per_usd: Decimal, fetched_at: datetime, *, estimated: bool, source: str | None = "dolarapi-oficial") -> None:
+    usd = get_currency_by_code(db, "USD")
+    vef = get_currency_by_code(db, "VEF")
+    db.add(
+        ExchangeRate(
+            base_currency_id=vef.id,
+            quote_currency_id=usd.id,
+            rate=Decimal("1") / bs_per_usd,
+            fetched_at=fetched_at,
+            source=source,
+            is_estimated=estimated,
+        )
+    )
+    db.commit()
+
+
+def test_a_real_rate_always_beats_a_more_recent_estimated_one(db, history_calls):
+    """Bug real: una fila de respaldo (36,5 Bs por USD) mas reciente que la tasa real tapaba a la real y un
+    gasto de 36.500 Bs se congelaba como $1.000. Las estimadas solo valen si no hay ninguna real."""
+    _store_rate(db, Decimal("849.564"), datetime(2026, 9, 21, 16, 9, 49, tzinfo=timezone.utc), estimated=False)
+    _store_rate(db, Decimal("36.5"), datetime(2026, 9, 21, 16, 9, 59, tzinfo=timezone.utc), estimated=True, source="fallback-stale")
+
+    rate = get_conversion_rate_at(db, "VEF", "USD", datetime(2026, 9, 21, 19, 0, tzinfo=timezone.utc))
+
+    assert bs_per_usd(rate) == Decimal("849.5640")
+    # 36.500 Bs valen ~$43, no $1.000.
+    assert round(Decimal("36500") * rate, 2) == Decimal("42.96")
+
+
+def test_estimated_rates_are_still_used_when_there_is_no_real_one(db):
+    """Sin ninguna lectura real para el par (y sin historico disponible: el proveedor devuelve vacio, como
+    en el resto de los tests), una estimada sigue siendo mejor que nada."""
+    _store_rate(db, Decimal("36.5"), datetime(2026, 9, 21, 16, 9, 59, tzinfo=timezone.utc), estimated=True, source="fallback-stale")
+
+    rate = get_conversion_rate_at(db, "VEF", "USD", datetime(2026, 9, 21, 19, 0, tzinfo=timezone.utc))
+
+    assert bs_per_usd(rate) == Decimal("36.5000")
+
+
+def test_a_later_real_rate_is_preferred_over_an_earlier_estimated_one_as_the_anchor(db):
+    _store_rate(db, Decimal("36.5"), datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc), estimated=True, source="fallback-stale")
+    _store_rate(db, Decimal("850"), datetime(2026, 9, 22, 12, 0, tzinfo=timezone.utc), estimated=False)
+
+    # Ninguna real es anterior a esa fecha: se prefiere la real mas cercana (aunque sea posterior) a la estimada.
+    rate = get_conversion_rate_at(db, "VEF", "USD", datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc))
+
+    assert bs_per_usd(rate) == Decimal("850.0000")

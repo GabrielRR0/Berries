@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -9,7 +10,10 @@ from app.models.currency.exchange_rate_model import ExchangeRate
 from app.services.currency.currency_lookup import get_currency_by_code
 from app.services.currency.rates.crypto_rate_client import fetch_crypto_rates
 from app.services.currency.rates.fiat_rate_client import fetch_fiat_rates
+from app.services.currency.rates.rate_sanity import is_plausible_change
 from app.services.currency.rates.venezuela_rate_client import fetch_vef_rate
+
+logger = logging.getLogger(__name__)
 
 
 def _fetch_rate_from_client(base_currency: str, quote_currency: str) -> tuple[Decimal, str, bool]:
@@ -91,19 +95,40 @@ def get_fresh_rate(db: Session, base_currency: str, quote_currency: str) -> Deci
 
     rate, source, is_estimated = _fetch_rate_from_client(base_currency, quote_currency)
 
-    if is_estimated:
-        last_real = db.scalar(
-            select(ExchangeRate)
-            .where(
-                ExchangeRate.base_currency_id == base_id,
-                ExchangeRate.quote_currency_id == quote_id,
-                ExchangeRate.is_estimated.is_(False),
-            )
-            .order_by(ExchangeRate.fetched_at.desc())
+    last_real = db.scalar(
+        select(ExchangeRate)
+        .where(
+            ExchangeRate.base_currency_id == base_id,
+            ExchangeRate.quote_currency_id == quote_id,
+            ExchangeRate.is_estimated.is_(False),
         )
-        if last_real is not None:
-            rate = last_real.rate
-            source = f"{last_real.source}-reused" if last_real.source else source
+        .order_by(ExchangeRate.fetched_at.desc())
+    )
+
+    # Chequeo de sensatez: una lectura marcada como real pero que se aparta de golpe de la ultima real (un
+    # respaldo viejo, un error del proveedor...) NO se guarda como dato de mercado: se trata como estimada y se
+    # reutiliza la ultima real. Bug real: una fila de 36,5 Bs por USD guardada como real (cuando valia ~850)
+    # congelo un gasto de 36.500 Bs como $1.000.
+    suspicious = False
+    if not is_estimated and last_real is not None:
+        last_at = last_real.fetched_at if last_real.fetched_at.tzinfo else last_real.fetched_at.replace(tzinfo=timezone.utc)
+        if not is_plausible_change(rate, last_real.rate, datetime.now(timezone.utc) - last_at):
+            logger.warning(
+                "Tasa sospechosa %s/%s: %s (fuente %s) frente a la ultima real %s; se reutiliza la ultima real",
+                base_currency,
+                quote_currency,
+                rate,
+                source,
+                last_real.rate,
+            )
+            suspicious = True
+            is_estimated = True
+
+    if is_estimated and last_real is not None:
+        rate = last_real.rate
+        source = f"{last_real.source or source}-suspicious-reused" if suspicious else (
+            f"{last_real.source}-reused" if last_real.source else source
+        )
 
     row = ExchangeRate(
         base_currency_id=base_id,
@@ -138,24 +163,25 @@ def get_rate_at(db: Session, base_currency: str, quote_currency: str, at: dateti
     base_id = get_currency_by_code(db, base_currency).id
     quote_id = get_currency_by_code(db, quote_currency).id
 
-    row = db.scalar(
-        select(ExchangeRate)
-        .where(
-            ExchangeRate.base_currency_id == base_id,
-            ExchangeRate.quote_currency_id == quote_id,
-            ExchangeRate.fetched_at <= at,
-        )
-        .order_by(ExchangeRate.fetched_at.desc())
-    )
-    if row is not None:
-        return row.rate
+    # Una lectura REAL siempre gana a una estimada (el respaldo hardcodeado de un cliente de tasas,
+    # ver get_fresh_rate): una tasa estimada mas reciente no debe tapar una real mas vieja - asi una
+    # fila de respaldo (ej. 36,5 Bs por USD) no puede congelar el valor de un gasto. Las estimadas solo
+    # se usan si para ese par no hay ninguna real.
+    for real_only in (True, False):
+        conditions = [ExchangeRate.base_currency_id == base_id, ExchangeRate.quote_currency_id == quote_id]
+        if real_only:
+            conditions.append(ExchangeRate.is_estimated.is_(False))
 
-    oldest = db.scalar(
-        select(ExchangeRate)
-        .where(ExchangeRate.base_currency_id == base_id, ExchangeRate.quote_currency_id == quote_id)
-        .order_by(ExchangeRate.fetched_at.asc())
-    )
-    if oldest is not None:
-        return oldest.rate
+        row = db.scalar(
+            select(ExchangeRate)
+            .where(*conditions, ExchangeRate.fetched_at <= at)
+            .order_by(ExchangeRate.fetched_at.desc())
+        )
+        if row is not None:
+            return row.rate
+
+        oldest = db.scalar(select(ExchangeRate).where(*conditions).order_by(ExchangeRate.fetched_at.asc()))
+        if oldest is not None:
+            return oldest.rate
 
     return get_fresh_rate(db, base_currency, quote_currency)

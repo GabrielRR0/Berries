@@ -13,6 +13,10 @@ Comandos:
         # existentes (no solo NULLs), ver backfill_reference_amounts en transaction_service.py.
         # --dry-run hace el mismo trabajo pero termina en rollback, para revisar el reporte de
         # cambios antes de tocar datos reales (recomendado correrlo así primero, contra una copia).
+    python manage.py check:rates [--tolerance 0.10]  # SOLO LECTURA: compara las tasas del bolivar guardadas y
+        # el valor de referencia congelado en los movimientos contra la serie real del proveedor y lista lo que
+        # se aparte mas de la tolerancia (10 % por defecto). Sale con codigo 1 si encuentra algo. Ver
+        # audit_vef_rates en currency_service.py.
     python manage.py backfill:vef-rate-history [--months N]  # trae el histórico REAL de la
         # tasa oficial (BCV) de los últimos N meses (12 por default) vía dolarapi.com e inserta
         # los días que todavía no existan en ExchangeRate - idempotente, ver
@@ -124,6 +128,30 @@ def cmd_backfill_vef_rate_history(args: argparse.Namespace) -> None:
         db.close()
 
 
+def cmd_check_rates(args: argparse.Namespace) -> None:
+    from decimal import Decimal
+
+    from app.core.database import SessionLocal
+    from app.services.currency.currency_service import audit_vef_rates
+
+    db = SessionLocal()
+    try:
+        audit = audit_vef_rates(db, tolerance=Decimal(str(args.tolerance)))
+    finally:
+        db.close()
+
+    print(f"Filas de tasa que se apartan de la real: {len(audit.bad_rates)}")
+    for item in audit.bad_rates:
+        print(f"  - {item['id']} {item['fetched_at']}: {item['bs_per_usd']} Bs/USD (publicada {item['published']}), fuente {item['source']}")
+    print(f"Movimientos con un valor de referencia que se aparta de la real: {len(audit.affected_transactions)}")
+    for item in audit.affected_transactions:
+        print(f"  - {item['id']} {item['occurred_on']}: tasa guardada {item['stored_rate']} (publicada {item['published']})")
+    if not audit.is_clean:
+        print("Reparacion: borrar la fila de tasa mala y correr `python manage.py backfill:reference-amounts`.")
+        sys.exit(1)
+    print("Todo en orden.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Comandos de administración del backend de Berry")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -150,6 +178,13 @@ def main() -> None:
         "--dry-run", action="store_true", help="Solo reporta los cambios, no los guarda (rollback al final)"
     )
     backfill_reference_amounts.set_defaults(func=cmd_backfill_reference_amounts)
+
+    check_rates = subparsers.add_parser(
+        "check:rates",
+        help="Solo lectura: lista las tasas del bolivar y los valores de referencia que se aparten de la serie real",
+    )
+    check_rates.add_argument("--tolerance", type=float, default=0.10, help="Desvio permitido (default 0.10 = 10 %%)")
+    check_rates.set_defaults(func=cmd_check_rates)
 
     backfill_vef_rate_history = subparsers.add_parser(
         "backfill:vef-rate-history",
