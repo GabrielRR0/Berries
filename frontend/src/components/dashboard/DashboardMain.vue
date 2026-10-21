@@ -1,21 +1,24 @@
 <script setup lang="ts">
-import { computed, onUnmounted, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useStaggerReveal } from '../../animation/useStaggerReveal'
 import { useAvatarInitials } from '../../composables/auth/useAvatarInitials'
+import { useGreeting } from '../../composables/auth/useGreeting'
 import { useScrollHeader } from '../../composables/layout/useScrollHeader'
 import { useSectionActive } from '../../composables/navigation/sectionContext'
 import { useOnboardingTour } from '../../composables/onboarding/useOnboardingTour'
 import TopHeader from '../layout/TopHeader.vue'
 import { useTransactionsStore } from '../../stores/transactions.store'
+import { formatMonthName } from '../../utils/formatters/formatDate'
 import { useWalletsStore } from '../../stores/wallets.store'
 import PageShell from '../layout/PageShell.vue'
-import AnimatedCurrency from '../ui/AnimatedCurrency.vue'
 import BaseCard from '../ui/BaseCard.vue'
 import LoadingIndicator from '../ui/LoadingIndicator.vue'
 import TransactionList from '../transactions/TransactionList.vue'
 import BalanceCard from './BalanceCard.vue'
 import IncomeExpenseSummary from './IncomeExpenseSummary.vue'
 import QuickActionsGrid from './QuickActionsGrid.vue'
+import WalletsCarousel from './WalletsCarousel.vue'
 
 // Pantalla "Inicio" - la carga real de wallets ocurre dentro de
 // BalanceCard.vue (que se monta como hijo de esta misma pantalla), asi que
@@ -37,8 +40,14 @@ const recentTransactions = computed(() =>
 )
 
 const router = useRouter()
+const monthName = formatMonthName()
+// Entrada escalonada de las secciones marcadas con data-reveal (Motion, ver
+// animation/useStaggerReveal.ts).
+const dashboardRef = ref<HTMLElement | null>(null)
+useStaggerReveal(dashboardRef)
 const { start: startTour, close: closeTour } = useOnboardingTour()
 const avatarInitials = useAvatarInitials()
+const { greeting, firstName } = useGreeting()
 const { isScrolled } = useScrollHeader()
 
 function goToWallets() {
@@ -67,25 +76,33 @@ onUnmounted(closeTour)
   <PageShell>
     <TopHeader
       :avatar-initials="avatarInitials"
+      :greeting="greeting"
+      :name="firstName"
       :scrolled="isScrolled"
       @avatar-click="goToSettings"
       @help-click="startTour"
     />
 
-    <div class="dashboard">
+    <div ref="dashboardRef" class="dashboard">
       <!-- Wrapper divs - cada columna de escritorio es su propio stack
            independiente (ver @media min-width:1024px). En mobile/tablet
            son bloques transparentes sin estilo propio, el flujo se ve
            identico a como era antes. -->
       <div class="dashboard-col dashboard-col-primary">
-        <BalanceCard class="dashboard-section" />
-        <QuickActionsGrid class="dashboard-section" />
+        <BalanceCard class="dashboard-section" data-reveal />
+        <QuickActionsGrid class="dashboard-section" data-reveal />
       </div>
 
       <div class="dashboard-col dashboard-col-secondary">
-        <IncomeExpenseSummary class="dashboard-section" />
+        <section class="dashboard-section month-section" data-reveal>
+          <div class="recent-header">
+            <h2 class="recent-title">{{ monthName }}</h2>
+            <RouterLink to="/analitica" class="recent-view-all">Ver análisis</RouterLink>
+          </div>
+          <IncomeExpenseSummary />
+        </section>
 
-        <section class="dashboard-section recent-section">
+        <section class="dashboard-section recent-section" data-reveal>
           <div class="recent-header">
             <h2 class="recent-title">Últimos movimientos</h2>
             <RouterLink to="/movimientos" class="recent-view-all">Ver todos →</RouterLink>
@@ -111,66 +128,13 @@ onUnmounted(closeTour)
           </Transition>
         </section>
 
-        <section class="dashboard-section wallets-section">
-          <div class="wallets-header">
-            <h2 class="wallets-title">Mis balances</h2>
-            <!-- Manda a /cuentas (WalletsMain.vue) - ahi vive la creacion real
-                 de wallets, ver componentes bajo components/wallets/. -->
-            <button type="button" class="wallets-fab" aria-label="Agregar billetera" @click="goToWallets">
-              <!-- SVG en vez del glyph de texto "+" - un caracter de texto no
-                   queda perfectamente centrado dentro de un circulo flex
-                   (la metrica de la fuente no coincide con el centro visual
-                   real del simbolo), un SVG con paths propios si. -->
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                <path d="M12 5v14M5 12h14" stroke-linecap="round" />
-              </svg>
-            </button>
-          </div>
-
-          <Transition name="loading-fade" mode="out-in">
-            <LoadingIndicator
-              v-if="walletsStore.isLoading && walletsStore.wallets.length === 0"
-              key="loading"
-              label="Cargando billeteras..."
-            />
-
-            <BaseCard v-else-if="walletsStore.wallets.length === 0" key="empty" class="wallets-empty">
-              <p class="wallets-empty-title">Todavía no tienes billeteras</p>
-              <p class="wallets-empty-text">
-                Crea tu primera billetera para empezar a llevar tus cuentas en distintas monedas.
-              </p>
-            </BaseCard>
-
-            <ul v-else key="list" class="wallets-preview-list">
-              <li
-                v-for="wallet in walletsStore.wallets"
-                :key="wallet.id"
-                class="wallets-preview-item"
-                role="button"
-                tabindex="0"
-                @click="goToWallets"
-                @keydown.enter="goToWallets"
-                @keydown.space.prevent="goToWallets"
-              >
-                <!-- Icono - oculto por default (display:none mas abajo),
-                     visible solo en escritorio: mismo icono de "Cuentas" ya
-                     usado en QuickActionsGrid.vue/WalletCard.vue, sin inventar
-                     uno nuevo. -->
-                <span class="wallets-preview-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="6" width="18" height="13" rx="2" />
-                    <path d="M3 10h18" />
-                    <path d="M16 15h2" stroke-linecap="round" />
-                  </svg>
-                </span>
-                <span class="wallets-preview-name">{{ wallet.name }}</span>
-                <span class="wallets-preview-balance">
-                  <AnimatedCurrency :value="wallet.balance" :currency="wallet.currency" />
-                </span>
-              </li>
-            </ul>
-          </Transition>
-        </section>
+        <WalletsCarousel
+          class="dashboard-section wallets-section"
+          data-reveal
+          :wallets="walletsStore.wallets"
+          :is-loading="walletsStore.isLoading"
+          @open="goToWallets"
+        />
       </div>
     </div>
   </PageShell>
@@ -273,71 +237,8 @@ onUnmounted(closeTour)
     font-size: 1.75rem;
   }
 
-  .recent-title,
-  .wallets-title {
+  .recent-title {
     font-size: 1.375rem;
-  }
-
-  .wallets-preview-item {
-    padding: 1.125rem 1.25rem;
-  }
-
-  .wallets-preview-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: var(--radius-pill);
-    border: 1px solid var(--glass-border);
-    background: var(--glass-bg-strong);
-    color: var(--text-h);
-  }
-
-  .wallets-preview-icon svg {
-    width: 46%;
-    height: 46%;
-  }
-
-  .wallets-preview-name {
-    flex: 1;
-    min-width: 0;
-  }
-}
-
-/* Animacion de entrada al cargar Inicio en escritorio - bloque SEPARADO del
-   de layout de arriba (no fusionado) para poder agregarle el guard extra de
-   prefers-reduced-motion sin tocar las reglas de grid. animation-fill-mode
-   "backwards" (nunca "both"/"forwards"): ver @keyframes content-enter en
-   style.css - "forwards" dejaria el transform pisado para siempre, y estos
-   mismos elementos ya reciben su propio hover de BaseCard.vue en varios
-   casos (ej. las cards de .wallets-empty). Delays escalonados siguiendo el
-   orden visual de grid-template-areas (balance -> actions -> summary ->
-   wallets). */
-@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
-  .balance-card {
-    animation: content-enter var(--duration-base) var(--ease-out) backwards;
-  }
-
-  .quick-actions {
-    animation: content-enter var(--duration-base) var(--ease-out) backwards;
-    animation-delay: 50ms;
-  }
-
-  .income-expense-summary {
-    animation: content-enter var(--duration-base) var(--ease-out) backwards;
-    animation-delay: 100ms;
-  }
-
-  .recent-section {
-    animation: content-enter var(--duration-base) var(--ease-out) backwards;
-    animation-delay: 150ms;
-  }
-
-  .wallets-section {
-    animation: content-enter var(--duration-base) var(--ease-out) backwards;
-    animation-delay: 200ms;
   }
 }
 
@@ -372,140 +273,5 @@ onUnmounted(closeTour)
 
 .recent-empty-text {
   font-size: 0.8125rem;
-}
-
-.wallets-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-
-.wallets-title {
-  font-size: 1.125rem;
-}
-
-.wallets-fab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border: none;
-  border-radius: var(--radius-pill);
-  background: var(--accent);
-  color: var(--accent-contrast);
-  cursor: pointer;
-  transition:
-    opacity var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-.wallets-fab svg {
-  width: 1.125rem;
-  height: 1.125rem;
-}
-
-.wallets-fab:hover {
-  opacity: 0.9;
-}
-
-.wallets-fab:active {
-  transform: scale(0.88);
-  opacity: 0.8;
-}
-
-.wallets-empty {
-  text-align: center;
-  color: var(--text-muted);
-}
-
-.wallets-empty-title {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-.wallets-empty-text {
-  margin-top: 0.375rem;
-  font-size: 0.8125rem;
-  line-height: 1.5;
-}
-
-.wallets-preview-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.wallets-preview-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.875rem 1rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--glass-border);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--blur-sm));
-  -webkit-backdrop-filter: blur(var(--blur-sm));
-  cursor: pointer;
-  transition:
-    border-color var(--duration-base) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out);
-}
-
-/* Feedback tactil en mobile/tablet (sin :hover disponible ahi) - mismo
-   criterio que .new-wallet-trigger:active en WalletsMain.vue, ahora que la
-   fila navega a /cuentas en vez de ser puramente decorativa. */
-.wallets-preview-item:active {
-  transform: scale(0.98);
-}
-
-/* No usa BaseCard.vue (duplica su look de cristal a mano, igual que
-   .transaction-item en TransactionList.vue), asi que no recibe el hover de
-   BaseCard.vue "gratis" - mismo tratamiento aplicado explicito aca. Sin
-   esto, esta era la unica lista de cards de toda la app sin respuesta al
-   mouse - se sentia mas plana que el resto. */
-@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
-  .wallets-preview-item:hover {
-    transform: translateY(-4px);
-    border-color: var(--glass-border-hover);
-    box-shadow: var(--shadow-lg);
-  }
-}
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .wallets-preview-item {
-    background: var(--bg-surface);
-  }
-}
-
-.wallets-preview-name {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-/* Oculto por default (mobile/tablet) - solo se muestra en escritorio (ver
-   @media min-width:1024px mas arriba), mismo patron ya usado en
-   TransactionsMain.vue (".filters-sidebar"). Sin este display:none de base,
-   el <span><svg>...</svg></span> se renderizaria inline sin tamaño definido
-   en mobile. */
-.wallets-preview-icon {
-  display: none;
-}
-
-.wallets-preview-balance {
-  font-size: 0.9375rem;
-  /* 600, no 700 - pedido explicito del usuario ("una fuente algo mas fina");
-     sigue distinguiendose del nombre (tambien 600) por ser mas grande, no
-     hace falta el peso extra para que se lea como el dato principal. */
-  font-weight: 600;
-  color: var(--text-h);
 }
 </style>

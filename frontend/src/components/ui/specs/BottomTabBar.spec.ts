@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useOfflineQueueStore } from '../../../stores/offlineQueue.store'
+import { useQuickRegister } from '../../../composables/quickRegister/useQuickRegister'
 import BottomTabBar from '../BottomTabBar.vue'
 
 vi.mock('vue-router', () => ({
@@ -46,5 +47,31 @@ describe('BottomTabBar', () => {
 
     expect(inicioTab.find('.tab-pending-badge').exists()).toBe(false)
     expect(menuTab.find('.tab-pending-badge').text()).toBe('1')
+  })
+
+  it('inserta el boton "+" de registrar movimiento en el centro, fuera de los tabs', () => {
+    const wrapper = mount(BottomTabBar)
+
+    const create = wrapper.find('.tab-create')
+    expect(create.exists()).toBe(true)
+    expect(create.attributes('aria-label')).toBe('Nuevo movimiento')
+
+    // Inicio y Movimientos a la izquierda, Menu a la derecha: el "+" no es un
+    // .tab (no es una seccion), asi que los 3 tabs siguen siendo 3.
+    const children = Array.from(wrapper.find('nav').element.children)
+    expect(wrapper.findAll('.tab')).toHaveLength(3)
+    expect(children.indexOf(create.element)).toBe(2)
+  })
+
+  it('el boton "+" abre el panel Registrar sin navegar a ninguna ruta', async () => {
+    const quickRegister = useQuickRegister()
+    quickRegister.close()
+    const wrapper = mount(BottomTabBar)
+
+    await wrapper.find('.tab-create').trigger('click')
+
+    expect(quickRegister.isOpen.value).toBe(true)
+    expect(quickRegister.step.value).toBe('menu')
+    quickRegister.close()
   })
 })

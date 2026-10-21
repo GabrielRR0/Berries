@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import type { Transaction } from '../../services/transactions/interfaces/transactions.interface'
 import type { TransferEditTarget, Wallet } from '../../services/wallets/interfaces/wallets.interface'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
-import { formatDate } from '../../utils/formatters/formatDate'
+import { formatDate, formatRelativeDay } from '../../utils/formatters/formatDate'
 import IconBadge from '../ui/IconBadge.vue'
 
 // Lista pura de movimientos ya cargados (TransactionsMain.vue hace el
@@ -187,6 +187,7 @@ function confirmDelete(id: string) {
     tag="ul"
     name="transaction-item"
     class="transaction-list"
+    :class="{ 'is-compact': props.readonly }"
     appear
     appear-active-class="transaction-item-appear-active"
   >
@@ -216,7 +217,10 @@ function confirmDelete(id: string) {
       </div>
 
       <div v-else class="transaction-main">
-        <IconBadge :variant="isTransfer(item.transaction) ? 'neutral' : item.transaction.type === 'expense' ? 'expense' : 'income'">
+        <IconBadge
+          :variant="isTransfer(item.transaction) ? 'neutral' : item.transaction.type === 'expense' ? 'expense' : 'income'"
+          :shape="props.readonly ? 'rounded' : 'circle'"
+        >
           <svg v-if="isTransfer(item.transaction)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M7 7h11m0 0-3.5-3.5M18 7l-3.5 3.5M17 17H6m0 0 3.5-3.5M6 17l3.5 3.5" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
@@ -229,9 +233,22 @@ function confirmDelete(id: string) {
         </IconBadge>
 
         <div class="transaction-info">
-          <p class="transaction-category">{{ item.transaction.category }}</p>
-          <p class="transaction-date">{{ formatDate(item.transaction.occurredAt) }}</p>
-          <p v-if="item.transaction.description" class="transaction-description">{{ item.transaction.description }}</p>
+          <!-- Vista compacta (readonly, "Ultimos movimientos" de Inicio): titulo
+               = descripcion (o categoria) y una sola linea "Hoy · Cuenta
+               principal" - la fecha exacta y el detalle viven en Movimientos. -->
+          <p class="transaction-category">
+            {{ props.readonly ? item.transaction.description || item.transaction.category : item.transaction.category }}
+          </p>
+          <p class="transaction-date">
+            {{
+              props.readonly
+                ? `${formatRelativeDay(item.transaction.occurredAt)} · ${walletName(item.transaction.walletId)}`
+                : formatDate(item.transaction.occurredAt)
+            }}
+          </p>
+          <p v-if="!props.readonly && item.transaction.description" class="transaction-description">
+            {{ item.transaction.description }}
+          </p>
         </div>
 
         <div class="transaction-amount-group">
@@ -709,3 +726,5 @@ function confirmDelete(id: string) {
   }
 }
 </style>
+
+<style scoped src="./transactionListCompact.css"></style>

@@ -25,7 +25,8 @@ import TransactionForm from './TransactionForm.vue'
 import TransactionList from './TransactionList.vue'
 import TransactionsFilterSheet, { DEFAULT_TRANSACTIONS_FILTER } from './TransactionsFilterSheet.vue'
 import TransactionsFilterPanel from './TransactionsFilterPanel.vue'
-import type { TransactionsFilterState } from './interfaces/TransactionsFilterSheet.interface'
+import TransactionTypeChips from './TransactionTypeChips.vue'
+import type { TransactionsFilterState, TransactionTypeFilter } from './interfaces/TransactionsFilterSheet.interface'
 
 // Pantalla "Movimientos" (/movimientos) - rediseñada segun dos capturas de
 // referencia que compartio el usuario (layout nada mas, la paleta sigue
@@ -112,6 +113,15 @@ const monthExpenses = computed(() => periodSummary.value?.totalExpense ?? 0)
 
 watch(activeMonth, (month) => fetchPeriodSummary(toPeriodKey(month.year, month.month)), { immediate: true })
 
+// Un movimiento registrado desde el panel "Registrar" global entra a la cache
+// compartida: el resumen del mes activo se vuelve a pedir para reflejarlo.
+watch(
+  () => transactionsStore.transactions.length,
+  (_length, previousLength) => {
+    if (previousLength > 0) fetchPeriodSummary(currentPeriodKey())
+  },
+)
+
 // Chips de categoria dinamicos: Berry no tiene una taxonomia fija (ver
 // TransactionsFilterSheet.vue) - se derivan de las categorias que el
 // usuario ya uso de verdad, ordenadas para que la lista no "salte" cada vez
@@ -163,6 +173,10 @@ function onMonthChange(year: number, month: number) {
 
 function onFilterApply(next: TransactionsFilterState) {
   filter.value = next
+}
+
+function onTypeChange(type: TransactionTypeFilter) {
+  filter.value = { ...filter.value, type }
 }
 
 function currentPeriodKey(): string {
@@ -322,6 +336,12 @@ function goBack() {
           </button>
         </div>
 
+        <TransactionTypeChips
+          class="transactions-section type-chips-row"
+          :model-value="filter.type"
+          @update:model-value="onTypeChange"
+        />
+
         <p v-if="loadError" class="transactions-error" role="alert">{{ loadError }}</p>
 
         <section class="transactions-section">
@@ -455,12 +475,19 @@ function goBack() {
   gap: 0.5rem;
 }
 
+/* Menos aire que entre secciones: los chips cuelgan de la busqueda. */
+.type-chips-row {
+  margin-top: 0.75rem;
+}
+
 .search-input {
   flex: 1;
-  padding: 0.75rem 0.875rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-inset);
+  padding: 0.8125rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
   color: var(--text-h);
   font: inherit;
   /* 1rem, no menos: por debajo de 16px iOS Safari hace zoom automatico al
@@ -480,10 +507,10 @@ function goBack() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 3rem;
+  height: 3rem;
   flex-shrink: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 1rem;
   border: 1px solid var(--glass-border);
   background: var(--glass-bg);
   color: var(--text-h);

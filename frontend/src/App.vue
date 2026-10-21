@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
 import SectionPager from './components/layout/SectionPager.vue'
+import QuickRegisterHost from './components/quickRegister/QuickRegisterHost.vue'
 import BottomTabBar from './components/ui/BottomTabBar.vue'
 import ToastBanner from './components/ui/ToastBanner.vue'
 import { useOnlineStatus } from './composables/connectivity/useOnlineStatus'
+import { isAnySheetOpen } from './composables/layout/useSheetPresence'
+import { useLooseRouteSwipe } from './composables/navigation/useLooseRouteSwipe'
 import { usePageTransitionName } from './composables/navigation/usePageTransition'
 import { useAuthStore } from './stores/auth.store'
 import { useOfflineQueueStore } from './stores/offlineQueue.store'
@@ -32,6 +35,15 @@ const showChrome = computed(() => Boolean(route.meta.requiresAuth) && !route.met
 const isSection = (r: RouteLocationNormalizedLoaded) => typeof r.meta.order === 'number'
 const isSectionRoute = computed(() => isSection(route))
 
+// En una pantalla suelta (fuera de las 4 de la barra) deslizar vuelve a la
+// pagina anterior, o a Inicio (ver useLooseRouteSwipe.ts). Solo con sesion
+// iniciada y sin un sheet abierto (los sheets tienen su propio gesto).
+const looseViewportRef = ref<HTMLElement | null>(null)
+useLooseRouteSwipe(
+  looseViewportRef,
+  () => Boolean(route.meta.requiresAuth) && !isSectionRoute.value && !isAnySheetOpen.value,
+)
+
 // Repuebla "user" al recargar la pagina cuando ya hay un token persistido
 // (ver stores/auth.store.ts) - sin esto, TopHeader no tendria iniciales de
 // avatar hasta el proximo login/register manual. Si el token ya no es
@@ -49,7 +61,7 @@ onMounted(() => {
 <template>
   <SectionPager v-if="authStore.isAuthenticated" />
 
-  <div class="route-transition-viewport" :class="{ 'is-passthrough': isSectionRoute }">
+  <div ref="looseViewportRef" class="route-transition-viewport" :class="{ 'is-passthrough': isSectionRoute }">
     <RouterView v-slot="{ Component, route: currentRoute }">
       <Transition :name="transitionName">
         <component :is="Component" v-if="Component && !isSection(currentRoute)" :key="currentRoute.path" />
@@ -58,5 +70,6 @@ onMounted(() => {
   </div>
 
   <BottomTabBar v-if="showChrome" />
+  <QuickRegisterHost v-if="showChrome" />
   <ToastBanner />
 </template>

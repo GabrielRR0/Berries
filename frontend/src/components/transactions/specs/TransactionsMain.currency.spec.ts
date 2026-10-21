@@ -10,7 +10,8 @@ import MonthPager from '../../ui/MonthPager.vue'
 import TransactionsMain from '../TransactionsMain.vue'
 
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  useRoute: () => ({ query: {} }),
 }))
 
 const now = new Date()

@@ -27,8 +27,8 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
 <style scoped>
 .pill-toggle {
   display: inline-flex;
-  gap: 0.375rem;
-  padding: 0.25rem;
+  gap: 0.125rem;
+  padding: 0.1875rem;
   border-radius: var(--radius-pill);
   background: var(--glass-bg);
   backdrop-filter: blur(var(--blur-sm));
@@ -43,13 +43,13 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
 }
 
 .pill {
-  padding: 0.375rem 0.875rem;
+  padding: 0.375rem 0.75rem;
   border: none;
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-muted);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -71,11 +71,11 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
   opacity: 0.7;
 }
 
-/* Activa: se queda solida/vibrante a proposito (el unico acento de la app no
-   se diluye en cristal) - el pill inactivo si es transparente sobre el
-   track de cristal. */
+/* Activa: pastilla blanca solida con texto oscuro (como el mockup aprobado)
+   - el rojo queda para acciones y montos de gasto, no para selectores. El
+   pill inactivo es transparente sobre el track de cristal. */
 .pill.active {
-  background: var(--accent);
-  color: var(--accent-contrast);
+  background: var(--text-h);
+  color: var(--bg);
 }
 </style>

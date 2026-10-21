@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 // Tour guiado de Inicio (pedido explicito del usuario): al tocar el "?" del
 // header aparece una secuencia de CoachMarkTooltip con Continuar/Atrás que
 // va señalando, en orden, el balance, las boxes de Ingresos/Gastos y cada
-// acceso rapido. Estado compartido a nivel de modulo (mismo criterio que
+// acceso rapido (Registrar, Por voz, Escanear, Transferir). Estado compartido a nivel de modulo (mismo criterio que
 // usePageTransition.ts) porque quien "es dueño" de cada paso vive en
 // componentes hermanos sin relacion padre/hijo entre ellos (BalanceCard,
 // IncomeExpenseSummary, QuickActionsGrid) - todos necesitan leer y avanzar
@@ -21,14 +21,14 @@ const TOUR_STEPS: TourStep[] = [
     title: 'Ingresos y gastos',
     text: 'Toca cualquiera de los dos para ver el detalle del mes y registrar un movimiento.',
   },
+  { id: 'registrar', title: 'Registrar', text: 'Anota un ingreso o un gasto en segundos.' },
+  { id: 'voz', title: 'Por voz', text: 'Dicta el movimiento y Berry lo completa por ti.' },
   {
-    id: 'metas',
-    title: 'Metas',
-    text: 'Planifica una compra futura y separa un poco cada mes hasta lograrla.',
+    id: 'escanear',
+    title: 'Escanear',
+    text: 'Sube capturas de tu banco y registra varios movimientos de una vez.',
   },
-  { id: 'movimientos', title: 'Movimientos', text: 'Tu historial completo de ingresos y gastos.' },
-  { id: 'cuentas', title: 'Cuentas', text: 'Tus billeteras en cada moneda, con su balance.' },
-  { id: 'ajustes', title: 'Ajustes', text: 'Tu perfil, sesión y preferencias de la app.' },
+  { id: 'transferir', title: 'Transferir', text: 'Mueve dinero entre tus cuentas, incluso de distinta moneda.' },
 ]
 
 const activeStepIndex = ref<number | null>(null)

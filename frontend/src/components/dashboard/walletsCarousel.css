@@ -1,0 +1,246 @@
+/* Estilos de WalletsCarousel.vue ("Mis cuentas" de Inicio). */
+.wallets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.wallets-title {
+  font-size: 1.125rem;
+}
+
+.wallets-fab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  cursor: pointer;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.wallets-fab svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.wallets-fab:hover {
+  opacity: 0.9;
+}
+
+.wallets-fab:active {
+  transform: scale(0.88);
+  opacity: 0.8;
+}
+
+.wallets-total {
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.wallets-total-amount {
+  margin-left: 0.375rem;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.wallets-empty {
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.wallets-empty-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.wallets-empty-text {
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+/* Pista que sangra hasta el borde de la pantalla (margen negativo = el
+   padding horizontal de PageShell) para que las tarjetas salgan por la
+   derecha en vez de cortarse contra el margen; el contenido arranca dentro
+   del margen (padding + scroll-padding), asi la primera tarjeta queda
+   alineada con el resto de la pagina. */
+.wallets-track {
+  position: relative;
+  margin: 0 -1.25rem;
+}
+
+/* Sombreado oscuro del borde derecho: las tarjetas aparecen y desaparecen de
+   una sombra al deslizar. pointer-events:none para no tapar los toques. */
+.wallets-track::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 5.5rem;
+  pointer-events: none;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.9));
+}
+
+.wallets-preview-list {
+  display: flex;
+  gap: 0.875rem;
+  margin: 0;
+  padding: 0.375rem 1.25rem 0.875rem;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 1.25rem;
+  scrollbar-width: none;
+}
+
+.wallets-preview-list::-webkit-scrollbar {
+  display: none;
+}
+
+.wallets-preview-item {
+  flex: 0 0 12.25rem;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  box-shadow: var(--glass-edge);
+  cursor: pointer;
+  transition:
+    border-color var(--duration-base) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+/* Feedback tactil en mobile/tablet (sin :hover disponible ahi). */
+.wallets-preview-item:active {
+  transform: scale(0.97);
+}
+
+.wallets-preview-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wallets-preview-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.375rem;
+  height: 2.375rem;
+  border-radius: 0.8125rem;
+  background: var(--accent-muted);
+  color: var(--accent);
+}
+
+.wallets-preview-icon svg {
+  width: 46%;
+  height: 46%;
+}
+
+.wallets-preview-currency {
+  padding: 0.25rem 0.5625rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--glass-border);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.wallets-preview-name {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.wallets-preview-balance {
+  display: block;
+  margin-top: 0.125rem;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-h);
+}
+
+.wallets-preview-share {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.wallets-preview-bar {
+  flex: 1;
+  height: 0.25rem;
+  border-radius: 0.25rem;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.wallets-preview-bar-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 0.25rem;
+  background: var(--accent);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .wallets-preview-item {
+    background: var(--bg-surface);
+  }
+}
+
+/* En escritorio la columna ya es angosta y ordenada: las tarjetas se acomodan
+   en una grilla en vez de un carrusel, sin sombreado de borde. */
+@media (min-width: 1024px) {
+  .wallets-title {
+    font-size: 1.375rem;
+  }
+
+  .wallets-track {
+    margin: 0;
+  }
+
+  .wallets-track::after {
+    display: none;
+  }
+
+  .wallets-preview-list {
+    flex-wrap: wrap;
+    padding: 0.375rem 0 0;
+    overflow: visible;
+  }
+
+  .wallets-preview-item {
+    flex: 1 1 12.25rem;
+  }
+}
+
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .wallets-preview-item:hover {
+    transform: translateY(-4px);
+    border-color: var(--glass-border-hover);
+  }
+}

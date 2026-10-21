@@ -1,0 +1,45 @@
+/* Variante compacta de TransactionList.vue (prop "readonly"): la lista se
+   vuelve UNA sola caja de cristal con las filas separadas por lineas finas,
+   en vez de una tarjeta por fila - "Ultimos movimientos" de Inicio. */
+.transaction-list.is-compact {
+  gap: 0;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  box-shadow: var(--glass-edge);
+  overflow: hidden;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .transaction-list.is-compact {
+    background: var(--bg-surface);
+  }
+}
+
+.is-compact .transaction-item {
+  padding: 0.875rem 1rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.is-compact .transaction-item + .transaction-item {
+  border-top: 1px solid var(--glass-border);
+}
+
+.is-compact .transaction-category {
+  font-size: 0.875rem;
+  text-transform: none;
+}
+
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .is-compact .transaction-item:hover {
+    transform: none;
+    box-shadow: none;
+    background: rgba(255, 255, 255, 0.04);
+  }
+}

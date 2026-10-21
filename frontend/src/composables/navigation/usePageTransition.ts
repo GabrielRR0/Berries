@@ -49,6 +49,16 @@ export function suppressNextTransition(): void {
   suppressNext = true
 }
 
+// Direccion elegida a mano para la PROXIMA navegacion (la usa el gesto de
+// deslizar en una pantalla suelta, ver useLooseRouteSwipe.ts): ese gesto no
+// anima nada por su cuenta, asi que la animacion tiene que ser la del
+// <Transition> - incluso si la navegacion es un router.back() (popstate), que
+// de otro modo se marcaria como "ya animada por el navegador".
+let forcedNext: string | null = null
+export function forceNextTransition(name: 'slide-left' | 'slide-right'): void {
+  forcedNext = name
+}
+
 function pathDepth(path: string): number {
   return path.split('/').filter(Boolean).length
 }
@@ -89,6 +99,13 @@ export function updatePageTransitionName(
   to: RouteLocationNormalizedLoaded | { name?: unknown },
   from: RouteLocationNormalizedLoaded | { name?: unknown },
 ): void {
+  if (forcedNext) {
+    transitionName.value = forcedNext
+    forcedNext = null
+    isPopNavigation = false
+    suppressNext = false
+    return
+  }
   if (isPopNavigation || suppressNext) {
     isPopNavigation = false
     suppressNext = false

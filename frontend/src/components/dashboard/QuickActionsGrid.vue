@@ -1,15 +1,26 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { quickActionLocation } from '../../composables/navigation/useQuickActions'
+import { useQuickRegister } from '../../composables/quickRegister/useQuickRegister'
 import { useOnboardingTour } from '../../composables/onboarding/useOnboardingTour'
 import { useScrollIntoViewOnActive } from '../../composables/onboarding/useScrollIntoViewOnActive'
 import CoachMarkTooltip from '../ui/CoachMarkTooltip.vue'
 import IconBadge from '../ui/IconBadge.vue'
 
-// Grid de 4 accesos rapidos (ver capturas de referencia "Rial"). Los 4 son
-// RouterLink reales (ver router/index.ts) - Calculadora se movio a Ajustes
-// (SettingsMenuMain.vue) y este cupo pasa a Metas, pedido explicito del
-// usuario. Calculadora en si sigue existiendo, ver
-// components/calculator/CalculatorMain.vue.
+// Fila de 4 accesos rapidos (mockup aprobado): Registrar, Por voz, Escanear y
+// Transferir. Los tres primeros abren el panel global "Registrar" (sin
+// navegar, ver composables/quickRegister/) - Registrar pregunta primero como,
+// Por voz abre el grabador y Escanear el selector de foto -, y Transferir
+// lleva a Cuentas con su sheet abierto (useQuickActions.ts). Metas, Cuentas y
+// Ajustes siguen a un toque: Cuentas esta en la barra flotante, Metas y
+// Ajustes en el Menu.
+const quickRegister = useQuickRegister()
+const ACTIONS = [
+  { id: 'registrar', label: 'Registrar', run: (from: Element) => quickRegister.open(from) },
+  { id: 'voz', label: 'Por voz', run: () => quickRegister.requestVoice() },
+  { id: 'escanear', label: 'Escanear', run: () => quickRegister.requestReceipt() },
+  { id: 'transferir', label: 'Transferir', to: quickActionLocation('transferir') },
+] as const
 
 // Pasos 3-6 del tour guiado de Inicio (ver BalanceCard.vue/
 // IncomeExpenseSummary.vue/useOnboardingTour.ts) - pedido explicito del
@@ -18,7 +29,7 @@ import IconBadge from '../ui/IconBadge.vue'
 // cambia con el paso activo; el boton correspondiente se resalta con un
 // anillo para dejar claro a cual se refiere.
 const { currentStep, stepPosition, isFirstStep, isLastStep, next, back, close } = useOnboardingTour()
-const QUICK_ACTION_STEP_IDS = ['metas', 'movimientos', 'cuentas', 'ajustes']
+const QUICK_ACTION_STEP_IDS: string[] = ACTIONS.map((action) => action.id)
 const showTourCoachMark = computed(() => QUICK_ACTION_STEP_IDS.includes(currentStep.value?.id ?? ''))
 const gridRef = ref<HTMLElement | null>(null)
 // Pedido explicito del usuario: aunque este grid suele estar visible cerca
@@ -29,57 +40,39 @@ useScrollIntoViewOnActive(gridRef, showTourCoachMark)
 
 <template>
   <div ref="gridRef" class="quick-actions">
-    <RouterLink to="/metas" class="quick-action" :class="{ 'tour-active': currentStep?.id === 'metas' }">
-      <IconBadge size="lg">
-        <!-- Bullseye simple (3 circulos concentricos) - misma logica que el
-           gear de Ajustes mas abajo: a este tamaño de icono, un simbolo con
-           pocos trazos se lee mejor que uno detallado. -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="8.5" />
-          <circle cx="12" cy="12" r="4.5" />
-          <circle cx="12" cy="12" r="0.5" fill="currentColor" />
+    <component
+      :is="'to' in action ? 'RouterLink' : 'button'"
+      v-for="action in ACTIONS"
+      :key="action.id"
+      v-bind="
+        'to' in action
+          ? { to: action.to }
+          : { type: 'button', onClick: (event: MouseEvent) => action.run(event.currentTarget as Element) }
+      "
+      class="quick-action"
+      :class="{ 'tour-active': currentStep?.id === action.id }"
+    >
+      <IconBadge size="lg" :variant="action.id === 'registrar' ? 'accent' : 'neutral'">
+        <svg v-if="action.id === 'registrar'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+          <path d="M12 5v14M5 12h14" stroke-linecap="round" />
         </svg>
-      </IconBadge>
-      <span class="quick-action-label">Metas</span>
-    </RouterLink>
-
-    <RouterLink to="/movimientos" class="quick-action" :class="{ 'tour-active': currentStep?.id === 'movimientos' }">
-      <IconBadge size="lg">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M4 7h13l-3-3M17 7l-3 3" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="M20 17H7l3-3M7 17l3 3" stroke-linecap="round" stroke-linejoin="round" />
+        <svg v-else-if="action.id === 'voz'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="9" y="3" width="6" height="12" rx="3" />
+          <path d="M5 11a7 7 0 0 0 14 0M12 18v3" stroke-linecap="round" />
         </svg>
-      </IconBadge>
-      <span class="quick-action-label">Movimientos</span>
-    </RouterLink>
-
-    <RouterLink to="/cuentas" class="quick-action" :class="{ 'tour-active': currentStep?.id === 'cuentas' }">
-      <IconBadge size="lg">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="6" width="18" height="13" rx="2" />
-          <path d="M3 10h18" />
-          <path d="M16 15h2" stroke-linecap="round" />
-        </svg>
-      </IconBadge>
-      <span class="quick-action-label">Cuentas</span>
-    </RouterLink>
-
-    <RouterLink to="/ajustes" class="quick-action" :class="{ 'tour-active': currentStep?.id === 'ajustes' }">
-      <IconBadge size="lg">
-        <!-- Gear simple (circulo + 8 lineas radiales) en vez del path
-           original (muy detallado, con muchos arcos chicos) - a este
-           tamaño de icono se veia "sucio"/roto, inconsistente con la
-           simplicidad de los otros 3 (rect+lineas, flechas). -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3.5" />
+        <svg v-else-if="action.id === 'escanear'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path
-            d="M12 2.5v3M12 18.5v3M4.4 4.4l2.1 2.1M17.5 17.5l2.1 2.1M2.5 12h3M18.5 12h3M4.4 19.6l2.1-2.1M17.5 6.5l2.1-2.1"
+            d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M4 12h16"
             stroke-linecap="round"
+            stroke-linejoin="round"
           />
         </svg>
+        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 7h13l-3-3M20 17H7l3 3" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
       </IconBadge>
-      <span class="quick-action-label">Ajustes</span>
-    </RouterLink>
+      <span class="quick-action-label">{{ action.label }}</span>
+    </component>
 
     <CoachMarkTooltip
       v-if="showTourCoachMark && currentStep"

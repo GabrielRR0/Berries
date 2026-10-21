@@ -12,8 +12,12 @@ declare module 'vue-router' {
     // espacio vertical util en el telefono.
     hideTabBar?: boolean
     // Fuente unica de verdad del orden horizontal de las secciones principales
-    // (pedido explicito del usuario: agregar una vista nueva a la barra
-    // flotante tiene que ser modular, sin tocar 3 archivos a mano). Tanto
+    // - SOLO las de la barra flotante (Inicio, Movimientos, Cuentas, Menu): son
+    // las unicas entre las que se desliza con el dedo (SectionPager.vue). Una
+    // pantalla sin order (Metas, Deudas, Analisis, Categorias...) es una
+    // pantalla suelta: deslizar en ella vuelve a la pagina anterior, ver
+    // composables/navigation/useLooseRouteSwipe.ts. Agregar una vista nueva a
+    // la barra tiene que ser modular, sin tocar 3 archivos a mano. Tanto
     // usePageTransition.ts (direccion del slide) como BottomTabBar.vue (orden
     // de los tabs) leen este mismo campo - antes eran dos arrays hardcodeados
     // e independientes que ya se habian desincronizado entre si.
@@ -22,7 +26,7 @@ declare module 'vue-router' {
     // en las pantallas de tarea enfocada (calculadora, captura, crear/editar
     // meta) y en las secciones secundarias que hoy solo se llegan via accesos
     // rapidos del dashboard.
-    tabBar?: { label: string; icon: 'home' | 'movimientos' | 'menu' }
+    tabBar?: { label: string; icon: 'home' | 'movimientos' | 'cuentas' | 'menu' }
   }
 }
 
@@ -67,25 +71,25 @@ const router = createRouter({
       path: '/cuentas',
       name: 'cuentas',
       component: () => import('../components/wallets/WalletsMain.vue'),
-      meta: { requiresAuth: true, order: 2 },
+      meta: { requiresAuth: true, order: 2, tabBar: { label: 'Cuentas', icon: 'cuentas' } },
     },
     {
       path: '/ajustes',
       name: 'ajustes',
       component: () => import('../components/dashboard/SettingsMenuMain.vue'),
-      meta: { requiresAuth: true, order: 7, tabBar: { label: 'Menú', icon: 'menu' } },
+      meta: { requiresAuth: true, order: 3, tabBar: { label: 'Menú', icon: 'menu' } },
     },
     {
       path: '/deudas',
       name: 'deudas',
       component: () => import('../components/debts/DebtsMain.vue'),
-      meta: { requiresAuth: true, order: 4 },
+      meta: { requiresAuth: true },
     },
     {
       path: '/analitica',
       name: 'analitica',
       component: () => import('../components/analytics/AnalyticsMain.vue'),
-      meta: { requiresAuth: true, order: 3 },
+      meta: { requiresAuth: true },
     },
     {
       path: '/tasas',
@@ -97,7 +101,7 @@ const router = createRouter({
       path: '/metas',
       name: 'metas',
       component: () => import('../components/goals/GoalsMain.vue'),
-      meta: { requiresAuth: true, order: 5 },
+      meta: { requiresAuth: true },
     },
     {
       path: '/metas/nueva',
@@ -115,7 +119,7 @@ const router = createRouter({
       path: '/categorias',
       name: 'categorias',
       component: () => import('../components/categories/CategoriesMain.vue'),
-      meta: { requiresAuth: true, order: 6 },
+      meta: { requiresAuth: true },
     },
     {
       path: '/pendientes',
