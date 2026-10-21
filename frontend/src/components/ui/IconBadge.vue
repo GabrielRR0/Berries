@@ -4,14 +4,25 @@
 // UI. "expense" es el unico que usa el rojo de marca - "income" se queda en
 // gris neutro a proposito (ver style.css: un solo acento, sin un segundo
 // tono para "positivo").
-withDefaults(defineProps<{ variant?: 'neutral' | 'income' | 'expense'; size?: 'sm' | 'md' | 'lg' }>(), {
-  variant: 'neutral',
-  size: 'md',
-})
+// "accent": el acceso principal de una fila de acciones (rojo solido, el
+// unico acento de la app). shape="rounded": cuadrado de esquinas redondeadas
+// (filas de listas) en vez del circulo de siempre.
+withDefaults(
+  defineProps<{
+    variant?: 'neutral' | 'income' | 'expense' | 'accent'
+    size?: 'sm' | 'md' | 'lg'
+    shape?: 'circle' | 'rounded'
+  }>(),
+  {
+    variant: 'neutral',
+    size: 'md',
+    shape: 'circle',
+  },
+)
 </script>
 
 <template>
-  <span class="icon-badge" :class="[variant, size]">
+  <span class="icon-badge" :class="[variant, size, shape]">
     <slot />
   </span>
 </template>
@@ -61,6 +72,17 @@ withDefaults(defineProps<{ variant?: 'neutral' | 'income' | 'expense'; size?: 's
 .icon-badge :deep(svg) {
   width: 46%;
   height: 46%;
+}
+
+.icon-badge.rounded {
+  border-radius: 0.875rem;
+}
+
+.icon-badge.accent {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-contrast);
+  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.45);
 }
 
 .icon-badge.income {

@@ -55,3 +55,16 @@
   justify-content: center;
   min-height: 100%;
 }
+
+/* Mientras las paginas se mueven (arrastre o asentamiento) se apaga el
+   backdrop-filter de todo lo que hay adentro. Una pagina que se traslada
+   (will-change: transform) con muchas cajas de cristal desenfocado adentro es
+   una combinacion que los GPU de telefono pintan mal: la pagina que entra
+   muestra por unos cuadros el contenido de la anterior y recien se corrige al
+   soltar el dedo (bug real reportado por el usuario). Las cajas ya son 80%
+   opacas, asi que sin blur casi no se nota la diferencia durante el gesto, y
+   el desenfoque vuelve apenas termina. */
+.section-pager.is-moving .section-pane * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}

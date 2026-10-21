@@ -10,4 +10,4 @@
 // bien: fisica de resorte con velocidad inicial real (swipe-to-dismiss de
 // BottomSheet). Todo lo demas de Berry (transiciones de pagina, hovers,
 // fades) sigue siendo CSS puro en style.css, a proposito.
-export { animate } from 'motion'
+export { animate, stagger } from 'motion'

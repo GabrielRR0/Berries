@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useOnQuickAction } from '../../composables/navigation/useQuickActions'
 import { useWalletsStore } from '../../stores/wallets.store'
 import PageShell from '../layout/PageShell.vue'
 import SectionHeader from '../layout/SectionHeader.vue'
@@ -26,6 +27,16 @@ const showTransferSheet = ref(false)
 const showHelpSheet = ref(false)
 
 const canTransfer = computed(() => walletsStore.wallets.length >= 2)
+
+// "Transferir" de los accesos rapidos de Inicio (ver useQuickActions.ts):
+// abre el sheet de transferencia, o el de crear billetera si todavia no hay
+// dos cuentas entre las que mover plata.
+useOnQuickAction({
+  transferir: () => {
+    if (canTransfer.value) showTransferSheet.value = true
+    else showCreateSheet.value = true
+  },
+})
 
 onMounted(() => {
   walletsStore.fetchWallets().catch(() => {

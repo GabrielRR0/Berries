@@ -1,0 +1,125 @@
+/* Estilos de QuickRegisterHost.vue. La expansion desde el boton la anima
+   Motion (animation/morphFromOrigin.ts) sobre .register-panel: aca solo vive
+   el aspecto en reposo y el fundido del velo. */
+.register-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: register-scrim-in var(--duration-base) var(--ease-out) both;
+}
+
+.register-scrim.is-closing {
+  animation: register-scrim-out var(--duration-base) var(--ease-out) both;
+}
+
+@keyframes register-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes register-scrim-out {
+  to {
+    opacity: 0;
+  }
+}
+
+.register-panel {
+  position: fixed;
+  z-index: 41;
+  left: 0;
+  right: 0;
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  width: calc(100% - 1.5rem);
+  max-width: 30rem;
+  max-height: calc(100dvh - 4.5rem);
+  margin-inline: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.75rem 1.25rem 1.5rem;
+  border-radius: 1.75rem;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
+  box-shadow: var(--glass-edge), var(--shadow-lg);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .register-panel {
+    background: var(--bg-raised);
+  }
+}
+
+/* Mientras se arrastra, el transform lo pone el inline style frame a frame. */
+.register-panel.is-dragging {
+  transition: none;
+}
+
+.register-drag-zone {
+  touch-action: none;
+  cursor: grab;
+}
+
+.register-grab {
+  display: block;
+  width: 2.5rem;
+  height: 0.25rem;
+  margin: 0 auto 1rem;
+  border-radius: 0.25rem;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.register-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.register-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.125rem;
+}
+
+.register-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.register-icon-button svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.register-icon-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-h);
+}
+
+.register-icon-button:active {
+  transform: scale(0.9);
+}
+
+.register-drafts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}

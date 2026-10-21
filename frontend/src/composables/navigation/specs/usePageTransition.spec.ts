@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { updatePageTransitionName, usePageTransitionName } from '../usePageTransition'
+import { forceNextTransition, updatePageTransitionName, usePageTransitionName } from '../usePageTransition'
 
 function route(name: string, path: string) {
   return { name, path }
@@ -89,5 +89,14 @@ describe('usePageTransition', () => {
 
       expect(usePageTransitionName().value).toBe('slide-left')
     })
+  })
+
+  it('una direccion forzada gana sobre la que saldria del orden, y vale una sola navegacion', () => {
+    forceNextTransition('slide-right')
+    updatePageTransitionName(route('deudas', '/deudas'), route('dashboard', '/'))
+    expect(usePageTransitionName().value).toBe('slide-right')
+
+    updatePageTransitionName(route('deudas', '/deudas'), route('dashboard', '/'))
+    expect(usePageTransitionName().value).toBe('slide-left')
   })
 })

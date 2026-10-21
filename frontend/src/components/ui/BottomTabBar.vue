@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { isAnySheetOpen } from '../../composables/layout/useSheetPresence'
+import { useQuickRegister } from '../../composables/quickRegister/useQuickRegister'
 import { useOfflineQueueStore } from '../../stores/offlineQueue.store'
 
 // Barra flotante fija - los tabs salen de route.meta.tabBar + route.meta.order
 // (ver router/index.ts), no de un array propio: agregar una vista nueva a la
 // barra es agregarle ese meta a su ruta, nada mas (pedido explicito del
 // usuario: que sea modular). "Menu" apunta a /ajustes hasta que exista una
-// pantalla de menu propia.
+// pantalla de menu propia. El boton "+" de registrar movimiento se inserta
+// solo en el centro de la lista, sea cual sea la cantidad de tabs.
 const router = useRouter()
 const tabs = computed(() =>
   router
@@ -15,12 +18,23 @@ const tabs = computed(() =>
     .filter((r) => r.meta.tabBar)
     .sort((a, b) => (Number(a.meta.order) || 0) - (Number(b.meta.order) || 0))
     .map((r) => {
-      const tabBar = r.meta.tabBar as { label: string; icon: 'home' | 'movimientos' | 'menu' }
+      const tabBar = r.meta.tabBar as { label: string; icon: 'home' | 'movimientos' | 'cuentas' | 'menu' }
       return { name: r.name, to: r.path, label: tabBar.label, icon: tabBar.icon }
     }),
 )
 
+const middle = computed(() => Math.ceil(tabs.value.length / 2))
+const leftTabs = computed(() => tabs.value.slice(0, middle.value))
+const rightTabs = computed(() => tabs.value.slice(middle.value))
+
 const route = useRoute()
+const quickRegister = useQuickRegister()
+
+// El panel "Registrar" nace del propio boton: se le pasa el elemento para que
+// la animacion de apertura parta de su posicion y tamaño.
+function openQuickRegister(event: MouseEvent) {
+  quickRegister.open(event.currentTarget as Element)
+}
 // Badge de pendientes en "Menú" - ahi vive la pantalla real (/pendientes,
 // dentro de Ajustes), para que el conteo se note aunque el usuario no este
 // parado ahi.
@@ -28,9 +42,9 @@ const offlineQueue = useOfflineQueueStore()
 </script>
 
 <template>
-  <nav class="bottom-tab-bar" aria-label="Navegación principal">
+  <nav class="bottom-tab-bar" :class="{ 'is-hidden': isAnySheetOpen }" aria-label="Navegación principal">
     <RouterLink
-      v-for="tab in tabs"
+      v-for="tab in leftTabs"
       :key="tab.name"
       :to="tab.to"
       class="tab"
@@ -44,6 +58,41 @@ const offlineQueue = useOfflineQueueStore()
         <svg v-else-if="tab.icon === 'movimientos'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 7h13M17 7l-3-3M17 7l-3 3" stroke-linecap="round" stroke-linejoin="round" />
           <path d="M20 17H7M7 17l3 3M7 17l3-3" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <svg v-else-if="tab.icon === 'cuentas'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="6" width="18" height="13" rx="2" />
+          <path d="M3 10h18M16 15h2" stroke-linecap="round" />
+        </svg>
+        <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" />
+        </svg>
+      </span>
+      <span class="tab-label">{{ tab.label }}</span>
+    </RouterLink>
+
+    <button
+      type="button"
+      class="tab-create"
+      aria-label="Nuevo movimiento"
+      aria-haspopup="dialog"
+      @click="openQuickRegister"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true">
+        <path d="M12 5v14M5 12h14" stroke-linecap="round" />
+      </svg>
+    </button>
+
+    <RouterLink
+      v-for="tab in rightTabs"
+      :key="tab.name"
+      :to="tab.to"
+      class="tab"
+      :class="{ active: route.name === tab.name }"
+    >
+      <span class="tab-icon" aria-hidden="true">
+        <svg v-if="tab.icon === 'cuentas'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="6" width="18" height="13" rx="2" />
+          <path d="M3 10h18M16 15h2" stroke-linecap="round" />
         </svg>
         <!-- 'menu' y cualquier icono futuro sin SVG propio todavia caen aca
              (3 lineas horizontales) - agregar uno nuevo real es sumar un
@@ -60,111 +109,4 @@ const offlineQueue = useOfflineQueueStore()
   </nav>
 </template>
 
-<style scoped>
-.bottom-tab-bar {
-  position: fixed;
-  left: 50%;
-  bottom: max(1.25rem, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.5rem;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--glass-border);
-  /* Cristal tipo Apple: el contenido scrolleable pasa por debajo de esta
-     barra flotante, asi que el blur tiene algo real para desenfocar. */
-  background: var(--glass-bg-strong);
-  backdrop-filter: blur(var(--blur-md));
-  -webkit-backdrop-filter: blur(var(--blur-md));
-  box-shadow: var(--shadow-md);
-}
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .bottom-tab-bar {
-    background: var(--bg-raised);
-  }
-}
-
-.tab {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.125rem;
-  min-width: 4.25rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-pill);
-  text-decoration: none;
-  color: var(--text-muted);
-  transition:
-    color var(--duration-fast) var(--ease-out),
-    background-color var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out),
-    opacity var(--duration-fast) var(--ease-out);
-}
-
-.tab-icon {
-  position: relative;
-  display: inline-flex;
-  width: 1.375rem;
-  height: 1.375rem;
-}
-
-.tab-icon svg {
-  width: 100%;
-  height: 100%;
-}
-
-.tab-pending-badge {
-  position: absolute;
-  top: -0.375rem;
-  right: -0.5rem;
-  min-width: 1.125rem;
-  height: 1.125rem;
-  padding: 0 0.25rem;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-contrast);
-  font-size: 0.625rem;
-  font-weight: 700;
-  line-height: 1.125rem;
-  text-align: center;
-}
-
-.tab-label {
-  font-size: 0.6875rem;
-  font-weight: 600;
-}
-
-.tab.active {
-  color: var(--accent);
-}
-
-/* En escritorio se queda flotante/centrada igual (pedido explicito del
-   usuario: nada de sidebar) - se probo agrandarla un poco (min-width mayor,
-   mas padding horizontal) y seguia viendose "muy grande"; se queda
-   exactamente del mismo tamaño que en mobile, un dock real (macOS, apps
-   desktop-class) tampoco escala con el tamaño de pantalla. Unico agregado
-   real de escritorio: el hover. */
-@media (min-width: 1024px) {
-  .tab:hover {
-    background: var(--bg-inset);
-  }
-
-  /* Calificado con :not(.active): un .tab:hover sin calificar tiene la
-     misma especificidad que .tab.active (2 clases cada uno) y podria pisar
-     el rojo del tab activo al pasar el mouse, segun el orden final del CSS
-     compilado. */
-  .tab:not(.active):hover {
-    color: var(--text);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .tab:active {
-    transform: scale(0.9);
-    opacity: 0.75;
-  }
-}
-</style>
+<style scoped src="./bottomTabBar.css"></style>

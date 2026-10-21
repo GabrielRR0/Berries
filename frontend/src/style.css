@@ -13,7 +13,7 @@
   /* Fondo casi negro (nunca #000 puro - fatiga visual, DESIGN.md #2) y
      superficies un escalon mas claras para que las cards se distingan del
      fondo sin depender solo del borde. */
-  --bg: #0a0a0a;
+  --bg: #030304;
   --bg-surface: #18181b;
   --bg-inset: #131316;
   --bg-raised: #202024;
@@ -38,13 +38,14 @@
   --accent-muted: rgba(239, 68, 68, 0.14);
   --accent-border: rgba(239, 68, 68, 0.35);
 
-  /* Tipografia: system font stack, sin cargar fuentes externas
-     (DESIGN.md #3). */
-  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /* Tipografia: Plus Jakarta Sans autoalojada (paquete @fontsource, no un
+     <link> a Google Fonts - cero pedidos externos) con el system font stack
+     como respaldo mientras carga. */
+  --sans: 'Plus Jakarta Sans Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
   /* Radios consistentes: 8px controles chicos, 16px cards (DESIGN.md #4). */
   --radius-sm: 8px;
-  --radius-lg: 16px;
+  --radius-lg: 22px;
   --radius-pill: 999px;
 
   /* Sombras sutiles unicamente - nunca duras ni de color (DESIGN.md #4). */
@@ -75,9 +76,12 @@
      coach-marks, tarjetas de modal) - nunca en cards de lista comunes, donde
      no hay nada detras que se note al desenfocar. Necesitan un fondo con
      algo de color detras para que el blur se vea (ver --hero-glow abajo). */
-  --glass-bg: rgba(24, 24, 27, 0.55);
-  --glass-bg-strong: rgba(24, 24, 27, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-bg: rgba(8, 8, 12, 0.8);
+  --glass-bg-strong: rgba(8, 8, 12, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.11);
+  /* Reflejo fino en el borde superior de cada caja de cristal: da la
+     sensacion de vidrio negro sin recurrir a una sombra de elevacion. */
+  --glass-edge: inset 0 1px 0 rgba(255, 255, 255, 0.09);
   --blur-sm: 12px;
   --blur-md: 20px;
 
@@ -85,7 +89,9 @@
      las capturas "Rial", recoloreado a la paleta negro/rojo de Berry) - le
      da a los headers/tab bars de cristal algo con textura detras para
      desenfocar; sin esto el blur no se notaria contra un fondo plano. */
-  --hero-glow: radial-gradient(120% 55% at 50% -10%, rgba(239, 68, 68, 0.22), transparent 70%);
+  --hero-glow:
+    radial-gradient(75% 16% at 85% 3%, rgba(239, 68, 68, 0.16), transparent 72%),
+    radial-gradient(70% 14% at 100% 52%, rgba(239, 68, 68, 0.08), transparent 72%);
 
   --header-height: 4rem;
 
@@ -241,6 +247,10 @@ a {
    (position:fixed, anterior en el DOM) sin crear un stacking context propio
    que dejaria a sus BottomSheet por debajo de la barra de tabs. */
 .route-transition-viewport {
+  /* El eje horizontal queda libre para el gesto de volver de las pantallas
+     sueltas (useLooseRouteSwipe.ts); el navegador sigue con el scroll
+     vertical y el zoom con dos dedos. */
+  touch-action: pan-y pinch-zoom;
   position: relative;
   min-height: 100dvh;
   min-height: 100vh;

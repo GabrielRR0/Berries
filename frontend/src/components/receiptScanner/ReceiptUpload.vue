@@ -11,6 +11,9 @@ import BottomSheet from '../ui/BottomSheet.vue'
 // foto se sube directo. El 503 "todavia no configurado" es el caso
 // esperado hoy mismo en este entorno (proveedor de OCR sin key real), no un
 // bug - se muestra el detail del backend tal cual.
+// hideTrigger: el panel "Registrar" (QuickRegisterHost.vue) usa solo el selector
+// de archivos y el sheet de progreso, con su propio boton de "Escanear recibo".
+defineProps<{ hideTrigger?: boolean }>()
 const emit = defineEmits<{ created: [draft: Draft] }>()
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -52,11 +55,14 @@ function closeSheet() {
   showSheet.value = false
   errorMessage.value = ''
 }
+
+defineExpose({ open: triggerFilePicker })
 </script>
 
 <template>
   <div class="receipt-upload">
     <button
+      v-if="!hideTrigger"
       type="button"
       class="capture-trigger"
       aria-label="Escanear recibo"

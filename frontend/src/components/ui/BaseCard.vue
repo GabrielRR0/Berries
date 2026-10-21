@@ -24,6 +24,7 @@ withDefaults(defineProps<{ padded?: boolean; variant?: 'glass' | 'glass-strong' 
   background: var(--glass-bg);
   backdrop-filter: blur(var(--blur-sm));
   -webkit-backdrop-filter: blur(var(--blur-sm));
+  box-shadow: var(--glass-edge);
   transition:
     border-color var(--duration-base) var(--ease-out),
     transform var(--duration-fast) var(--ease-out),
@@ -45,7 +46,7 @@ withDefaults(defineProps<{ padded?: boolean; variant?: 'glass' | 'glass-strong' 
   .base-card:hover {
     transform: translateY(-4px);
     border-color: var(--glass-border-hover);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--glass-edge), var(--shadow-lg);
   }
 }
 

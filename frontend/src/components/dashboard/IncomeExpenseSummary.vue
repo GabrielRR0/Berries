@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import type { Draft, Transaction } from '../../services/transactions/interfaces/transactions.interface'
+import { vGrowBar } from '../../animation/vGrowBar'
 import { useAnalytics } from '../../composables/analytics/useAnalytics'
 import { useOnboardingTour } from '../../composables/onboarding/useOnboardingTour'
 import { useScrollIntoViewOnActive } from '../../composables/onboarding/useScrollIntoViewOnActive'
@@ -102,9 +103,26 @@ const expenseTransactions = computed(() => monthTransactions.value.filter((t) =>
 const income = computed(() => periodSummary.value?.totalIncome ?? 0)
 const expenses = computed(() => periodSummary.value?.totalExpense ?? 0)
 
+// Largo de cada barra = su monto sobre el mayor de los dos: a simple vista se
+// ve cual pesa mas este mes (la barra mayor siempre llega al borde).
+const peak = computed(() => Math.max(income.value, expenses.value))
+const incomeRatio = computed(() => (peak.value > 0 ? income.value / peak.value : 0))
+const expenseRatio = computed(() => (peak.value > 0 ? expenses.value / peak.value : 0))
+
 const sheetTitle = computed(() => (activeSheet.value === 'income' ? 'Ingresos de este mes' : 'Gastos de este mes'))
 const sheetTransactions = computed(() =>
   activeSheet.value === 'income' ? incomeTransactions.value : expenseTransactions.value,
+)
+
+// Un movimiento registrado desde otro lado (el panel "Registrar" global, otra
+// pantalla) entra a la cache compartida: el resumen del mes se vuelve a pedir
+// para que los totales y las barras lo reflejen sin recargar.
+watch(
+  () => transactionsStore.transactions.length,
+  (_length, previousLength) => {
+    // La primera carga (de 0 a N) ya la cubre el fetch de onMounted.
+    if (previousLength > 0) fetchPeriodSummary()
+  },
 )
 
 onMounted(() => {
@@ -207,6 +225,7 @@ function onDraftDiscarded(draftId: string) {
       <p class="summary-amount">
         <AnimatedCurrency :value="income" :currency="displayCurrency" direction="up" />
       </p>
+      <span class="summary-bar" aria-hidden="true"><span v-grow-bar="incomeRatio" class="summary-bar-fill" /></span>
     </BaseCard>
 
     <BaseCard
@@ -231,6 +250,9 @@ function onDraftDiscarded(draftId: string) {
       <p class="summary-amount expense">
         <AnimatedCurrency :value="expenses" :currency="displayCurrency" direction="down" />
       </p>
+      <span class="summary-bar" aria-hidden="true">
+        <span v-grow-bar="expenseRatio" class="summary-bar-fill expense" />
+      </span>
     </BaseCard>
 
     <p v-if="loadError" class="summary-error" role="alert">{{ loadError }}</p>
@@ -457,3 +479,5 @@ function onDraftDiscarded(draftId: string) {
   }
 }
 </style>
+
+<style scoped src="./incomeExpenseBars.css"></style>

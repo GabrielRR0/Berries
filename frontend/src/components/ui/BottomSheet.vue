@@ -5,9 +5,14 @@
 // su propio titulo + contenido via slot. Cristal tipo Apple, igual criterio
 // que el resto de los overlays de Berry (VoiceRecorderModal, etc.).
 import { useSwipeToDismiss } from '../../animation/useSwipeToDismiss'
+import { trackSheetPresence } from '../../composables/layout/useSheetPresence'
 
 defineProps<{ title: string }>()
 const emit = defineEmits<{ close: [] }>()
+
+// Mientras este abierto la barra flotante se esconde (ver useSheetPresence.ts):
+// si no, tapaba el pie del sheet.
+trackSheetPresence()
 
 // Swipe-to-dismiss: se arrastra desde el handle o el header (no desde el
 // body, que necesita su propio scroll). Logica de gesto + resorte vive en

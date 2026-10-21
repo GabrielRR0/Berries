@@ -1,0 +1,53 @@
+/* Estilos de QuickRegisterMenu.vue. */
+.register-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.register-option {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 1.125rem;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-h);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.register-option:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--glass-border-hover);
+}
+
+.register-option:active {
+  transform: scale(0.98);
+}
+
+.register-option-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.register-option-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.register-option-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
