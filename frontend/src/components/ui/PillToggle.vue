@@ -32,7 +32,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
   flex-wrap: wrap;
   gap: 0.375rem;
   padding: 0.25rem;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-lg);
   background: var(--glass-bg);
   backdrop-filter: blur(var(--blur-sm));
   -webkit-backdrop-filter: blur(var(--blur-sm));
@@ -48,7 +48,7 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
 .pill {
   padding: 0.375rem 0.875rem;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   font: inherit;
@@ -74,20 +74,5 @@ defineEmits<{ 'update:modelValue': [value: string] }>()
 .pill.active {
   background: var(--accent);
   color: var(--accent-contrast);
-}
-
-/* Estilo de "segmented control" tipo Apple en escritorio (contenedor con
-   esquinas menos redondeadas + segmentos casi cuadrados) en vez del pill
-   completo de mobile - pedido explicito del usuario ("los inputs fuesen un
-   poco mas cuadrados"). Mobile se queda exactamente igual (pill completo,
-   ya aprobado). */
-@media (min-width: 1024px) {
-  .pill-toggle {
-    border-radius: var(--radius-lg);
-  }
-
-  .pill {
-    border-radius: var(--radius-sm);
-  }
 }
 </style>

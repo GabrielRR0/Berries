@@ -249,7 +249,7 @@ async function onSubmit() {
   align-self: flex-start;
   gap: 0.375rem;
   padding: 0.25rem;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-lg);
   background: var(--glass-bg);
   backdrop-filter: blur(var(--blur-sm));
   -webkit-backdrop-filter: blur(var(--blur-sm));
@@ -265,7 +265,7 @@ async function onSubmit() {
 .type-option {
   padding: 0.375rem 0.875rem;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   font: inherit;

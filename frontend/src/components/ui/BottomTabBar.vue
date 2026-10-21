@@ -1,15 +1,24 @@
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useOfflineQueueStore } from '../../stores/offlineQueue.store'
 
-// Barra flotante fija - 3 tabs alcanzan por ahora (Inicio/Movimientos/Menu),
-// segun el layout de referencia. "Menu" apunta a /ajustes hasta que exista
-// una pantalla de menu propia (ver router/index.ts).
-const tabs = [
-  { name: 'dashboard', to: '/', label: 'Inicio' },
-  { name: 'movimientos', to: '/movimientos', label: 'Movimientos' },
-  { name: 'ajustes', to: '/ajustes', label: 'Menú' },
-] as const
+// Barra flotante fija - los tabs salen de route.meta.tabBar + route.meta.order
+// (ver router/index.ts), no de un array propio: agregar una vista nueva a la
+// barra es agregarle ese meta a su ruta, nada mas (pedido explicito del
+// usuario: que sea modular). "Menu" apunta a /ajustes hasta que exista una
+// pantalla de menu propia.
+const router = useRouter()
+const tabs = computed(() =>
+  router
+    .getRoutes()
+    .filter((r) => r.meta.tabBar)
+    .sort((a, b) => (Number(a.meta.order) || 0) - (Number(b.meta.order) || 0))
+    .map((r) => {
+      const tabBar = r.meta.tabBar as { label: string; icon: 'home' | 'movimientos' | 'menu' }
+      return { name: r.name, to: r.path, label: tabBar.label, icon: tabBar.icon }
+    }),
+)
 
 const route = useRoute()
 // Badge de pendientes en "Menú" - ahi vive la pantalla real (/pendientes,
@@ -28,18 +37,21 @@ const offlineQueue = useOfflineQueueStore()
       :class="{ active: route.name === tab.name }"
     >
       <span class="tab-icon" aria-hidden="true">
-        <svg v-if="tab.name === 'dashboard'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg v-if="tab.icon === 'home'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 11.5 12 4l9 7.5" stroke-linecap="round" stroke-linejoin="round" />
           <path d="M5.5 10v9a1 1 0 0 0 1 1H9.5a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-9" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
-        <svg v-else-if="tab.name === 'movimientos'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg v-else-if="tab.icon === 'movimientos'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 7h13M17 7l-3-3M17 7l-3 3" stroke-linecap="round" stroke-linejoin="round" />
           <path d="M20 17H7M7 17l3 3M7 17l3-3" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
+        <!-- 'menu' y cualquier icono futuro sin SVG propio todavia caen aca
+             (3 lineas horizontales) - agregar uno nuevo real es sumar un
+             v-else-if mas, sin tocar la logica de arriba. -->
         <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" />
         </svg>
-        <span v-if="tab.name === 'ajustes' && offlineQueue.pendingCount > 0" class="tab-pending-badge">
+        <span v-if="tab.icon === 'menu' && offlineQueue.pendingCount > 0" class="tab-pending-badge">
           {{ offlineQueue.pendingCount }}
         </span>
       </span>

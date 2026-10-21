@@ -178,16 +178,19 @@ input {
 }
 
 /* Foco de teclado global (:focus-visible nunca matchea con click/touch, solo
-   con navegacion real por teclado) - cubre BaseButton, RouterLink (<a>),
-   inputs/selects/tabs de toda la app sin tener que tocar cada archivo.
-   Compone con el foco propio que ya tienen algunos inputs (ej. .search-input
-   en TransactionsMain.vue: border-color al acento) - son propiedades
-   distintas (box-shadow vs border-color), asi que ambas se ven a la vez. */
+   con navegacion real por teclado) - cubre BaseButton y RouterLink (<a>) sin
+   tener que tocar cada archivo.
+   input/select/textarea NO entran aca: casi todos ya tienen su propio foco
+   via border-color al acento (ver los numerosos ".field input:focus" en todo
+   el proyecto), y a diferencia de button/a, Chrome/Firefox consideran
+   :focus-visible = true en un input incluso al hacer click con mouse (no
+   solo teclado) - asi que este aro terminaba apareciendo en CASI CUALQUIER
+   click sobre un input/select/textarea, como un recuadro blanco feo que
+   rompia el estilo (bug real reportado por el usuario). Los pocos inputs sin
+   indicador propio de foco quedan sin aro visible; preferible a que vuelva el
+   recuadro global. */
 button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
+a:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -241,6 +244,11 @@ a {
   min-height: 100dvh;
   min-height: 100vh;
   overflow-x: clip;
+  /* pan-y: el navegador sigue manejando el scroll vertical nativo el solo,
+     pero no intenta paneo/zoom horizontal propio - deja el eje horizontal
+     libre para el gesto de swipe-entre-paginas (useSwipeNavigation.ts) sin
+     pelearle el reconocimiento de gesto al sistema operativo. */
+  touch-action: pan-y;
 }
 
 .slide-left-enter-active,
@@ -284,6 +292,40 @@ a {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Pagina vecina real, montada mientras dura el arrastre (ver
+   useSwipeNavigation.ts) - vive AL LADO de la pagina actual (no debajo),
+   dentro del mismo .route-transition-viewport, para que el translateX que el
+   gesto le aplica al viewport mueva a las dos juntas. Antes de esto solo la
+   pagina actual estaba montada: arrastrarla revelaba el fondo negro vacio del
+   viewport en vez de la pagina siguiente (bug real confirmado con
+   Playwright). */
+.swipe-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  /* transform (aunque sea identidad): sin esto, el header fijo de la pagina
+     vecina (SectionHeader.vue, position:fixed) ignora el left:100%/-100% de
+     ESTE pane y resuelve su offset directo contra .route-transition-viewport
+     (el ancestro que de verdad tiene un transform, por el drag) - quedaba
+     pegado en la esquina real de la pantalla, encimado con el header de la
+     pagina actual (bug real confirmado con captura de pantalla + Playwright:
+     "Movimientos"/"Cuentas" superpuestos). Darle su propio transform (aunque
+     sea translateX(0)) hace que ESTE pane establezca su propio containing
+     block para "position:fixed" - el header vecino pasa a resolver su
+     left/right contra el pane (que si respeta el 100%/-100%), no contra el
+     viewport entero. El drag en vivo lo sigue arrastrando igual porque el
+     transform del ancestro se pinta en toda la rama de todos modos. */
+  transform: translateX(0);
+}
+
+.swipe-preview--right {
+  left: 100%;
+}
+
+.swipe-preview--left {
+  left: -100%;
 }
 
 /* Fade simple para reemplazar estados en el flujo normal del documento (ej.

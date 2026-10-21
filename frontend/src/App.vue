@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import TopHeader from './components/layout/TopHeader.vue'
 import BottomTabBar from './components/ui/BottomTabBar.vue'
@@ -8,6 +8,7 @@ import { useAvatarInitials } from './composables/auth/useAvatarInitials'
 import { useOnlineStatus } from './composables/connectivity/useOnlineStatus'
 import { useScrollHeader } from './composables/layout/useScrollHeader'
 import { usePageTransitionName } from './composables/navigation/usePageTransition'
+import { useSwipeNavigation } from './composables/navigation/useSwipeNavigation'
 import { useOnboardingTour } from './composables/onboarding/useOnboardingTour'
 import { useAuthStore } from './stores/auth.store'
 import { useOfflineQueueStore } from './stores/offlineQueue.store'
@@ -17,6 +18,8 @@ const offlineQueue = useOfflineQueueStore()
 const route = useRoute()
 const router = useRouter()
 const transitionName = usePageTransitionName()
+const viewportEl = ref<HTMLElement | null>(null)
+const { dragX, previewComponent, previewSide } = useSwipeNavigation(viewportEl)
 const avatarInitials = useAvatarInitials()
 const { start: startTour } = useOnboardingTour()
 const { isScrolled } = useScrollHeader()
@@ -68,12 +71,24 @@ onMounted(() => {
     @help-click="startTour"
   />
 
-  <div class="route-transition-viewport">
+  <div
+    class="route-transition-viewport"
+    ref="viewportEl"
+    :style="dragX !== 0 ? { transform: `translateX(${dragX}px)`, transition: 'none' } : null"
+  >
     <RouterView v-slot="{ Component, route: currentRoute }">
       <Transition :name="transitionName">
         <component :is="Component" :key="currentRoute.path" />
       </Transition>
     </RouterView>
+
+    <!-- Vecino real montado mientras se arrastra (ver useSwipeNavigation.ts) -
+         sin esto, arrastrar revelaba fondo negro vacio en vez de la pagina
+         siguiente (bug real reportado por el usuario, confirmado con
+         Playwright). -->
+    <div v-if="previewComponent" class="swipe-preview" :class="`swipe-preview--${previewSide}`">
+      <component :is="previewComponent" />
+    </div>
   </div>
 
   <BottomTabBar v-if="showChrome" />

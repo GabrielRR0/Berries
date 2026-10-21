@@ -9,12 +9,14 @@ import type { RouteLocationNormalizedLoaded } from 'vue-router'
 // el <Transition> de Vue - ver App.vue y las clases .slide-*/.fade-* de
 // style.css).
 //
-// Orden horizontal de las secciones autenticadas, de izquierda a derecha,
-// tal como aparecen en la barra inferior + los accesos rapidos del
-// dashboard. Moverse a una seccion mas a la derecha desliza la pantalla
+// El orden horizontal de las secciones (izquierda a derecha) vive en
+// route.meta.order (ver router/index.ts) - no en un array propio: antes
+// habia un SECTION_ORDER hardcodeado aca que ya se habia desincronizado del
+// orden real del router y del array de BottomTabBar.vue (pedido explicito
+// del usuario: agregar una vista nueva tiene que ser modular, un solo lugar
+// para tocar). Moverse a una seccion de order mas alto desliza la pantalla
 // nueva desde la derecha (como al deslizar entre tabs en apps mobile tipo
-// Instagram); moverse a la izquierda desliza desde la izquierda.
-const SECTION_ORDER = ['dashboard', 'movimientos', 'cuentas', 'analitica', 'deudas', 'metas', 'categorias', 'ajustes']
+// Instagram); moverse a un order mas bajo desliza desde la izquierda.
 
 const transitionName = ref('fade')
 
@@ -38,22 +40,32 @@ window.addEventListener(
   true,
 )
 
+// Mismo mecanismo que isPopNavigation, para el mismo motivo: useSwipeNavigation.ts
+// ya anima el commit del swipe a mano (traslada el viewport hasta el final con su
+// propia transition CSS) antes de llamar a router.push - si DESPUES el <Transition>
+// de App.vue tambien animara ese cambio de ruta con slide-left/slide-right, la
+// pagina se deslizaria una segunda vez encima del gesto que el usuario ya vio
+// terminar con su propio dedo.
+let suppressNext = false
+export function suppressNextTransition(): void {
+  suppressNext = true
+}
+
 function pathDepth(path: string): number {
   return path.split('/').filter(Boolean).length
 }
 
-function resolveTransitionName(
-  to: RouteLocationNormalizedLoaded | { name?: unknown; path?: string },
-  from: RouteLocationNormalizedLoaded | { name?: unknown; path?: string },
-): string {
-  const toIndex = SECTION_ORDER.indexOf(String(to.name))
-  const fromIndex = SECTION_ORDER.indexOf(String(from.name))
+type TransitionRoute = RouteLocationNormalizedLoaded | { name?: unknown; path?: string; meta?: { order?: number } }
 
-  if (toIndex !== -1 && fromIndex !== -1 && toIndex !== fromIndex) {
-    return toIndex > fromIndex ? 'slide-left' : 'slide-right'
+function resolveTransitionName(to: TransitionRoute, from: TransitionRoute): string {
+  const toOrder = to.meta?.order
+  const fromOrder = from.meta?.order
+
+  if (typeof toOrder === 'number' && typeof fromOrder === 'number' && toOrder !== fromOrder) {
+    return toOrder > fromOrder ? 'slide-left' : 'slide-right'
   }
 
-  // Fallback por profundidad de path: SECTION_ORDER solo modela las secciones
+  // Fallback por profundidad de path: meta.order solo modela las secciones
   // de nivel superior, no sub-rutas anidadas dentro de una misma seccion (ej.
   // /metas -> /metas/nueva, o /metas -> /metas/:id/editar) - "entrar" a algo
   // mas profundo desliza para adelante, "volver" desliza para atras, igual
@@ -79,12 +91,14 @@ export function updatePageTransitionName(
   to: RouteLocationNormalizedLoaded | { name?: unknown },
   from: RouteLocationNormalizedLoaded | { name?: unknown },
 ): void {
-  if (isPopNavigation) {
+  if (isPopNavigation || suppressNext) {
     isPopNavigation = false
+    suppressNext = false
     // 'none' no matchea ningun .none-enter-active/.none-leave-active en
     // style.css a proposito - Vue hace el cambio de contenido al instante,
     // sin animacion propia, dejando que la unica animacion visible sea la
-    // que ya hizo el propio navegador con su gesto/boton de atras.
+    // que ya hizo el propio navegador (gesto/boton de atras) o la que ya
+    // hizo useSwipeNavigation.ts a mano.
     transitionName.value = 'none'
     return
   }
