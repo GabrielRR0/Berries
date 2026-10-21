@@ -5,6 +5,10 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [vue()],
   server: {
+    // host:true (0.0.0.0): pedido explicito del usuario para probar desde el
+    // telefono en la misma WiFi via la IP local (ej. 192.168.x.x:5173) - sin
+    // esto Vite solo escucha en localhost y el telefono no puede ni conectar.
+    host: true,
     proxy: {
       // Puerto 8002 (no 8000) a propósito: s-rank ya usa 8000 y tayuya-check usa 8001
       // por convención del portafolio — cada proyecto hermano necesita su propio

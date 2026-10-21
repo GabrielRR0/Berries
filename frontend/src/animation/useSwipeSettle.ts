@@ -1,28 +1,46 @@
 import type { Ref } from 'vue'
 import { animate } from './motion'
 
-// Anima el translateX final de un arrastre horizontal (commit hasta el otro
-// lado, o spring-back a 0) via Motion One - mismo criterio que
-// useSpringBack.ts (ver README.md de esta carpeta): consumido por
-// useSwipeNavigation.ts para terminar el gesto de deslizar entre secciones
-// (Inicio/Movimientos/etc.) a mano, antes de cambiar de ruta. Queda en su
-// propio composable (no un rAF+transitionend a mano adentro de
-// useSwipeNavigation.ts) para que la curva/duracion del asentamiento se pueda
-// tunear aca solo, sin tocar la logica de deteccion del gesto.
+// Asienta el desplazamiento horizontal del paginador de secciones (commit al
+// otro lado o vuelta a 0) con un resorte de Motion One que ARRANCA con la
+// velocidad real del dedo al soltar - un tween de duracion fija ignora esa
+// velocidad y se siente como si el gesto "frenara" de golpe al levantar el
+// dedo. bounce:0 = criticamente amortiguado (sin rebote pasado el borde de la
+// pagina). Consumido por useSectionPager.ts; tunear la sensacion aca solo.
+const VISUAL_DURATION_S = 0.26
+// Umbrales de reposo en px y px/s: sin esto el resorte seguia "terminando"
+// el ultimo medio pixel ~400ms despues de que visualmente ya habia llegado
+// (medido: 450-800ms en total) y el paginador quedaba ocupado ese tiempo.
+const REST_DELTA_PX = 1
+const REST_SPEED_PX_S = 40
+
 export function useSwipeSettle(target: Ref<number>) {
-  // easing/duration calcados de --ease-slide/--duration-base (style.css) -
-  // misma sensacion que el resto de las transiciones de pagina de Berry.
-  function settleTo(value: number, duration = 0.3): Promise<unknown> {
-    const controls = animate(target.value, value, {
-      type: 'tween',
-      duration,
-      ease: [0.4, 0, 0.2, 1],
+  let controls: { stop: () => void } | null = null
+
+  function settleTo(value: number, velocityPxPerSec = 0): Promise<void> {
+    controls?.stop()
+    const current = animate(target.value, value, {
+      type: 'spring',
+      bounce: 0,
+      visualDuration: VISUAL_DURATION_S,
+      restDelta: REST_DELTA_PX,
+      restSpeed: REST_SPEED_PX_S,
+      velocity: velocityPxPerSec,
       onUpdate: (latest) => {
         target.value = latest
       },
     })
-    return controls.finished
+    controls = current
+    return current.finished.then(() => {
+      if (controls === current) controls = null
+      target.value = value
+    })
   }
 
-  return { settleTo }
+  function stop(): void {
+    controls?.stop()
+    controls = null
+  }
+
+  return { settleTo, stop }
 }

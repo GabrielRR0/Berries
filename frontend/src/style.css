@@ -232,23 +232,25 @@ a {
   color: inherit;
 }
 
-/* Modulo de transiciones de pagina (ver
-   composables/navigation/usePageTransition.ts + App.vue): direccional tipo
-   "swipe entre tabs" al estilo Instagram, con Vue <Transition> + CSS nativo
-   nada mas - sin GSAP/Framer Motion (vetados en DESIGN.md raiz por pesados;
-   un slide direccional simple no los necesita). Ambos lados (el que entra y
-   el que sale) animan a la vez, no en secuencia, por eso quedan absolute
-   dentro de un contenedor position:relative mientras dura la transicion. */
+/* Transiciones de las pantallas sueltas (las que NO son seccion del
+   paginador - ver App.vue y components/layout/SectionPager.vue): entran por
+   encima del paginador con Vue <Transition> + CSS nativo. Ambos lados (el
+   que entra y el que sale) animan a la vez, por eso quedan absolute dentro
+   de un contenedor position:relative mientras dura la transicion.
+   position:relative sin z-index a proposito: pinta por encima del paginador
+   (position:fixed, anterior en el DOM) sin crear un stacking context propio
+   que dejaria a sus BottomSheet por debajo de la barra de tabs. */
 .route-transition-viewport {
   position: relative;
   min-height: 100dvh;
   min-height: 100vh;
   overflow-x: clip;
-  /* pan-y: el navegador sigue manejando el scroll vertical nativo el solo,
-     pero no intenta paneo/zoom horizontal propio - deja el eje horizontal
-     libre para el gesto de swipe-entre-paginas (useSwipeNavigation.ts) sin
-     pelearle el reconocimiento de gesto al sistema operativo. */
-  touch-action: pan-y;
+}
+
+/* Sobre una seccion el contenedor queda vacio (o con la pantalla suelta que
+   esta saliendo): no puede tragarse los toques que van al paginador. */
+.route-transition-viewport.is-passthrough {
+  pointer-events: none;
 }
 
 .slide-left-enter-active,
@@ -292,40 +294,6 @@ a {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
-}
-
-/* Pagina vecina real, montada mientras dura el arrastre (ver
-   useSwipeNavigation.ts) - vive AL LADO de la pagina actual (no debajo),
-   dentro del mismo .route-transition-viewport, para que el translateX que el
-   gesto le aplica al viewport mueva a las dos juntas. Antes de esto solo la
-   pagina actual estaba montada: arrastrarla revelaba el fondo negro vacio del
-   viewport en vez de la pagina siguiente (bug real confirmado con
-   Playwright). */
-.swipe-preview {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  /* transform (aunque sea identidad): sin esto, el header fijo de la pagina
-     vecina (SectionHeader.vue, position:fixed) ignora el left:100%/-100% de
-     ESTE pane y resuelve su offset directo contra .route-transition-viewport
-     (el ancestro que de verdad tiene un transform, por el drag) - quedaba
-     pegado en la esquina real de la pantalla, encimado con el header de la
-     pagina actual (bug real confirmado con captura de pantalla + Playwright:
-     "Movimientos"/"Cuentas" superpuestos). Darle su propio transform (aunque
-     sea translateX(0)) hace que ESTE pane establezca su propio containing
-     block para "position:fixed" - el header vecino pasa a resolver su
-     left/right contra el pane (que si respeta el 100%/-100%), no contra el
-     viewport entero. El drag en vivo lo sigue arrastrando igual porque el
-     transform del ancestro se pinta en toda la rama de todos modos. */
-  transform: translateX(0);
-}
-
-.swipe-preview--right {
-  left: 100%;
-}
-
-.swipe-preview--left {
-  left: -100%;
 }
 
 /* Fade simple para reemplazar estados en el flujo normal del documento (ej.

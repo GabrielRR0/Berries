@@ -23,7 +23,7 @@ puede borrar o reemplazar sin tocar el componente.
 ## Como desinstalar esto en el futuro
 
 1. Buscar los usos: `grep -rl "from '.*animation" src/` (hoy: `BottomSheet.vue`
-   via `useSwipeToDismiss.ts`, y `useSwipeNavigation.ts` via `useSwipeSettle.ts`).
+   via `useSwipeToDismiss.ts`, y `useSectionPager.ts` via `useSwipeSettle.ts`).
 2. Reemplazar cada uso por su equivalente en CSS (transition/@keyframes) o
    quitar el comportamiento si ya no hace falta.
 3. Borrar la carpeta `src/animation/`.
@@ -35,7 +35,17 @@ puede borrar o reemplazar sin tocar el componente.
   al soltar el drag sin cruzar el umbral de cierre.
 - `useSwipeToDismiss.ts` → `BottomSheet.vue`: estado + handlers del gesto de
   arrastrar hacia abajo para cerrar.
-- `useSwipeSettle.ts` → `useSwipeNavigation.ts` (composables/navigation/):
-  asienta el arrastre horizontal entre secciones (Inicio/Movimientos/etc.) al
-  soltar - hasta el commit (cambia de pagina) o de vuelta a 0 (spring-back) -
-  con una curva/duracion tuneables aca solo, sin tocar la deteccion del gesto.
+- `useSwipeSettle.ts` → `useSectionPager.ts` (composables/navigation/):
+  resorte que asienta el paginador de secciones (Inicio/Movimientos/etc.) al
+  soltar el dedo - hasta la pagina siguiente o de vuelta a 0 - arrancando con
+  la velocidad real del gesto. Tunear la sensacion aca solo.
+
+## Paginador de secciones (fuera de esta carpeta, para ubicarlo)
+
+- `components/layout/SectionPager.vue` + `SectionPane.vue` + `sectionPager.css`:
+  solo conectan.
+- `composables/navigation/useSectionPager.ts`: estado, posiciones, sync con la ruta.
+- `composables/navigation/useSectionSwipe.ts`: deteccion del gesto.
+- `composables/navigation/useSectionComponents.ts`: precarga del codigo de cada seccion.
+- `composables/navigation/velocityTracker.ts`: velocidad de suelta (ultimos ~100ms).
+- `composables/navigation/sectionContext.ts`: scroll propio + "activa" para cada pagina.

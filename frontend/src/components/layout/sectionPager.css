@@ -1,0 +1,57 @@
+/* Paginador de secciones (ver useSectionPager.ts). El contenedor que recorta
+   (.section-pager) queda FIJO; lo que se mueve son las paginas de adentro -
+   si el recorte viajara con lo que se traslada, recortaria siempre a la
+   pagina vecina. */
+.section-pager {
+  /* absolute, NO fixed: position:fixed siempre crea un stacking context, y
+     encerraba a los BottomSheet de cada pagina (z-index 50) por debajo de la
+     barra de tabs (z-index 30, fuera del paginador). Sobre una seccion el
+     documento no scrollea (cada pagina scrollea adentro), asi que absolute
+     arriba de todo equivale visualmente a fixed. */
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+  /* El navegador sigue manejando el scroll vertical; el eje horizontal queda
+     libre para el gesto (useSectionSwipe.ts). */
+  touch-action: pan-y;
+}
+
+.section-pane {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+}
+
+.section-pager.is-moving .section-pane {
+  will-change: transform;
+}
+
+/* Cada seccion scrollea por separado (patron ion-content): asi su scroll
+   sobrevive mientras esta fuera de pantalla y el header fijo no depende del
+   scroll de window. */
+.section-pane-scroller {
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  /* Sin barra visible, igual que el scroll de window que tenian antes estas
+     pantallas en el telefono. */
+  scrollbar-width: none;
+}
+
+.section-pane-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.section-pane-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+}

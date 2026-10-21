@@ -40,12 +40,10 @@ window.addEventListener(
   true,
 )
 
-// Mismo mecanismo que isPopNavigation, para el mismo motivo: useSwipeNavigation.ts
-// ya anima el commit del swipe a mano (traslada el viewport hasta el final con su
-// propia transition CSS) antes de llamar a router.push - si DESPUES el <Transition>
-// de App.vue tambien animara ese cambio de ruta con slide-left/slide-right, la
-// pagina se deslizaria una segunda vez encima del gesto que el usuario ya vio
-// terminar con su propio dedo.
+// Mismo mecanismo que isPopNavigation, para el mismo motivo: useSectionPager.ts
+// ya termino de deslizar la pagina con el gesto antes de llamar a router.push -
+// el paginador lee este 'none' para cambiar de seccion al instante en vez de
+// animar el mismo cambio una segunda vez.
 let suppressNext = false
 export function suppressNextTransition(): void {
   suppressNext = true
@@ -98,7 +96,7 @@ export function updatePageTransitionName(
     // style.css a proposito - Vue hace el cambio de contenido al instante,
     // sin animacion propia, dejando que la unica animacion visible sea la
     // que ya hizo el propio navegador (gesto/boton de atras) o la que ya
-    // hizo useSwipeNavigation.ts a mano.
+    // hizo el paginador de secciones con el gesto (useSectionPager.ts).
     transitionName.value = 'none'
     return
   }
