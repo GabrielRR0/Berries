@@ -1,25 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import TopHeader from './components/layout/TopHeader.vue'
+import { useRoute, type RouteLocationNormalizedLoaded } from 'vue-router'
+import SectionPager from './components/layout/SectionPager.vue'
 import BottomTabBar from './components/ui/BottomTabBar.vue'
 import ToastBanner from './components/ui/ToastBanner.vue'
-import { useAvatarInitials } from './composables/auth/useAvatarInitials'
 import { useOnlineStatus } from './composables/connectivity/useOnlineStatus'
-import { useScrollHeader } from './composables/layout/useScrollHeader'
 import { usePageTransitionName } from './composables/navigation/usePageTransition'
-import { useOnboardingTour } from './composables/onboarding/useOnboardingTour'
 import { useAuthStore } from './stores/auth.store'
 import { useOfflineQueueStore } from './stores/offlineQueue.store'
 
 const authStore = useAuthStore()
 const offlineQueue = useOfflineQueueStore()
 const route = useRoute()
-const router = useRouter()
 const transitionName = usePageTransitionName()
-const avatarInitials = useAvatarInitials()
-const { start: startTour } = useOnboardingTour()
-const { isScrolled } = useScrollHeader()
 const { isOnline } = useOnlineStatus()
 
 // Reconexion dispara la sincronizacion sola - vive aca (no dentro del store)
@@ -28,22 +21,16 @@ watch(isOnline, (online) => {
   if (online) offlineQueue.syncAll().catch(() => {})
 })
 
-// TopHeader/BottomTabBar viven UNA sola vez aca, fuera de <Transition> - no
-// dentro de cada pantalla (como antes) - porque son position:fixed: si cada
-// pantalla monta su propia copia, durante el swipe entre rutas quedaban dos
-// headers/tab-bars superpuestos en el mismo lugar de la pantalla (se vio
-// literalmente al probarlo). El "chrome" queda fijo e inmóvil; solo el
-// contenido de abajo se desliza entre secciones.
+// BottomTabBar vive UNA sola vez aca (position:fixed, fuera del paginador) -
+// queda quieta mientras las secciones se deslizan por debajo.
 const showChrome = computed(() => Boolean(route.meta.requiresAuth) && !route.meta.hideTabBar)
-// El header (avatar/wordmark/ayuda) pedido explicito del usuario: solo tiene
-// sentido en Inicio, que es la unica pantalla con tour guiado - en el resto
-// de las pantallas el botón de "?" no tendría nada que explicar todavía.
-// BottomTabBar si sigue en todas las pantallas autenticadas.
-const showHeader = computed(() => route.name === 'dashboard')
 
-function onAvatarClick() {
-  router.push({ name: 'ajustes' })
-}
+// Las secciones (rutas con meta.order) las pinta SectionPager.vue, con
+// instancias persistentes; el RouterView queda solo para las pantallas
+// sueltas (calculadora, crear/editar meta, tasas, ...), que entran por encima
+// del paginador con el <Transition> de siempre.
+const isSection = (r: RouteLocationNormalizedLoaded) => typeof r.meta.order === 'number'
+const isSectionRoute = computed(() => isSection(route))
 
 // Repuebla "user" al recargar la pagina cuando ya hay un token persistido
 // (ver stores/auth.store.ts) - sin esto, TopHeader no tendria iniciales de
@@ -60,18 +47,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <TopHeader
-    v-if="showHeader"
-    :avatar-initials="avatarInitials"
-    :scrolled="isScrolled"
-    @avatar-click="onAvatarClick"
-    @help-click="startTour"
-  />
+  <SectionPager v-if="authStore.isAuthenticated" />
 
-  <div class="route-transition-viewport">
+  <div class="route-transition-viewport" :class="{ 'is-passthrough': isSectionRoute }">
     <RouterView v-slot="{ Component, route: currentRoute }">
       <Transition :name="transitionName">
-        <component :is="Component" :key="currentRoute.path" />
+        <component :is="Component" v-if="Component && !isSection(currentRoute)" :key="currentRoute.path" />
       </Transition>
     </RouterView>
   </div>

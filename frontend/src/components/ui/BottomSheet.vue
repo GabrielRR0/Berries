@@ -4,8 +4,16 @@
 // Ingresos/Gastos de Inicio. Generico: cualquier pantalla puede usarlo con
 // su propio titulo + contenido via slot. Cristal tipo Apple, igual criterio
 // que el resto de los overlays de Berry (VoiceRecorderModal, etc.).
+import { useSwipeToDismiss } from '../../animation/useSwipeToDismiss'
+
 defineProps<{ title: string }>()
-defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: [] }>()
+
+// Swipe-to-dismiss: se arrastra desde el handle o el header (no desde el
+// body, que necesita su propio scroll). Logica de gesto + resorte vive en
+// animation/useSwipeToDismiss.ts (unico uso de Motion One en Berry, ver
+// src/animation/README.md); aca solo se conectan los handlers al template.
+const { isDragging, dragOffset, onDragStart, onDragMove, onDragEnd } = useSwipeToDismiss(() => emit('close'))
 </script>
 
 <template>
@@ -16,12 +24,43 @@ defineEmits<{ close: [] }>()
        transicion alguna). -->
   <Transition name="sheet" appear>
     <div class="sheet-scrim" @click.self="$emit('close')">
-      <div class="sheet-panel">
-        <span class="sheet-handle" aria-hidden="true" />
+      <div
+        class="sheet-panel"
+        :class="{ 'sheet-panel--dragging': isDragging }"
+        :style="isDragging ? { transform: `translateY(${dragOffset}px)` } : null"
+      >
+        <span
+          class="sheet-handle"
+          aria-hidden="true"
+          @pointerdown="onDragStart"
+          @pointermove="onDragMove"
+          @pointerup="onDragEnd"
+          @pointercancel="onDragEnd"
+        />
 
-        <div class="sheet-header">
+        <div
+          class="sheet-header"
+          @pointerdown="onDragStart"
+          @pointermove="onDragMove"
+          @pointerup="onDragEnd"
+          @pointercancel="onDragEnd"
+        >
           <h2 class="sheet-title">{{ title }}</h2>
-          <button type="button" class="sheet-close" aria-label="Cerrar" @click="$emit('close')">×</button>
+          <!-- .stop: sin esto, el pointerdown de este boton burbujea al
+               @pointerdown del header de arriba, que hace setPointerCapture
+               para el swipe - eso redirige el click sintetico al header en
+               vez de al boton (bug real confirmado con Playwright: la "X"
+               nunca cerraba el sheet). Frenar la propagacion aca deja el
+               swipe del header intacto para el resto del area. -->
+          <button
+            type="button"
+            class="sheet-close"
+            aria-label="Cerrar"
+            @pointerdown.stop
+            @click="$emit('close')"
+          >
+            ×
+          </button>
         </div>
 
         <div class="sheet-body">
@@ -82,6 +121,9 @@ defineEmits<{ close: [] }>()
   margin: 0.75rem auto 0;
   border-radius: var(--radius-pill);
   background: var(--border);
+  /* Zona de agarre real para el swipe-to-dismiss, no solo decorativa. */
+  touch-action: none;
+  cursor: grab;
 }
 
 .sheet-header {
@@ -90,6 +132,15 @@ defineEmits<{ close: [] }>()
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem 0.75rem;
+  touch-action: none;
+  cursor: grab;
+}
+
+/* Mientras se arrastra, el transform lo pone el inline style frame a frame
+   (ver onDragMove) - si la transition de abajo siguiera activa, cada frame
+   quedaria "amortiguado" y el panel iria detras del dedo en vez de pegado. */
+.sheet-panel--dragging {
+  transition: none !important;
 }
 
 .sheet-title {
@@ -181,10 +232,10 @@ defineEmits<{ close: [] }>()
     box-shadow: var(--shadow-md);
   }
 
-  /* La barrita de "deslizar" solo tiene sentido como affordance de swipe-to-
-     dismiss pegado al borde de mobile - no hay gesto de swipe implementado
-     en ningun breakpoint, y una vez que el panel flota centrado con backdrop
-     en los 4 lados, esa convención deja de aplicar. */
+  /* La barrita de "deslizar" solo tiene sentido como affordance pegada al
+     borde de mobile - el gesto de swipe sigue funcionando igual desde el
+     header en desktop, pero una vez que el panel flota centrado con backdrop
+     en los 4 lados, la convención visual del handle deja de aplicar. */
   .sheet-handle {
     display: none;
   }

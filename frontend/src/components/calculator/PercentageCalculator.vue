@@ -133,14 +133,6 @@ const shareResult = computed(() => {
   border-color: var(--accent);
 }
 
-/* Pisa el aro de foco global (ver style.css: input:focus-visible{box-shadow:
-   var(--focus-ring)}) - el cambio de color de borde de arriba ya alcanza
-   como señal de foco; el box-shadow encima se veia como un recuadro feo al
-   tocar el input (bug real reportado por el usuario). */
-.field input:focus-visible {
-  box-shadow: none;
-}
-
 .result-card {
   display: flex;
   align-items: baseline;

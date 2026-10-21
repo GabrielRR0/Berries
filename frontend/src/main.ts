@@ -11,6 +11,17 @@ import './style.css'
 // en desktop. No hace nada más que "despertar" ese comportamiento.
 document.addEventListener('touchstart', () => {}, { passive: true })
 
+// La restauracion nativa de scroll del navegador (su default es 'auto') corre
+// en paralelo a la propia de router/index.ts + usePageScroll.ts y las dos
+// terminan peleandose por el mismo scrollY - el navegador suele reaplicar la
+// suya recien cuando juzga la pagina "estable", que puede caer justo despues
+// de que el contenido async (fetch de la pantalla) termino de cambiar el alto
+// del documento (bug real reportado por el usuario: salto brusco ~1s despues
+// de cambiar de pagina). Apagarla deja un solo responsable del scroll.
+if ('scrollRestoration' in history) {
+  history.scrollRestoration = 'manual'
+}
+
 const app = createApp(App)
 
 app.use(createPinia())

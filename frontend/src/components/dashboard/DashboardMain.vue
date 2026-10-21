@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { computed, onUnmounted } from 'vue'
+import { computed, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAvatarInitials } from '../../composables/auth/useAvatarInitials'
+import { useScrollHeader } from '../../composables/layout/useScrollHeader'
+import { useSectionActive } from '../../composables/navigation/sectionContext'
 import { useOnboardingTour } from '../../composables/onboarding/useOnboardingTour'
+import TopHeader from '../layout/TopHeader.vue'
 import { useTransactionsStore } from '../../stores/transactions.store'
 import { useWalletsStore } from '../../stores/wallets.store'
 import PageShell from '../layout/PageShell.vue'
@@ -17,8 +21,6 @@ import QuickActionsGrid from './QuickActionsGrid.vue'
 // BalanceCard.vue (que se monta como hijo de esta misma pantalla), asi que
 // la seccion "Mis balances" de aca abajo solo LEE el wallets.store
 // compartido (Pinia es singleton) en vez de volver a pedir la lista.
-// TopHeader/BottomTabBar ya no se montan aca - viven una sola vez en
-// App.vue, ver el comentario de PageShell.vue.
 const walletsStore = useWalletsStore()
 // Idea de la sesion de brainstorm de UI: antes la unica forma de ver
 // movimientos desde Inicio era abrir el sheet de Ingresos/Gastos (varios
@@ -35,21 +37,41 @@ const recentTransactions = computed(() =>
 )
 
 const router = useRouter()
-const { close: closeTour } = useOnboardingTour()
+const { start: startTour, close: closeTour } = useOnboardingTour()
+const avatarInitials = useAvatarInitials()
+const { isScrolled } = useScrollHeader()
 
 function goToWallets() {
   router.push({ name: 'cuentas' })
 }
 
-// Si el usuario navega a otra pestaña con el tour a mitad de camino, esta
-// pantalla se desmonta (cada ruta es una instancia nueva) - sin este cierre,
-// al volver a Inicio reaparecería el mismo paso donde quedó, sin que el
-// usuario haya vuelto a tocar el "?" del header.
+// TopHeader vive dentro de Inicio (no en App.vue): en el paginador de
+// secciones se desliza junto con esta pagina, en vez de quedar flotando
+// encima de Movimientos mientras se arrastra.
+function goToSettings() {
+  router.push({ name: 'ajustes' })
+}
+
+// Si el usuario se va a otra seccion con el tour a mitad de camino, se
+// cierra - sin esto, al volver a Inicio reapareceria el mismo paso donde
+// quedo. En el paginador Inicio puede seguir montada como vecina (fuera de
+// pantalla), por eso no alcanza con onUnmounted.
+const isActive = useSectionActive()
+watch(isActive, (active) => {
+  if (!active) closeTour()
+})
 onUnmounted(closeTour)
 </script>
 
 <template>
   <PageShell>
+    <TopHeader
+      :avatar-initials="avatarInitials"
+      :scrolled="isScrolled"
+      @avatar-click="goToSettings"
+      @help-click="startTour"
+    />
+
     <div class="dashboard">
       <!-- Wrapper divs - cada columna de escritorio es su propio stack
            independiente (ver @media min-width:1024px). En mobile/tablet

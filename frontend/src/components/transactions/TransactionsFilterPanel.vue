@@ -177,7 +177,7 @@ function onClear() {
 
 .category-chip {
   padding: 0.375rem 0.75rem;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--glass-border);
   background: var(--glass-bg);
   color: var(--text-muted);

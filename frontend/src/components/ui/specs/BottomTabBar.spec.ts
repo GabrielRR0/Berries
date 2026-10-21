@@ -6,6 +6,13 @@ import BottomTabBar from '../BottomTabBar.vue'
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({ name: 'dashboard' }),
+  useRouter: () => ({
+    getRoutes: () => [
+      { name: 'dashboard', path: '/', meta: { order: 0, tabBar: { label: 'Inicio', icon: 'home' } } },
+      { name: 'movimientos', path: '/movimientos', meta: { order: 1, tabBar: { label: 'Movimientos', icon: 'movimientos' } } },
+      { name: 'ajustes', path: '/ajustes', meta: { order: 7, tabBar: { label: 'Menú', icon: 'menu' } } },
+    ],
+  }),
   RouterLink: { template: '<a><slot /></a>' },
 }))
 

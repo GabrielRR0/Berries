@@ -783,15 +783,6 @@ function onCreate() {
   border-color: var(--accent);
 }
 
-/* Pisa el aro de foco global (ver style.css: input:focus-visible{box-shadow:
-   var(--focus-ring)}) - pensado para inputs con caja/fondo visible; sobre este
-   input transparente sin bordes laterales se veia como un recuadro feo
-   saliendo de la nada (bug real reportado por el usuario). El cambio de color
-   del borde de abajo (arriba) ya alcanza como señal de foco. */
-.wizard-amount-input:focus-visible {
-  box-shadow: none;
-}
-
 .wizard-amount-currency {
   font-size: 1rem;
   font-weight: 600;

@@ -178,16 +178,19 @@ input {
 }
 
 /* Foco de teclado global (:focus-visible nunca matchea con click/touch, solo
-   con navegacion real por teclado) - cubre BaseButton, RouterLink (<a>),
-   inputs/selects/tabs de toda la app sin tener que tocar cada archivo.
-   Compone con el foco propio que ya tienen algunos inputs (ej. .search-input
-   en TransactionsMain.vue: border-color al acento) - son propiedades
-   distintas (box-shadow vs border-color), asi que ambas se ven a la vez. */
+   con navegacion real por teclado) - cubre BaseButton y RouterLink (<a>) sin
+   tener que tocar cada archivo.
+   input/select/textarea NO entran aca: casi todos ya tienen su propio foco
+   via border-color al acento (ver los numerosos ".field input:focus" en todo
+   el proyecto), y a diferencia de button/a, Chrome/Firefox consideran
+   :focus-visible = true en un input incluso al hacer click con mouse (no
+   solo teclado) - asi que este aro terminaba apareciendo en CASI CUALQUIER
+   click sobre un input/select/textarea, como un recuadro blanco feo que
+   rompia el estilo (bug real reportado por el usuario). Los pocos inputs sin
+   indicador propio de foco quedan sin aro visible; preferible a que vuelva el
+   recuadro global. */
 button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
+a:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -229,18 +232,25 @@ a {
   color: inherit;
 }
 
-/* Modulo de transiciones de pagina (ver
-   composables/navigation/usePageTransition.ts + App.vue): direccional tipo
-   "swipe entre tabs" al estilo Instagram, con Vue <Transition> + CSS nativo
-   nada mas - sin GSAP/Framer Motion (vetados en DESIGN.md raiz por pesados;
-   un slide direccional simple no los necesita). Ambos lados (el que entra y
-   el que sale) animan a la vez, no en secuencia, por eso quedan absolute
-   dentro de un contenedor position:relative mientras dura la transicion. */
+/* Transiciones de las pantallas sueltas (las que NO son seccion del
+   paginador - ver App.vue y components/layout/SectionPager.vue): entran por
+   encima del paginador con Vue <Transition> + CSS nativo. Ambos lados (el
+   que entra y el que sale) animan a la vez, por eso quedan absolute dentro
+   de un contenedor position:relative mientras dura la transicion.
+   position:relative sin z-index a proposito: pinta por encima del paginador
+   (position:fixed, anterior en el DOM) sin crear un stacking context propio
+   que dejaria a sus BottomSheet por debajo de la barra de tabs. */
 .route-transition-viewport {
   position: relative;
   min-height: 100dvh;
   min-height: 100vh;
   overflow-x: clip;
+}
+
+/* Sobre una seccion el contenedor queda vacio (o con la pantalla suelta que
+   esta saliendo): no puede tragarse los toques que van al paginador. */
+.route-transition-viewport.is-passthrough {
+  pointer-events: none;
 }
 
 .slide-left-enter-active,
