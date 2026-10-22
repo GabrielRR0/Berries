@@ -4,6 +4,8 @@ import type { Transaction } from '../../services/transactions/interfaces/transac
 import type { TransferEditTarget, Wallet } from '../../services/wallets/interfaces/wallets.interface'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 import { formatDate, formatRelativeDay } from '../../utils/formatters/formatDate'
+import { mergeTransferLegs, transferEditTarget, transferSecondaryText } from '../../utils/transactions/transactionListItems'
+import type { TransactionListItem, TransferListItem } from '../../utils/transactions/transactionListItems'
 import IconBadge from '../ui/IconBadge.vue'
 
 // Lista pura de movimientos ya cargados (TransactionsMain.vue hace el
@@ -65,19 +67,7 @@ function referenceLabel(transaction: Transaction): string | null {
   return `${base} (tasa: ${rateLabel} por USD, ${formatDate(transaction.occurredAt)})`
 }
 
-interface TransferListItem {
-  kind: 'transfer'
-  transferId: string
-  occurredAt: string
-  fromLeg: Transaction
-  toLeg: Transaction
-  feeLeg: Transaction | null
-}
-interface SingleListItem {
-  kind: 'single'
-  transaction: Transaction
-}
-type ListItem = TransferListItem | SingleListItem
+type ListItem = TransactionListItem
 
 function listItemId(item: ListItem): string {
   return item.kind === 'transfer' ? item.transferId : item.transaction.id
@@ -91,79 +81,11 @@ function isTransfer(transaction: Transaction): boolean {
   return transaction.source === 'transfer'
 }
 
-// Una transferencia entre wallets propias no es un ingreso ni un gasto real -
-// plata que solo cambia de lugar (ver transfer_service.py). Pedido explicito
-// del usuario: verla como DOS filas separadas ("Transferencia a X" en una
-// wallet, "Transferencia desde Y" en la otra) confundia mas que ayudaba -
-// ahora se fusionan en UNA sola fila "X → Y" siempre que ambas patas
-// (fromLeg/toLeg, mismo transferId) esten presentes en la lista recibida. Si
-// un filtro externo (ver TransactionsMain.vue) deja solo una pata visible -
-// p.ej. buscar texto que matchea una sola descripcion -, esa pata se
-// muestra suelta en vez de forzar una fusion a medias. La comision (si la
-// hubo) es su propia transaction real (source="manual", category="Comisión")
-// y SIEMPRE se fusiona a la card cuando esta presente, mostrandose como el
-// monto principal (es el unico costo real de la transferencia).
-const listItems = computed<ListItem[]>(() => {
-  const groups = new Map<string, { fromLeg?: Transaction; toLeg?: Transaction; feeLeg?: Transaction }>()
-  for (const transaction of props.transactions) {
-    if (!transaction.transferId) continue
-    const group = groups.get(transaction.transferId) ?? {}
-    if (transaction.source === 'transfer' && transaction.type === 'expense') group.fromLeg = transaction
-    else if (transaction.source === 'transfer' && transaction.type === 'income') group.toLeg = transaction
-    else group.feeLeg = transaction
-    groups.set(transaction.transferId, group)
-  }
+// Fusion de las patas de una transferencia en UNA fila: ver utils/transactions/transactionListItems.ts.
+const listItems = computed<ListItem[]>(() => mergeTransferLegs(props.transactions))
 
-  const emittedGroups = new Set<string>()
-  const items: ListItem[] = []
-  for (const transaction of props.transactions) {
-    const group = transaction.transferId ? groups.get(transaction.transferId) : undefined
-    if (group?.fromLeg && group.toLeg) {
-      if (emittedGroups.has(transaction.transferId!)) continue
-      emittedGroups.add(transaction.transferId!)
-      items.push({
-        kind: 'transfer',
-        transferId: transaction.transferId!,
-        occurredAt: group.fromLeg.occurredAt,
-        fromLeg: group.fromLeg,
-        toLeg: group.toLeg,
-        feeLeg: group.feeLeg ?? null,
-      })
-      continue
-    }
-    items.push({ kind: 'single', transaction })
-  }
-  return items
-})
-
-// Texto chico bajo el titulo de una card de transferencia fusionada: el
-// monto que realmente se movio, siempre en segundo plano (pedido explicito
-// del usuario de que el monto grande sea la comision, no el principal). Si
-// origen/destino tienen moneda distinta se aclaran los dos montos, ya que
-// no son intercambiables 1 a 1.
-function transferSecondaryText(item: TransferListItem): string {
-  const fromText = formatCurrency(item.fromLeg.amount, currencyFor(item.fromLeg))
-  const toCurrency = currencyFor(item.toLeg)
-  if (toCurrency !== currencyFor(item.fromLeg)) return `${fromText} → ${formatCurrency(item.toLeg.amount, toCurrency)}`
-  return item.feeLeg ? `${fromText} transferidos` : `${fromText} transferidos, sin comisión`
-}
-
-// Arma el TransferEditTarget que espera TransferForm.vue a partir de las
-// patas ya fusionadas (fromLeg/toLeg/feeLeg) - convertedAmount solo tiene
-// sentido si las monedas difieren, mismo criterio que transferSecondaryText.
-function transferEditTarget(item: TransferListItem): TransferEditTarget {
-  const fromCurrency = currencyFor(item.fromLeg)
-  const toCurrency = currencyFor(item.toLeg)
-  return {
-    transferId: item.transferId,
-    fromWalletId: item.fromLeg.walletId,
-    toWalletId: item.toLeg.walletId,
-    amount: item.fromLeg.amount,
-    fee: item.feeLeg?.amount ?? 0,
-    convertedAmount: toCurrency !== fromCurrency ? item.toLeg.amount : null,
-    occurredAt: item.occurredAt,
-  }
-}
+const transferText = (item: TransferListItem) => transferSecondaryText(item, currencyFor)
+const transferTarget = (item: TransferListItem) => transferEditTarget(item, currencyFor)
 
 function requestDelete(id: string) {
   confirmingDeleteId.value = id
@@ -207,7 +129,7 @@ function confirmDelete(id: string) {
         <div class="transaction-info">
           <p class="transaction-category">{{ walletName(item.fromLeg.walletId) }} → {{ walletName(item.toLeg.walletId) }}</p>
           <p class="transaction-date">{{ formatDate(item.occurredAt) }}</p>
-          <p class="transaction-description">{{ transferSecondaryText(item) }}</p>
+          <p class="transaction-description">{{ transferText(item) }}</p>
         </div>
 
         <p class="transaction-amount" :class="{ expense: item.feeLeg }">
@@ -300,7 +222,7 @@ function confirmDelete(id: string) {
               v-if="item.kind === 'transfer'"
               type="button"
               class="transaction-edit-trigger"
-              @click="emit('editTransfer', transferEditTarget(item))"
+              @click="emit('editTransfer', transferTarget(item))"
             >
               Editar
             </button>
@@ -375,13 +297,13 @@ function confirmDelete(id: string) {
 
 @keyframes transaction-danger-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45);
+    box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.45);
   }
   60% {
-    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    box-shadow: 0 0 0 8px rgba(var(--accent-rgb), 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0);
   }
 }
 

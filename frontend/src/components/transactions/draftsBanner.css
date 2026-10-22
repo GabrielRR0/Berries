@@ -1,0 +1,74 @@
+/* Estilos de DraftsBanner.vue. */
+.drafts-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.drafts-banner-button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 0.875rem;
+  border-radius: 1.125rem;
+  border: 1px solid var(--accent-bright-border);
+  background: rgba(var(--accent-bright-rgb), 0.1);
+  color: var(--text-h);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drafts-banner-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.75rem;
+  background: var(--accent-bright);
+  color: var(--on-accent-bright);
+  font-size: 0.9375rem;
+  font-weight: 800;
+}
+
+.drafts-banner-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.drafts-banner-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.drafts-banner-caption {
+  font-size: 0.75rem;
+  color: var(--text);
+}
+
+.drafts-banner-chevron {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.drafts-banner-button[aria-expanded='true'] .drafts-banner-chevron {
+  transform: rotate(90deg);
+}
+
+.drafts-banner-list-wrap {
+  overflow: hidden;
+}
+
+.drafts-banner-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}

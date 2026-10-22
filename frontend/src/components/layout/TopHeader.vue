@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Header superior: avatar circular a la izquierda, saludo ("Buenas tardes /
-// Hola, Gabriel") y boton de ayuda a la derecha - sin saludo cae al wordmark
+// Gabriel") y boton de ayuda a la derecha - sin saludo cae al wordmark
 // de Berry centrado, como antes. Capturas de referencia "Rial" (esa
 // referencia tenia ademas un boton de chat/soporte, quitado a pedido
 // explicito del usuario: no hay ninguna funcionalidad de chat/soporte real
@@ -35,7 +35,7 @@ defineEmits<{ avatarClick: []; helpClick: [] }>()
 
     <div v-if="greeting" class="greeting">
       <span class="greeting-label">{{ greeting }}</span>
-      <span class="greeting-name">{{ name ? `Hola, ${name}` : 'Hola' }}</span>
+      <span v-if="name" class="greeting-name">{{ name }}</span>
     </div>
     <div v-else class="wordmark">
       <slot name="logo">

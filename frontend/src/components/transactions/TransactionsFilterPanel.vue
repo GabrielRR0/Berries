@@ -15,7 +15,8 @@ import type {
   TransactionsFilterState,
 } from './interfaces/TransactionsFilterSheet.interface'
 
-const props = defineProps<{ modelValue: TransactionsFilterState; categories: string[] }>()
+// hideType: el panel lateral de escritorio ya tiene el selector de tipo arriba del historial.
+const props = defineProps<{ modelValue: TransactionsFilterState; categories: string[]; hideType?: boolean }>()
 const emit = defineEmits<{ apply: [filter: TransactionsFilterState] }>()
 
 const TYPE_OPTIONS = [
@@ -93,7 +94,7 @@ function onClear() {
 
 <template>
   <div class="filter-panel">
-    <div class="filter-group">
+    <div v-if="!hideType" class="filter-group">
       <span class="filter-group-label">Tipo</span>
       <PillToggle :options="TYPE_OPTIONS" :model-value="draftType" @update:model-value="onTypeChange" />
     </div>

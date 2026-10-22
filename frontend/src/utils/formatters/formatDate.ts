@@ -34,3 +34,25 @@ export function formatRelativeDay(date: string | Date, now: Date = new Date(), l
   if (daysAgo === 1) return 'Ayer'
   return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(parsed).replace('.', '')
 }
+
+// "mié 21 oct" - dia de la semana + dia + mes, sin comas ni puntos.
+function formatWeekdayDay(date: Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short' })
+    .format(date)
+    .replace(/[,.]/g, '')
+}
+
+// Titulo de un grupo de dia en Movimientos: "Hoy · mié 21 oct", "Ayer · mar
+// 20 oct" y, pasados dos dias, solo "lun 19 oct".
+export function formatDayHeading(date: string | Date, now: Date = new Date(), locale = 'es-VE'): string {
+  const parsed = typeof date === 'string' ? new Date(date) : date
+  const relative = formatRelativeDay(parsed, now, locale)
+  const absolute = formatWeekdayDay(parsed, locale)
+  return relative === 'Hoy' || relative === 'Ayer' ? `${relative} · ${absolute}` : absolute
+}
+
+// "13:40" - hora local del movimiento (detalle expandido de una fila).
+export function formatTime(date: string | Date, locale = 'es-VE'): string {
+  const parsed = typeof date === 'string' ? new Date(date) : date
+  return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hour12: false }).format(parsed)
+}

@@ -2,6 +2,7 @@ import { createPinia } from 'pinia'
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
+import { initAccentTheme } from './composables/theme/useAccentTheme'
 import '@fontsource-variable/plus-jakarta-sans'
 import './style.css'
 
@@ -22,6 +23,9 @@ document.addEventListener('touchstart', () => {}, { passive: true })
 if ('scrollRestoration' in history) {
   history.scrollRestoration = 'manual'
 }
+
+// Color principal guardado (Menu > Apariencia): se aplica antes de montar, sin parpadeo.
+initAccentTheme()
 
 const app = createApp(App)
 

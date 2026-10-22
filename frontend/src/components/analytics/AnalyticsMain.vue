@@ -428,7 +428,7 @@ onMounted(() => {
    resto de la app ya usa rojo. */
 .stat-card.expense-tint {
   border-color: var(--accent-border);
-  background: linear-gradient(155deg, rgba(239, 68, 68, 0.1), transparent 65%), var(--glass-bg);
+  background: linear-gradient(155deg, rgba(var(--accent-rgb), 0.1), transparent 65%), var(--glass-bg);
 }
 
 .stat-card.net {

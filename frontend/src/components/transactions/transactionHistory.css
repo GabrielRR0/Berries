@@ -1,0 +1,269 @@
+/* Estilos de TransactionHistory.vue. */
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 1.375rem;
+}
+
+.history-day {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.history-day-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.25rem;
+}
+
+.history-day-label {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.history-day-net {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.history-card {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  box-shadow: var(--glass-edge);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .history-card {
+    background: var(--bg-surface);
+  }
+}
+
+.history-row + .history-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.history-row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: none;
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.history-row-main:hover,
+.history-row.is-open .history-row-main {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.history-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.875rem;
+  background: var(--bg-raised);
+  color: var(--text-h);
+}
+
+.history-tile.expense {
+  background: var(--accent-bright-muted);
+  color: var(--accent-soft);
+}
+
+.history-tile svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.history-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+}
+
+.history-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-subtitle {
+  font-size: 0.78125rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-amounts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1875rem;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-amount {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.history-amount.expense {
+  color: var(--accent-soft);
+}
+
+.history-secondary {
+  font-size: 0.71875rem;
+  color: var(--text-muted);
+}
+
+.history-detail-wrap {
+  overflow: hidden;
+}
+
+.history-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0 1rem 1rem 4.5rem;
+}
+
+.history-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.75rem 0.875rem;
+  border-radius: 0.875rem;
+  background: var(--bg-raised);
+}
+
+.history-detail-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78125rem;
+}
+
+.history-detail-item dt {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.history-detail-item dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.history-confirm-text {
+  flex: 1;
+  font-size: 0.8125rem;
+  color: var(--text);
+}
+
+.history-action {
+  flex: 1;
+  min-height: 2.75rem;
+  border-radius: 0.875rem;
+  border: 1px solid var(--glass-border-hover);
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.history-confirm .history-action {
+  flex: 0 0 auto;
+  padding: 0 1rem;
+}
+
+.history-action.danger {
+  border-color: var(--accent-bright-border);
+  color: var(--accent-soft);
+}
+
+.history-action.danger.solid {
+  border-color: var(--accent-bright);
+  background: var(--accent-bright);
+  color: var(--on-accent-bright);
+}
+
+.history-action:active {
+  transform: scale(0.96);
+}
+
+/* Altas/bajas de filas: las anima Motion (animation/useListStaggerTransition.ts);
+   aca solo queda el reacomodo (FLIP) de las filas que se quedan. */
+.history-row-move {
+  transition: transform var(--duration-base) var(--ease-out);
+}
+
+@media (min-width: 1024px) {
+  .history-row-main {
+    gap: 1rem;
+    padding: 0.875rem 1.25rem;
+  }
+
+  .history-detail {
+    padding: 0 1.25rem 1rem 5.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .history-row-move {
+    transition: none;
+  }
+}
+
+/* Telefonos angostos: el detalle usa todo el ancho de la fila. */
+@media (max-width: 399px) {
+  .history-detail {
+    padding-left: 1rem;
+  }
+}

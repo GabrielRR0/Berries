@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useCollapseTransition } from '../../animation/useCollapseTransition'
+import { useFadeTransition } from '../../animation/useFadeTransition'
+import { vPress } from '../../animation/vPress'
+import { useStaggerReveal } from '../../animation/useStaggerReveal'
+import { useQuickRegister } from '../../composables/quickRegister/useQuickRegister'
 import { useAnalytics } from '../../composables/analytics/useAnalytics'
 import { useAuthStore } from '../../stores/auth.store'
 import { useTransactionsStore } from '../../stores/transactions.store'
@@ -19,10 +24,13 @@ import MonthPager from '../ui/MonthPager.vue'
 import VoiceEntryButton from '../voiceEntry/VoiceEntryButton.vue'
 import CaptureEntryButton from '../screenshotScan/CaptureEntryButton.vue'
 import TransferForm from '../wallets/TransferForm.vue'
+import CategoryBreakdownCard from './CategoryBreakdownCard.vue'
+import CategoryChips from './CategoryChips.vue'
 import DraftReviewCard from './DraftReviewCard.vue'
+import DraftsBanner from './DraftsBanner.vue'
 import MonthSummaryCards from './MonthSummaryCards.vue'
 import TransactionForm from './TransactionForm.vue'
-import TransactionList from './TransactionList.vue'
+import TransactionHistory from './TransactionHistory.vue'
 import TransactionsFilterSheet, { DEFAULT_TRANSACTIONS_FILTER } from './TransactionsFilterSheet.vue'
 import TransactionsFilterPanel from './TransactionsFilterPanel.vue'
 import TransactionTypeChips from './TransactionTypeChips.vue'
@@ -40,7 +48,18 @@ import type { TransactionsFilterState, TransactionTypeFilter } from './interface
 // filtro por mes/tipo/periodo/categoria/busqueda se resuelve ENTERO en el
 // cliente (computed abajo) - no hay pedidos nuevos al backend por cambiar de
 // mes o tocar un filtro.
+// Entrada escalonada de las secciones marcadas con data-reveal (Motion, ver
+// animation/useStaggerReveal.ts) - mismo recurso que ya usa Inicio.
+const mainRef = ref<HTMLElement | null>(null)
+useStaggerReveal(mainRef, { spring: true, rise: 10, step: 0.06 })
+
+// Aparecer/desaparecer fluido (Motion): bloques que empujan al resto (error, pendientes)
+// animan su alto; los que reemplazan a otro (cargando -> lista -> vacio) hacen fundido.
+const collapse = useCollapseTransition()
+const fade = useFadeTransition()
+
 const router = useRouter()
+const quickRegister = useQuickRegister()
 const walletsStore = useWalletsStore()
 const transactionsStore = useTransactionsStore()
 const authStore = useAuthStore()
@@ -49,7 +68,7 @@ const authStore = useAuthStore()
 // User.default_currency, la etiqueta debe coincidir con eso. Efecto intencional: el
 // selector USD/EUR/USDT deja de afectar estas cajas, solo balances.
 const displayCurrency = computed(() => authStore.user?.defaultCurrency ?? 'USD')
-const { periodSummary, fetchPeriodSummary } = useAnalytics()
+const { periodSummary, fetchPeriodSummary, categoryBreakdown, fetchCategoryBreakdown } = useAnalytics()
 
 const drafts = ref<Draft[]>([])
 const loadError = ref<string | null>(null)
@@ -68,6 +87,7 @@ const editingTransaction = ref<Transaction | null>(null)
 const editingTransfer = ref<TransferEditTarget | null>(null)
 const showHelpSheet = ref(false)
 const showFilterSheet = ref(false)
+const draftsExpanded = ref(false)
 const searchQuery = ref('')
 const filter = ref<TransactionsFilterState>({ ...DEFAULT_TRANSACTIONS_FILTER })
 
@@ -111,16 +131,35 @@ function isInMonth(occurredAt: string, year: number, month: number): boolean {
 const monthIncome = computed(() => periodSummary.value?.totalIncome ?? 0)
 const monthExpenses = computed(() => periodSummary.value?.totalExpense ?? 0)
 
-watch(activeMonth, (month) => fetchPeriodSummary(toPeriodKey(month.year, month.month)), { immediate: true })
+// Resumen del mes + desglose de gastos por categoria (panel "En qué se fue el mes" y
+// chips de categoria): mismo mes activo, mismas reglas de conversion del backend.
+function refreshMonthStats(periodKey: string) {
+  fetchPeriodSummary(periodKey)
+  fetchCategoryBreakdown('expense', periodKey)
+}
+
+watch(activeMonth, (month) => refreshMonthStats(toPeriodKey(month.year, month.month)), { immediate: true })
 
 // Un movimiento registrado desde el panel "Registrar" global entra a la cache
 // compartida: el resumen del mes activo se vuelve a pedir para reflejarlo.
 watch(
   () => transactionsStore.transactions.length,
   (_length, previousLength) => {
-    if (previousLength > 0) fetchPeriodSummary(currentPeriodKey())
+    if (previousLength > 0) refreshMonthStats(currentPeriodKey())
   },
 )
+
+// "N movimientos este mes" de las tarjetas de Ingresos/Gastos (escritorio): cuenta de
+// movimientos reales del mes activo, sin las patas de transferencia.
+const monthIncomeCount = computed(() => countMonthTransactions('income'))
+const monthExpenseCount = computed(() => countMonthTransactions('expense'))
+
+function countMonthTransactions(type: 'income' | 'expense'): number {
+  return transactionsStore.transactions.filter(
+    (t) =>
+      t.type === type && t.source !== 'transfer' && isInMonth(t.occurredAt, activeMonth.value.year, activeMonth.value.month),
+  ).length
+}
 
 // Chips de categoria dinamicos: Berry no tiene una taxonomia fija (ver
 // TransactionsFilterSheet.vue) - se derivan de las categorias que el
@@ -175,6 +214,17 @@ function onFilterApply(next: TransactionsFilterState) {
   filter.value = next
 }
 
+function onCategoryChange(category: string | null) {
+  filter.value = { ...filter.value, category }
+}
+
+// "Nuevo movimiento" abre el MISMO panel "Registrar" que el "+" de la barra flotante:
+// primero pregunta como registrarlo (escribir, voz, recibo o capturas) y nace del
+// boton que lo abrio. El sheet de abajo queda solo para EDITAR un movimiento.
+function openRegisterPanel(event: MouseEvent) {
+  quickRegister.open(event.currentTarget as Element)
+}
+
 function onTypeChange(type: TransactionTypeFilter) {
   filter.value = { ...filter.value, type }
 }
@@ -185,7 +235,7 @@ function currentPeriodKey(): string {
 
 function onTransactionCreated(transaction: Transaction) {
   transactionsStore.recordCreated(transaction)
-  fetchPeriodSummary(currentPeriodKey())
+  refreshMonthStats(currentPeriodKey())
   closeCreateSheet()
 }
 
@@ -208,7 +258,7 @@ function onEditTransaction(transaction: Transaction) {
 
 function onTransactionUpdated(transaction: Transaction) {
   transactionsStore.recordUpdated(transaction)
-  fetchPeriodSummary(currentPeriodKey())
+  refreshMonthStats(currentPeriodKey())
   closeCreateSheet()
 }
 
@@ -228,7 +278,7 @@ function closeTransferEditSheet() {
 async function onDeleteTransaction(transactionId: string) {
   try {
     await transactionsStore.removeTransaction(transactionId)
-    fetchPeriodSummary(currentPeriodKey())
+    refreshMonthStats(currentPeriodKey())
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : 'No se pudo eliminar el movimiento.'
   }
@@ -236,7 +286,7 @@ async function onDeleteTransaction(transactionId: string) {
 
 function onDraftConfirmed(transaction: Transaction, draftId: string) {
   transactionsStore.recordCreated(transaction)
-  fetchPeriodSummary(currentPeriodKey())
+  refreshMonthStats(currentPeriodKey())
   drafts.value = drafts.value.filter((draft) => draft.id !== draftId)
 }
 
@@ -244,7 +294,7 @@ function onDraftConfirmed(transaction: Transaction, draftId: string) {
 function onDraftTransferred(draftId: string) {
   drafts.value = drafts.value.filter((draft) => draft.id !== draftId)
   transactionsStore.fetchTransactions({ force: true })
-  fetchPeriodSummary(currentPeriodKey())
+  refreshMonthStats(currentPeriodKey())
 }
 
 function onDraftDiscarded(draftId: string) {
@@ -264,64 +314,94 @@ function goBack() {
   <PageShell>
     <SectionHeader title="Movimientos" @back="goBack" @help="showHelpSheet = true" />
 
-    <div class="transactions-main">
-      <!-- Wrapper divs (columnas independientes de escritorio, ver
-           @media min-width:1024px) - mismo criterio que DashboardMain.vue:
-           con grid-column simple + auto-placement (como estaba antes) el
-           auto-placement de CSS Grid seguia emparejando filters-sidebar
-           (muy alto, todo el panel de filtros) con "Historial" en la MISMA
-           fila del grid (coincidencia del orden del DOM), dejando un hueco
-           vacio real antes de que "Historial" pudiera empezar. En
-           mobile/tablet estos divs son bloques transparentes sin estilo
-           propio, el flujo se ve identico a como era antes. -->
-      <div class="transactions-col transactions-col-sidebar">
-        <div class="month-pager-row">
-          <MonthPager :year="activeMonth.year" :month="activeMonth.month" @change="onMonthChange" />
-        </div>
-
-        <MonthSummaryCards
-          class="transactions-section"
-          :income="monthIncome"
-          :expenses="monthExpenses"
-          :currency="displayCurrency"
+    <!-- Movil: una columna (resumen con el pager adentro, registrar, pendientes,
+         busqueda+filtros, historial). Escritorio (grid, ver transactionsMain.css):
+         barra superior con pager+registrar, tres tarjetas de resumen y debajo
+         historial a la izquierda / panel lateral (pendientes, desglose, filtros)
+         a la derecha. -->
+    <div ref="mainRef" class="transactions-main">
+      <div class="tx-toolbar" data-reveal>
+        <MonthPager
+          class="tx-toolbar-pager"
+          variant="toolbar"
+          :year="activeMonth.year"
+          :month="activeMonth.month"
+          @change="onMonthChange"
         />
 
-        <!-- Solo visible en escritorio (ver @media min-width:1024px abajo) -
-             en mobile/tablet los mismos filtros siguen viviendo en el
-             TransactionsFilterSheet de mas abajo, sin cambios. -->
-        <aside class="filters-sidebar">
-          <TransactionsFilterPanel :model-value="filter" :categories="categories" @apply="onFilterApply" />
-        </aside>
+        <div class="capture-row">
+          <VoiceEntryButton label="Voz" @created="onDraftCreated" />
+          <ReceiptUpload label="Recibo" @created="onDraftCreated" />
+          <CaptureEntryButton label="Captura" />
+          <button v-press="0.96" type="button" class="new-transaction-trigger" @click="openRegisterPanel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" stroke-linecap="round" />
+            </svg>
+            Nuevo movimiento
+          </button>
+        </div>
       </div>
 
-      <div class="transactions-col transactions-col-main">
-        <div class="transactions-section capture-row">
-          <button type="button" class="new-transaction-trigger" @click="showCreateSheet = true">
-            + Nuevo movimiento
-          </button>
-          <VoiceEntryButton @created="onDraftCreated" />
-          <ReceiptUpload @created="onDraftCreated" />
-          <CaptureEntryButton />
-        </div>
+      <MonthSummaryCards
+        class="tx-hero"
+        data-reveal
+        :income="monthIncome"
+        :expenses="monthExpenses"
+        :currency="displayCurrency"
+        :month-stamp="activeMonth.year * 12 + activeMonth.month"
+        :income-count="monthIncomeCount"
+        :expense-count="monthExpenseCount"
+      >
+        <template #pager>
+          <MonthPager variant="hero" :year="activeMonth.year" :month="activeMonth.month" @change="onMonthChange" />
+        </template>
+      </MonthSummaryCards>
 
-        <div v-if="drafts.length > 0" class="transactions-section drafts-list">
-          <DraftReviewCard
-            v-for="draft in drafts"
-            :key="draft.id"
-            :draft="draft"
-            @confirmed="onDraftConfirmed"
-            @transferred="onDraftTransferred"
-            @discarded="onDraftDiscarded"
-          />
-        </div>
+      <aside class="tx-aside" data-reveal>
+        <DraftsBanner :count="drafts.length" :expanded="draftsExpanded" @toggle="draftsExpanded = !draftsExpanded">
+          <TransitionGroup tag="div" class="drafts-list" :css="false" @enter="collapse.onEnter" @leave="collapse.onLeave">
+            <DraftReviewCard
+              v-for="draft in drafts"
+              :key="draft.id"
+              :draft="draft"
+              @confirmed="onDraftConfirmed"
+              @transferred="onDraftTransferred"
+              @discarded="onDraftDiscarded"
+            />
+          </TransitionGroup>
+        </DraftsBanner>
 
-        <div class="transactions-section search-row">
-          <input
-            v-model="searchQuery"
-            type="search"
-            class="search-input"
-            placeholder="Buscar por categoría o descripción..."
-          />
+        <CategoryBreakdownCard
+          class="tx-aside-desktop"
+          :breakdown="categoryBreakdown"
+          :currency="displayCurrency"
+          :selected="filter.category"
+          @select="onCategoryChange"
+        />
+
+        <!-- Solo visible en escritorio - en movil los mismos filtros viven en el
+             TransactionsFilterSheet de mas abajo. -->
+        <section class="tx-aside-desktop filters-card">
+          <h2 class="filters-card-title">Filtros</h2>
+          <TransactionsFilterPanel hide-type :model-value="filter" :categories="categories" @apply="onFilterApply" />
+        </section>
+      </aside>
+
+      <div class="tx-primary">
+        <div class="search-row" data-reveal>
+          <label class="search-field">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3.5-3.5" stroke-linecap="round" />
+            </svg>
+            <input
+              v-model="searchQuery"
+              type="search"
+              class="search-input"
+              aria-label="Buscar movimientos"
+              placeholder="Buscar movimientos"
+            />
+          </label>
           <button
             type="button"
             class="filter-trigger"
@@ -334,19 +414,30 @@ function goBack() {
             </svg>
             <span v-if="hasActiveFilter" class="filter-trigger-dot" aria-hidden="true" />
           </button>
+          <TransactionTypeChips class="type-chips-row" :model-value="filter.type" @update:model-value="onTypeChange" />
         </div>
 
-        <TransactionTypeChips
-          class="transactions-section type-chips-row"
-          :model-value="filter.type"
-          @update:model-value="onTypeChange"
+        <CategoryChips
+          class="category-chips-row"
+          data-reveal
+          :breakdown="categoryBreakdown"
+          :currency="displayCurrency"
+          :model-value="filter.category"
+          @update:model-value="onCategoryChange"
         />
 
-        <p v-if="loadError" class="transactions-error" role="alert">{{ loadError }}</p>
+        <Transition :css="false" @enter="collapse.onEnter" @leave="collapse.onLeave">
+          <p v-if="loadError" class="transactions-error" role="alert">{{ loadError }}</p>
+        </Transition>
 
-        <section class="transactions-section">
-          <h2 class="section-title">Historial</h2>
-          <Transition name="loading-fade" mode="out-in">
+        <section class="history-section">
+          <Transition
+            mode="out-in"
+            :css="false"
+            @before-enter="fade.onBeforeEnter"
+            @enter="fade.onEnter"
+            @leave="fade.onLeave"
+          >
             <LoadingIndicator
               v-if="transactionsStore.isLoading && transactionsStore.transactions.length === 0"
               key="loading"
@@ -355,7 +446,7 @@ function goBack() {
             <BaseCard v-else-if="filteredTransactions.length === 0" key="empty" class="transactions-empty">
               <p class="transactions-empty-text">No tienes movimientos que coincidan con estos filtros.</p>
             </BaseCard>
-            <TransactionList
+            <TransactionHistory
               v-else
               key="list"
               :transactions="filteredTransactions"
@@ -406,270 +497,4 @@ function goBack() {
   </PageShell>
 </template>
 
-<style scoped>
-.transactions-main {
-  display: flex;
-  flex-direction: column;
-  max-width: 30rem;
-  margin: 0 auto;
-}
-
-.month-pager-row {
-  display: flex;
-  justify-content: center;
-}
-
-.filters-sidebar {
-  display: none;
-}
-
-.transactions-section {
-  margin-top: 1.5rem;
-}
-
-.section-title {
-  margin-bottom: 0.75rem;
-  font-size: 1rem;
-}
-
-.capture-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.new-transaction-trigger {
-  flex: 1;
-  padding: 0.75rem;
-  border: 1px dashed var(--glass-border);
-  border-radius: var(--radius-lg);
-  background: transparent;
-  color: var(--accent);
-  font: inherit;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    opacity var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-.new-transaction-trigger:hover {
-  opacity: 0.85;
-}
-
-.new-transaction-trigger:active {
-  transform: scale(0.98);
-  opacity: 0.75;
-}
-
-.drafts-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.search-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-/* Menos aire que entre secciones: los chips cuelgan de la busqueda. */
-.type-chips-row {
-  margin-top: 0.75rem;
-}
-
-.search-input {
-  flex: 1;
-  padding: 0.8125rem 1rem;
-  border-radius: 1rem;
-  border: 1px solid var(--glass-border);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--blur-sm));
-  -webkit-backdrop-filter: blur(var(--blur-sm));
-  color: var(--text-h);
-  font: inherit;
-  /* 1rem, no menos: por debajo de 16px iOS Safari hace zoom automatico al
-     enfocar un input - pedido explicito del usuario ("ningun input debe
-     hacer que el tlf haga zoom"), rompe la sensacion de app nativa. */
-  font-size: 1rem;
-  transition: border-color var(--duration-fast) var(--ease-out);
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.filter-trigger {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 3rem;
-  height: 3rem;
-  flex-shrink: 0;
-  border-radius: 1rem;
-  border: 1px solid var(--glass-border);
-  background: var(--glass-bg);
-  color: var(--text-h);
-  cursor: pointer;
-  transition:
-    border-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out),
-    transform var(--duration-fast) var(--ease-out);
-}
-
-.filter-trigger svg {
-  width: 1.125rem;
-  height: 1.125rem;
-}
-
-.filter-trigger:active {
-  transform: scale(0.94);
-}
-
-.filter-trigger.has-active-filter {
-  border-color: var(--accent-border);
-  color: var(--accent);
-}
-
-.filter-trigger-dot {
-  position: absolute;
-  top: 0.375rem;
-  right: 0.375rem;
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
-  background: var(--accent);
-}
-
-.transactions-error {
-  margin-top: 1.5rem;
-  padding: 0.625rem 0.75rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--accent-border);
-  background: var(--accent-muted);
-  color: var(--accent);
-  font-size: 0.8125rem;
-}
-
-.transactions-empty {
-  text-align: center;
-  color: var(--text-muted);
-}
-
-.transactions-empty-text {
-  font-size: 0.8125rem;
-  line-height: 1.5;
-}
-
-.help-text {
-  font-size: 0.875rem;
-  line-height: 1.6;
-  color: var(--text-muted);
-}
-
-/* En escritorio los filtros pasan de bottom sheet a sidebar siempre visible
-   (pedido explicito del usuario de layout multi-columna). Cada columna es
-   su propio stack independiente (.transactions-col, ver template) - se
-   probo antes con grid-column simple + auto-placement de CSS Grid (sin
-   wrapper), pero el auto-placement seguia emparejando filters-sidebar (muy
-   alto, todo el panel de filtros) con "Historial" en la MISMA fila
-   compartida del grid por simple coincidencia del orden del DOM, dejando un
-   hueco vacio real antes de que "Historial" pudiera empezar - mismo bug de
-   fondo (filas de grid compartidas entre columnas de alturas muy distintas)
-   que ya se encontro en DashboardMain.vue. */
-@media (min-width: 1024px) {
-  .transactions-main {
-    max-width: 76rem;
-    display: grid;
-    grid-template-columns: 20rem 1fr;
-    column-gap: 2rem;
-    align-items: start;
-  }
-
-  .transactions-col {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-
-  .transactions-col-sidebar {
-    grid-column: 1;
-  }
-
-  .transactions-col-main {
-    grid-column: 2;
-  }
-
-  /* Mismo alto minimo en ".month-pager-row" y ".capture-row" (el pager mide
-     ~36px de alto natural, el boton "+ Nuevo movimiento" ~46px) para que
-     Ingresos/Gastos (debajo del pager, columna izquierda) arranque a la
-     misma altura que el buscador (debajo de "+ Nuevo movimiento", columna
-     derecha) - pedido explicito del usuario. Ambas columnas siguen siendo
-     independientes entre si (align-items:start en ".transactions-main"),
-     esto solo empareja el alto de la PRIMERA fila de cada una. */
-  .month-pager-row {
-    justify-content: flex-start;
-    align-items: center;
-    min-height: 2.75rem;
-  }
-
-  .capture-row {
-    min-height: 2.75rem;
-  }
-
-  /* El spacing entre items de cada columna ahora lo da ".transactions-col"
-     (gap:1.5rem) - sin resetear esto a 0 quedaria doble espacio (margin +
-     gap) entre cada elemento. */
-  .transactions-section,
-  .transactions-error {
-    margin-top: 0;
-  }
-
-  .filters-sidebar {
-    display: block;
-  }
-
-  .section-title {
-    font-size: 1.375rem;
-  }
-
-  .filter-trigger {
-    display: none;
-  }
-
-  .filter-sheet {
-    display: none;
-  }
-}
-
-/* Animacion de entrada al cargar Movimientos en escritorio - bloque
-   separado, con guard extra de prefers-reduced-motion. "section.
-   transactions-section" (el wrapper de Historial/TransactionList) queda
-   deliberadamente afuera: envuelve una lista que ya tiene su propio stagger
-   via TransitionGroup + appear (ver TransactionList.vue) - animar tambien el
-   wrapper la dejaria escondida detras del delay del padre. */
-@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
-  .month-pager-row {
-    animation: content-enter var(--duration-base) var(--ease-out) backwards;
-  }
-
-  .month-summary-cards {
-    animation: content-enter var(--duration-base) var(--ease-out) backwards;
-    animation-delay: 50ms;
-  }
-
-  .filters-sidebar {
-    animation: content-enter var(--duration-base) var(--ease-out) backwards;
-    animation-delay: 100ms;
-  }
-
-  .capture-row {
-    animation: content-enter var(--duration-base) var(--ease-out) backwards;
-    animation-delay: 150ms;
-  }
-}
-</style>
+<style scoped src="./transactionsMain.css"></style>

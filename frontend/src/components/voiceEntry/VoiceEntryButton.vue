@@ -10,6 +10,8 @@ import VoiceRecorderModal from './VoiceRecorderModal.vue'
 // (TransactionsMain.vue). VoiceRecorderModal.vue ahora es generico (recibe
 // "submit" por prop, ver ese archivo) para poder reusarse tambien en Metas
 // (GoalVoiceEntryButton.vue) sin duplicar la maquinaria de grabacion.
+// label: texto visible junto al icono (barra de escritorio de Movimientos).
+defineProps<{ label?: string }>()
 const emit = defineEmits<{ created: [draft: Draft] }>()
 
 const showModal = ref(false)
@@ -27,6 +29,7 @@ function onCreated(result: unknown) {
       <path d="M5 11a7 7 0 0 0 14 0" stroke-linecap="round" />
       <path d="M12 18v3M9 21h6" stroke-linecap="round" />
     </svg>
+    <span v-if="label" class="capture-trigger-label">{{ label }}</span>
   </button>
 
   <VoiceRecorderModal v-if="showModal" :submit="submitVoiceEntry" @created="onCreated" @close="showModal = false" />

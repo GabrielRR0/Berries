@@ -122,6 +122,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/ajustes/color',
+      name: 'ajustes-color',
+      component: () => import('../components/settings/ThemeSettingsMain.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/pendientes',
       name: 'pendientes',
       component: () => import('../components/offline/PendingSyncMain.vue'),

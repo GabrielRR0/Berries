@@ -82,7 +82,7 @@ withDefaults(
   background: var(--accent);
   border-color: transparent;
   color: var(--accent-contrast);
-  box-shadow: 0 10px 24px rgba(239, 68, 68, 0.45);
+  box-shadow: 0 10px 24px rgba(var(--accent-rgb), 0.45);
 }
 
 .icon-badge.income {
@@ -92,7 +92,7 @@ withDefaults(
 }
 
 .icon-badge.expense {
-  background: rgba(239, 68, 68, 0.16);
+  background: rgba(var(--accent-rgb), 0.16);
   border-color: var(--accent-border);
   color: var(--accent);
 }

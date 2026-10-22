@@ -59,7 +59,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <SectionPager v-if="authStore.isAuthenticated" />
+  <!-- is-covered: una pantalla suelta (Deudas, Apariencia, ...) esta encima del paginador;
+       sin esconder los headers fijos de las secciones de abajo se veian encimados con
+       el de la pantalla suelta (ver sectionPager.css). -->
+  <SectionPager v-if="authStore.isAuthenticated" :class="{ 'is-covered': !isSectionRoute }" />
 
   <div ref="looseViewportRef" class="route-transition-viewport" :class="{ 'is-passthrough': isSectionRoute }">
     <RouterView v-slot="{ Component, route: currentRoute }">

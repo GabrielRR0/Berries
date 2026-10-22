@@ -13,7 +13,7 @@ import BottomSheet from '../ui/BottomSheet.vue'
 // bug - se muestra el detail del backend tal cual.
 // hideTrigger: el panel "Registrar" (QuickRegisterHost.vue) usa solo el selector
 // de archivos y el sheet de progreso, con su propio boton de "Escanear recibo".
-defineProps<{ hideTrigger?: boolean }>()
+defineProps<{ hideTrigger?: boolean; label?: string }>()
 const emit = defineEmits<{ created: [draft: Draft] }>()
 
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -78,6 +78,7 @@ defineExpose({ open: triggerFilePicker })
         <rect x="3" y="8" width="18" height="12" rx="2" />
         <circle cx="12" cy="14" r="3.25" />
       </svg>
+      <span v-if="label" class="capture-trigger-label">{{ label }}</span>
     </button>
 
     <input

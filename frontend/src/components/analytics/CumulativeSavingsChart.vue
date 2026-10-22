@@ -277,7 +277,7 @@ function monthLabel(month: string): string {
 
 .cumulative-dot-core.negative {
   fill: var(--accent);
-  filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.95));
+  filter: drop-shadow(0 0 4px rgba(var(--accent-rgb), 0.95));
 }
 
 .cumulative-axis {
