@@ -413,7 +413,7 @@ function onMenuDelete() {
   width: 16.25rem;
   height: 16.25rem;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(239, 68, 68, 0.17), transparent 65%);
+  background: radial-gradient(circle, rgba(var(--accent-rgb), 0.17), transparent 65%);
   filter: blur(1.125rem);
   pointer-events: none;
 }
@@ -763,13 +763,13 @@ function onMenuDelete() {
 
 @keyframes goal-danger-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45);
+    box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.45);
   }
   60% {
-    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    box-shadow: 0 0 0 8px rgba(var(--accent-rgb), 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0);
   }
 }
 

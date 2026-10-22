@@ -3,7 +3,7 @@ import { useRouter } from 'vue-router'
 
 // Botón que abre la vista "Registro desde capturas". Desde una billetera se pasa su
 // id para que llegue elegida.
-const props = defineProps<{ walletId?: string }>()
+const props = defineProps<{ walletId?: string; label?: string }>()
 const router = useRouter()
 
 function open() {
@@ -24,6 +24,7 @@ function open() {
       <path d="M7 14l3-3 3 3 2-2 3 3" stroke-linecap="round" stroke-linejoin="round" />
       <circle cx="8.5" cy="8.5" r="1.25" />
     </svg>
+    <span v-if="label" class="capture-trigger-label">{{ label }}</span>
   </button>
 </template>
 

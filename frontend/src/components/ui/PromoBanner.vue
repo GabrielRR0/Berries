@@ -57,7 +57,7 @@ defineEmits<{ dismiss: [] }>()
   width: 2.75rem;
   height: 2.75rem;
   border-radius: var(--radius-pill);
-  background: rgba(239, 68, 68, 0.16);
+  background: rgba(var(--accent-rgb), 0.16);
   color: var(--accent);
 }
 

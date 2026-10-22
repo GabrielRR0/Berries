@@ -32,11 +32,29 @@
      DESIGN.md #2, con rojo en vez de gris+1). A proposito no existe un
      segundo tono para "ingreso" (ni verde ni azul): los montos positivos
      usan texto neutro claro, ver IncomeExpenseSummary.vue. */
-  --accent: #ef4444;
-  --accent-strong: #dc2626;
-  --accent-contrast: #ffffff;
-  --accent-muted: rgba(239, 68, 68, 0.14);
-  --accent-border: rgba(239, 68, 68, 0.35);
+  /* El acento es ELEGIBLE (Menu > Apariencia, ver composables/theme/useAccentTheme.ts):
+     ese composable sobreescribe sobre <html> las variables de abajo marcadas "(tema)"
+     y todo lo demas se deriva de ellas. Los valores de aqui son el rojo original. */
+  --accent-rgb: 239, 68, 68; /* (tema) */
+  --accent-strong-rgb: 220, 38, 38; /* (tema) */
+  --accent-bright-rgb: 255, 90, 82; /* (tema) */
+  --accent: rgb(var(--accent-rgb));
+  --accent-strong: rgb(var(--accent-strong-rgb));
+  --accent-contrast: #ffffff; /* (tema) */
+  --accent-muted: rgba(var(--accent-rgb), 0.14);
+  --accent-border: rgba(var(--accent-rgb), 0.35);
+  /* Variantes del acento para la pantalla Movimientos (rediseño): "bright" para
+     rellenos (CTA, barras, tiles de gasto), "soft" para texto de monto sobre
+     fondo oscuro (mas legible que --accent), "softer" para texto sobre un fondo
+     tintado, "tint" para un segundo segmento de barra y "on-bright" para el texto
+     sobre un relleno bright. Siguen siendo el mismo y unico acento. */
+  --accent-bright: rgb(var(--accent-bright-rgb));
+  --accent-bright-muted: rgba(var(--accent-bright-rgb), 0.16);
+  --accent-bright-border: rgba(var(--accent-bright-rgb), 0.4);
+  --accent-soft: #ff8a83; /* (tema) */
+  --accent-softer: #ffb3ae; /* (tema) */
+  --accent-tint: #ffa29b; /* (tema) */
+  --on-accent-bright: #1a0505; /* (tema) */
 
   /* Tipografia: Plus Jakarta Sans autoalojada (paquete @fontsource, no un
      <link> a Google Fonts - cero pedidos externos) con el system font stack
@@ -90,8 +108,8 @@
      da a los headers/tab bars de cristal algo con textura detras para
      desenfocar; sin esto el blur no se notaria contra un fondo plano. */
   --hero-glow:
-    radial-gradient(75% 16% at 85% 3%, rgba(239, 68, 68, 0.16), transparent 72%),
-    radial-gradient(70% 14% at 100% 52%, rgba(239, 68, 68, 0.08), transparent 72%);
+    radial-gradient(75% 16% at 85% 3%, rgba(var(--accent-rgb), 0.16), transparent 72%),
+    radial-gradient(70% 14% at 100% 52%, rgba(var(--accent-rgb), 0.08), transparent 72%);
 
   --header-height: 4rem;
 
@@ -156,6 +174,15 @@ body {
 
   html::-webkit-scrollbar {
     display: none;
+  }
+}
+
+/* Escritorio: el hueco del scrollbar queda siempre reservado. Sin esto, cuando
+   una pantalla termina de cargar y se vuelve mas alta que la ventana aparece el
+   scrollbar y TODO el contenido se corre ~8px de golpe (se notaba en Movimientos). */
+@media (min-width: 1025px) {
+  html {
+    scrollbar-gutter: stable;
   }
 }
 
@@ -330,4 +357,19 @@ a {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Al cambiar el color principal (useAccentTheme.ts) la clase accent-transition vive
+   ~450ms sobre <html>: todos los colores hacen un fundido en vez de saltar. */
+html.accent-transition,
+html.accent-transition *,
+html.accent-transition *::before,
+html.accent-transition *::after {
+  transition:
+    background-color 0.4s ease,
+    color 0.4s ease,
+    border-color 0.4s ease,
+    fill 0.4s ease,
+    stroke 0.4s ease,
+    box-shadow 0.4s ease !important;
 }

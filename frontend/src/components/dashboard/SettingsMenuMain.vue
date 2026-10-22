@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAccentTheme } from '../../composables/theme/useAccentTheme'
 import { useAvatarInitials } from '../../composables/auth/useAvatarInitials'
 import { useAuthStore } from '../../stores/auth.store'
 import { useOfflineCachePreferencesStore } from '../../stores/offlineCachePreferences.store'
@@ -26,6 +27,7 @@ const offlineQueue = useOfflineQueueStore()
 const offlineCachePreferences = useOfflineCachePreferencesStore()
 
 const avatarInitials = useAvatarInitials()
+const { palette: accentPalette } = useAccentTheme()
 const showHelpSheet = ref(false)
 
 const displayName = computed(() => authStore.user?.displayName || authStore.user?.email || 'Usuario')
@@ -152,6 +154,28 @@ async function onDeleteAccount() {
             </IconBadge>
             <span class="menu-item-label">Pendientes</span>
             <span v-if="offlineQueue.pendingCount > 0" class="menu-item-badge">{{ offlineQueue.pendingCount }}</span>
+            <span class="menu-item-arrow" aria-hidden="true">›</span>
+          </RouterLink>
+        </nav>
+      </div>
+
+      <div class="menu-section">
+        <p class="menu-section-label">Apariencia</p>
+        <nav class="menu-list" aria-label="Apariencia">
+          <RouterLink to="/ajustes/color" class="menu-item">
+            <IconBadge size="sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.6 1.8-1.6H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8Z" stroke-linejoin="round" />
+                <circle cx="7.5" cy="11" r="1" fill="currentColor" stroke="none" />
+                <circle cx="10.5" cy="7" r="1" fill="currentColor" stroke="none" />
+                <circle cx="15" cy="7.5" r="1" fill="currentColor" stroke="none" />
+              </svg>
+            </IconBadge>
+            <span class="menu-item-label">Color principal</span>
+            <span class="menu-item-value">
+              <span class="menu-item-dot" aria-hidden="true" :style="{ background: accentPalette.base }" />
+              {{ accentPalette.label }}
+            </span>
             <span class="menu-item-arrow" aria-hidden="true">›</span>
           </RouterLink>
         </nav>
@@ -396,6 +420,22 @@ async function onDeleteAccount() {
 .menu-item-arrow {
   color: var(--text-muted);
   font-size: 1.125rem;
+}
+
+.menu-item-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.menu-item-dot {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  transition: background-color var(--duration-base) var(--ease-out);
 }
 
 .menu-item-badge {

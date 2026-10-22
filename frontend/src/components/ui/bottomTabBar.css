@@ -127,7 +127,7 @@
   cursor: pointer;
   background: var(--accent);
   color: var(--accent-contrast);
-  box-shadow: 0 12px 28px rgba(239, 68, 68, 0.5);
+  box-shadow: 0 12px 28px rgba(var(--accent-rgb), 0.5);
   transition: transform 0.35s var(--ease-odometer);
 }
 

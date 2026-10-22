@@ -83,7 +83,7 @@ const endPoint = computed(() => {
 }
 
 .goal-progress-ring.glow .ring-fill {
-  filter: drop-shadow(0 0 0.625rem rgba(239, 68, 68, 0.27));
+  filter: drop-shadow(0 0 0.625rem rgba(var(--accent-rgb), 0.27));
 }
 
 .ring-end-dot {

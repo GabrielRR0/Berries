@@ -120,6 +120,11 @@
 .avatar-button {
   width: 2.75rem;
   height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  line-height: 1;
   border-color: transparent;
   background: linear-gradient(135deg, var(--accent), #7f1d1d);
   color: var(--accent-contrast);

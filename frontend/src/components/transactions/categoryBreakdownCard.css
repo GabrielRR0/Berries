@@ -1,0 +1,111 @@
+/* Estilos de CategoryBreakdownCard.vue. Los 4 tonos varian en luminosidad, no
+   solo en matiz: rojo de marca, rojo suave y dos grises. */
+.breakdown-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.375rem 1.5rem;
+  border-radius: 1.5rem;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
+  box-shadow: var(--glass-edge);
+}
+
+.breakdown-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 800;
+}
+
+.breakdown-bar {
+  display: flex;
+  gap: 2px;
+  height: 0.75rem;
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.breakdown-bar-segment {
+  min-width: 2px;
+}
+
+.tone-0 {
+  background: var(--accent-bright);
+}
+
+.tone-1 {
+  background: var(--accent-tint);
+}
+
+.tone-2 {
+  background: #8e8e96;
+}
+
+.tone-3 {
+  background: #4a4a50;
+}
+
+.breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.breakdown-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 0.625rem;
+  border: none;
+  border-radius: 0.75rem;
+  background: transparent;
+  color: var(--text-h);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+
+.breakdown-row:disabled {
+  cursor: default;
+}
+
+.breakdown-row:not(:disabled):hover,
+.breakdown-row.active {
+  background: var(--bg-raised);
+}
+
+.breakdown-swatch {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-shrink: 0;
+  border-radius: 0.25rem;
+}
+
+.breakdown-name {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.breakdown-share {
+  font-size: 0.78125rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdown-total {
+  min-width: 4rem;
+  text-align: right;
+  font-size: 0.875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}

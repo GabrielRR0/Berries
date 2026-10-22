@@ -305,7 +305,9 @@ async function onDiscard() {
 
 .draft-fields-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, ...) y no 1fr: con 1fr cada columna no baja de su contenido minimo, y el
+     campo Monto (input + boton Max) se salia de la tarjeta. Monto un poco mas ancho. */
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
   gap: 0.75rem;
 }
 
@@ -313,6 +315,7 @@ async function onDiscard() {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
+  min-width: 0;
 }
 
 .field-label {
@@ -323,6 +326,9 @@ async function onDiscard() {
 
 .field input,
 .field select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 0.75rem 0.875rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);

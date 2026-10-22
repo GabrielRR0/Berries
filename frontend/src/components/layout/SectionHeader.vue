@@ -68,7 +68,9 @@ const { isScrolled } = useScrollHeader()
    de abajo (mismo criterio y mismo ancho de referencia que TopHeader.vue). */
 @media (min-width: 1024px) {
   .section-header {
-    padding-inline: max(1.25rem, calc((100vw - var(--section-header-max-width)) / 2));
+    /* 100% (no 100vw): el header es fixed, su ancho excluye el scrollbar, igual que
+       la columna de contenido; con 100vw quedaba ~8px desalineado cuando hay scrollbar. */
+    padding-inline: max(1.25rem, calc((100% - var(--section-header-max-width)) / 2));
   }
 
   /* Hoy es el titulo mas chico de toda la app (1.0625rem) sin ningun ajuste

@@ -68,3 +68,12 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
+/* Pantalla suelta encima del paginador: los headers fijos de las secciones de abajo
+   se esconden (con un retraso igual a la entrada de la pantalla, para que el de
+   abajo siga visible mientras esta se desliza) en vez de verse encimados con el
+   header de la pantalla suelta. Al volver, reaparecen de inmediato. */
+.section-pager.is-covered .section-header {
+  visibility: hidden;
+  transition: visibility 0s linear 0.5s;
+}
