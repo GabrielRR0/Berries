@@ -2,7 +2,7 @@
 
 - `groups.py` — **grupos de acceso con nombre**: `public_group()`, `auth_group()` y
   `cron_group()`. Cada controller crea su router con uno, una sola vez, y vive en la
-  carpeta que le corresponde (`public/`, `private/user/`, `system/`). Para cambiar lo que
+  carpeta que le corresponde (`anonymous/`, `private/user/`, `system/`). Para cambiar lo que
   exige un grupo se edita solo este archivo.
 - `current_user.py` — `get_current_user` (quién es el usuario a partir del token),
   `CurrentUser` (el tipo para recibirlo en un controller) y `verify_cron_secret`.

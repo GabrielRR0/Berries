@@ -54,7 +54,7 @@ backend/tests/
   README.md
   controllers/
     __init__.py             <modulo>_routers = [...]  (el que tiene /{id}, último)
-    public/                 sin sesión                      public_group()
+    anonymous/              sin sesión                      public_group()
     private/user/           cualquier usuario con sesión    auth_group()
     system/                 Vercel Cron (CRON_SECRET)       cron_group()
   contracts/

@@ -26,7 +26,7 @@ Guía completa y estructura: [BACKEND-MODULAR.md](BACKEND-MODULAR.md). Referenci
 
 **Controllers**
 - Un archivo = **un acceso + un recurso**. 🔒 El router se crea con el grupo de su
-  carpeta: `public/` → `public_group()`, `private/user/` → `auth_group()`,
+  carpeta: `anonymous/` → `public_group()`, `private/user/` → `auth_group()`,
   `system/` → `cron_group()`. Los grupos están en `common/security/groups.py`.
 - 🔒 Toda ruta que responde algo declara `response_model=<X>Resource` y anota el mismo
   tipo de retorno.

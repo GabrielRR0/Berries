@@ -1,15 +1,19 @@
 """Grupos de acceso con nombre: quién puede usar las rutas de un controller.
 
 Cada controller crea su router con uno de estos, una sola vez, y vive en la carpeta
-que le corresponde (lo comprueba tests/architecture/test_controller_layout.py):
+que le corresponde (lo comprueba tests/architecture/test_rules.py):
 
-| Grupo            | Carpeta                  | Quién                                  |
-|------------------|--------------------------|----------------------------------------|
-| `public_group()` | `controllers/public/`    | cualquiera, sin sesión                 |
-| `auth_group()`   | `controllers/private/user/` | cualquier usuario con sesión        |
-| `cron_group()`   | `controllers/system/`    | Vercel Cron, con `CRON_SECRET`         |
+| Grupo            | Carpeta                     | Quién                          |
+|------------------|-----------------------------|--------------------------------|
+| `public_group()` | `controllers/anonymous/`    | cualquiera, sin sesión         |
+| `auth_group()`   | `controllers/private/user/` | cualquier usuario con sesión   |
+| `cron_group()`   | `controllers/system/`       | Vercel Cron, con `CRON_SECRET` |
 
 Para cambiar lo que exige un grupo se edita solo este archivo.
+
+La carpeta de las rutas sin sesión se llama `anonymous/` y no `public/` a propósito:
+Vercel descarta del paquete del backend cualquier carpeta `public/` (la reserva para
+archivos estáticos) y la app no arrancaría. Lo comprueba tests/architecture/test_vercel_bundle.py.
 """
 
 from fastapi import APIRouter, Depends
