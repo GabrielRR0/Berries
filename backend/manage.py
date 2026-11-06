@@ -47,10 +47,10 @@ def _delete_demo_user_data(db, user) -> None:
     delete-orphan"` de Debt.installments solo aplica a borrados objeto-por-objeto vía
     la sesión ORM (`db.delete(obj)`), no a un DELETE masivo — por eso acá se borra cada
     fila explícitamente en vez de un solo `delete(User)...`."""
-    from app.models.debts.debt_model import Debt
-    from app.models.transactions.transaction_draft_model import TransactionDraft
-    from app.models.transactions.transaction_model import Transaction
-    from app.models.wallets.wallet_model import Wallet
+    from app.modules.debts import Debt
+    from app.modules.transactions import TransactionDraft
+    from app.modules.transactions import Transaction
+    from app.modules.wallets import Wallet
 
     for model in (Transaction, TransactionDraft):
         for row in db.query(model).filter(model.user_id == user.id):
@@ -69,9 +69,9 @@ def _delete_demo_user_data(db, user) -> None:
 def cmd_seed_demo(args: argparse.Namespace) -> None:
     # Imports adentro de la función: manage.py no debe pagar el costo de importar toda
     # la app (ni requerir DATABASE_URL/JWT_SECRET) para comandos que no lo necesitan.
-    from app.core.database import SessionLocal
-    from app.models.auth.user_model import User
-    from app.services.devTools.demo_seed_service import DEMO_EMAIL, get_or_create_demo_user
+    from app.database import SessionLocal
+    from app.modules.auth import User
+    from app.modules.dev_tools import DEMO_EMAIL, get_or_create_demo_user
 
     db = SessionLocal()
     try:
@@ -94,8 +94,8 @@ def cmd_backfill_reference_amounts(args: argparse.Namespace) -> None:
     # ver backfill_reference_amounts en transaction_service.py, que ahora también
     # reconcilia (no solo rellena) valores ya existentes que quedaron mal calculados
     # por el fallback roto de get_rate_at, corregido en esta misma tanda de cambios.
-    from app.core.database import SessionLocal
-    from app.services.transactions.transaction_service import backfill_reference_amounts
+    from app.database import SessionLocal
+    from app.modules.transactions import backfill_reference_amounts
 
     db = SessionLocal()
     try:
@@ -117,8 +117,8 @@ def cmd_backfill_vef_rate_history(args: argparse.Namespace) -> None:
     # Pedido explícito del usuario: "buscar registros anteriores... de hace un año
     # para acá" - dolarapi.com ya tiene el histórico real completo, solo hacía falta
     # traerlo. Ver backfill_historical_vef_rates en currency_service.py.
-    from app.core.database import SessionLocal
-    from app.services.currency.currency_service import backfill_historical_vef_rates
+    from app.database import SessionLocal
+    from app.modules.currency import backfill_historical_vef_rates
 
     db = SessionLocal()
     try:
@@ -131,8 +131,8 @@ def cmd_backfill_vef_rate_history(args: argparse.Namespace) -> None:
 def cmd_check_rates(args: argparse.Namespace) -> None:
     from decimal import Decimal
 
-    from app.core.database import SessionLocal
-    from app.services.currency.currency_service import audit_vef_rates
+    from app.database import SessionLocal
+    from app.modules.currency import audit_vef_rates
 
     db = SessionLocal()
     try:

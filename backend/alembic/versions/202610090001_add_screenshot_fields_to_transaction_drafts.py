@@ -20,7 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Todo aditivo y nullable - cero impacto en los borradores existentes (voz/OCR), que
     # seguiran con estas columnas en NULL. fee y reference son Text porque van
-    # encriptadas (ver EncryptedDecimal/EncryptedString en app/core/encryption.py).
+    # encriptadas (ver EncryptedDecimal/EncryptedString en app/common/crypto/encrypted_types.py).
     with op.batch_alter_table("transaction_drafts") as batch_op:
         batch_op.add_column(sa.Column("txn_type", sa.String(length=10), nullable=True))
         batch_op.add_column(sa.Column("occurred_at", sa.DateTime(timezone=True), nullable=True))

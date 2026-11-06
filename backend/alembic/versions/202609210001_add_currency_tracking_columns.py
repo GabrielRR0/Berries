@@ -33,7 +33,7 @@ def upgrade() -> None:
         batch_op.create_foreign_key("fk_transactions_currency_id", "currencies", ["currency_id"], ["id"])
         batch_op.create_index("ix_transactions_currency_id", ["currency_id"])
         # Text (no Numeric) - encriptada, mismo criterio que reference_amount_usd (ver
-        # EncryptedDecimal en app/core/encryption.py).
+        # EncryptedDecimal en app/common/crypto/encrypted_types.py).
         batch_op.add_column(sa.Column("reference_rate", sa.Text(), nullable=True))
 
     # exchange_rates.source/is_estimated: procedencia y confiabilidad de cada tasa -

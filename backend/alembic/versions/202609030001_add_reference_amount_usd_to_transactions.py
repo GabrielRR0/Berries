@@ -19,7 +19,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Text (no Numeric) - columna encriptada, mismo tipo subyacente que "amount" (ver
-    # EncryptedDecimal en app/core/encryption.py). Nullable: NULL significa "la wallet ya
+    # EncryptedDecimal en app/common/crypto/encrypted_types.py). Nullable: NULL significa "la wallet ya
     # estaba en USD, no hace falta un valor de referencia" (ver create_transaction) - las
     # filas existentes también quedan en NULL, no se backfillea automáticamente.
     with op.batch_alter_table("transactions") as batch_op:

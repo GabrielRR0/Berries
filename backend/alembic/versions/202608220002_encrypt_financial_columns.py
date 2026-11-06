@@ -3,7 +3,7 @@ description, debts.total_amount/counterparty_name/description, installments.amou
 transaction_drafts.raw_input/parsed_amount/parsed_category/parsed_description)
 
 Pedido explícito del usuario: ni un admin mirando la tabla directo debe poder ver
-cuánto gastó/recibió un usuario ni su historial. Ver app/core/encryption.py -
+cuánto gastó/recibió un usuario ni su historial. Ver app/common/crypto/encrypted_types.py -
 EncryptedDecimal/EncryptedString guardan el valor como texto cifrado (Fernet), así que
 las columnas ya no pueden seguir siendo Numeric/String de largo fijo: pasan a Text.
 

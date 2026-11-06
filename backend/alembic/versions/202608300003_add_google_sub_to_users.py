@@ -1,7 +1,7 @@
 """add google_sub to users
 
 Pedido explícito del usuario: login con Google, además de correo/contraseña. Ver
-app/shared/google_auth.py.
+app/support/google_identity_support/.
 
 Revision ID: 202608300003
 Revises: 202608300002

@@ -23,7 +23,7 @@ El nombre de archivo sigue el patrón `YYYYMMDDNNNN_descripcion.py` (por ejemplo
 
 ## SQLite en desarrollo, Postgres en producción
 
-En desarrollo se usa SQLite (`berry_dev.db`), y en producción Postgres. SQLite no permite modificar una columna existente directamente (cambiar su tipo, por ejemplo) — hay que envolver ese cambio en `op.batch_alter_table(...)`. Un ejemplo real es `202608220002_encrypt_financial_columns.py`, que cambia varias columnas para que puedan guardar datos encriptados (ver `../app/core/README.md`). Ese mismo código funciona sin problema contra Postgres también, así que no hace falta escribir la migración dos veces.
+En desarrollo se usa SQLite (`berry_dev.db`), y en producción Postgres. SQLite no permite modificar una columna existente directamente (cambiar su tipo, por ejemplo) — hay que envolver ese cambio en `op.batch_alter_table(...)`. Un ejemplo real es `202608220002_encrypt_financial_columns.py`, que cambia varias columnas para que puedan guardar datos encriptados (ver `../app/common/crypto/encrypted_types.py`). Ese mismo código funciona sin problema contra Postgres también, así que no hace falta escribir la migración dos veces.
 
 ## Ojo: una migración no reescribe los datos que ya existen
 

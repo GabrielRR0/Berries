@@ -1,0 +1,113 @@
+def _register(client, email="ana@example.com"):
+    response = client.post(
+        "/api/auth/register", json={"email": email, "password": "supersecret123", "display_name": "Ana"}
+    )
+    return response.json()["access_token"]
+
+
+def _auth_headers(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_convert_same_currency_returns_200(client):
+    token = _register(client)
+
+    response = client.get(
+        "/api/currency/convert", params={"amount": "100", "from": "USD", "to": "USD"}, headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert float(body["converted_amount"]) == 100.0
+    assert float(body["rate_used"]) == 1.0
+
+
+def test_convert_cross_currency_returns_positive_number(client):
+    token = _register(client)
+
+    response = client.get(
+        "/api/currency/convert", params={"amount": "100", "from": "USD", "to": "VEF"}, headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert float(body["converted_amount"]) > 0
+    assert float(body["rate_used"]) > 0
+
+
+def test_convert_requires_auth(client):
+    response = client.get("/api/currency/convert", params={"amount": "100", "from": "USD", "to": "VEF"})
+
+    assert response.status_code == 401
+
+
+def test_convert_accepts_negative_amount(client):
+    """Bug real encontrado en vivo: BalanceCard.vue convierte el BALANCE de cada
+    wallet a la moneda de visualizacion, y una wallet puede estar en negativo
+    (mas gastado que ingresado) - antes esto devolvia 422 y el balance total
+    quedaba mal calculado (la wallet en negativo se salteaba silenciosamente)."""
+    token = _register(client)
+
+    response = client.get(
+        "/api/currency/convert", params={"amount": "-100", "from": "USD", "to": "VEF"}, headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 200
+    assert float(response.json()["converted_amount"]) < 0
+
+
+def test_convert_accepts_zero_amount(client):
+    token = _register(client)
+
+    response = client.get(
+        "/api/currency/convert", params={"amount": "0", "from": "USD", "to": "VEF"}, headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 200
+    assert float(response.json()["converted_amount"]) == 0.0
+
+
+def test_history_returns_points_with_source_and_is_estimated(client):
+    token = _register(client)
+
+    # Cualquier conversion involucrando VEF ya deja al menos una fila en ExchangeRate
+    # (get_fresh_rate la crea on-demand) - alcanza para tener algo que listar.
+    client.get("/api/currency/convert", params={"amount": "1", "from": "USD", "to": "VEF"}, headers=_auth_headers(token))
+
+    response = client.get("/api/currency/history", params={"code": "VEF"}, headers=_auth_headers(token))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["code"] == "VEF"
+    assert body["quote"] == "USD"  # default de "against"
+    assert len(body["points"]) >= 1
+    point = body["points"][0]
+    assert "source" in point
+    assert "is_estimated" in point
+
+
+def test_history_against_usdt_defaults_to_empty_without_transfers(client):
+    token = _register(client)
+
+    response = client.get(
+        "/api/currency/history", params={"code": "VEF", "against": "USDT"}, headers=_auth_headers(token)
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["quote"] == "USDT"
+    assert body["points"] == []
+
+
+def test_history_rejects_unsupported_currency(client):
+    token = _register(client)
+
+    response = client.get("/api/currency/history", params={"code": "XXX"}, headers=_auth_headers(token))
+
+    assert response.status_code == 400
+
+
+def test_history_requires_auth(client):
+    response = client.get("/api/currency/history", params={"code": "VEF"})
+
+    assert response.status_code == 401
