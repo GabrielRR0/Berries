@@ -26,7 +26,7 @@ def delete_transaction(db: Session, transaction_id: uuid.UUID, user_id: uuid.UUI
     """Revierte el delta de saldo aplicado al crear la transacción antes de borrarla.
 
     Si la transacción viene de una transferencia (`transfer_id` no nulo, ver
-    transfer_service.py), borra las DOS patas juntas (mismo transfer_id) revirtiendo
+    wallets/services/transfers/), borra las DOS patas juntas (mismo transfer_id) revirtiendo
     ambos saldos en el mismo commit - eliminar solo una mitad dejaria el ledger
     inconsistente (plata "desaparecida" de un wallet sin haber llegado nunca al otro)."""
     transaction = db.get(Transaction, transaction_id)
@@ -43,7 +43,7 @@ def delete_transaction(db: Session, transaction_id: uuid.UUID, user_id: uuid.UUI
         for sibling in siblings:
             _reverse_and_delete(db, sibling)
         # La observación de tasa implícita que esa transferencia haya congelado (ver
-        # transfer_service._record_transfer_rate_observation) no debe sobrevivir a la
+        # wallets/services/transfers/transfer_rates.py) no debe sobrevivir a la
         # transferencia que la originó - dejarla sería una tasa "huérfana" en el
         # historial de una operación que ya no existe.
         for rate_row in db.scalars(select(ExchangeRate).where(ExchangeRate.transfer_id == transaction.transfer_id)):

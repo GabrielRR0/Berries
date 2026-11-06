@@ -1,3 +1,5 @@
+"""Entender un abono dicho por voz para precargar el formulario."""
+
 import re
 import uuid
 from dataclasses import dataclass

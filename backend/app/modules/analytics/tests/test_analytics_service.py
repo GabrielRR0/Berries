@@ -97,7 +97,7 @@ def test_period_summary_defaults_to_current_calendar_month(db):
 def test_period_summary_excludes_transfer_legs_but_includes_transfer_fee(db):
     # Regresion: antes de excluir source="transfer", mover plata entre wallets propias
     # inflaba ingreso Y gasto por igual - una transferencia no es ni ingreso ni gasto
-    # real (ver transfer_service.py). La comision SI cuenta (source="manual").
+    # real (ver wallets/services/transfers/). La comision SI cuenta (source="manual").
     user = _user(db)
     cash = _wallet(db, user.id, "Cash")
     bank = _wallet(db, user.id, "Banco")

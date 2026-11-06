@@ -1,7 +1,9 @@
+"""Cliente de la tasa oficial del bolívar (dolarapi.com), en vivo e histórica."""
+
 from datetime import date
 from decimal import Decimal
 
-import httpx
+from app.support import http_support
 
 # Respaldo (aproximado, relativo a USD) - solo se usa si dolarapi.com no responde.
 _FALLBACK_VEF_RATE = Decimal("36.5")
@@ -29,10 +31,10 @@ def fetch_vef_rate() -> tuple[Decimal, bool]:
     lectura real de mercado - ver get_fresh_rate en cache_refresh.py, que en ese caso
     prefiere reusar la última tasa REAL ya conocida en vez de este respaldo."""
     try:
-        response = httpx.get("https://ve.dolarapi.com/v1/dolares/oficial", timeout=10.0)
+        response = http_support.get("https://ve.dolarapi.com/v1/dolares/oficial", timeout=10.0)
         response.raise_for_status()
         return Decimal(str(response.json()["promedio"])), False
-    except (httpx.HTTPError, KeyError, ValueError, TypeError):
+    except (http_support.HttpError, KeyError, ValueError, TypeError):
         return _FALLBACK_VEF_RATE, True
 
 
@@ -43,11 +45,11 @@ def fetch_vef_rate_history() -> list[tuple[date, Decimal]]:
     "buscar registros anteriores... de hace un año para acá" - a diferencia de
     fetch_vef_rate (solo el valor de HOY), este endpoint trae todo el histórico de
     una vez. Usado solo para backfill (ver
-    currency_service.backfill_historical_vef_rates), nunca en el camino de crear una
+    currency/services/history/vef_history.py: backfill_historical_vef_rates), nunca en el camino de crear una
     transacción - si falla, se propaga el error tal cual (un backfill puede
     reintentarse más tarde, no hace falta un respaldo hardcodeado para un año entero
     de datos)."""
-    response = httpx.get("https://ve.dolarapi.com/v1/historicos/dolares/oficial", timeout=30.0)
+    response = http_support.get("https://ve.dolarapi.com/v1/historicos/dolares/oficial", timeout=30.0)
     response.raise_for_status()
     entries = response.json()
     return [

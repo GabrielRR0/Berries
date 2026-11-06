@@ -1,3 +1,5 @@
+"""Tasa vigente (con refresco a pedido) y tasa de una fecha pasada."""
+
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -19,7 +21,7 @@ logger = logging.getLogger(__name__)
 def _fetch_rate_from_client(base_currency: str, quote_currency: str) -> tuple[Decimal, str, bool]:
     """Resuelve una tasa directa donde uno de los dos lados es USD o USDT (los únicos
     pivotes que los clientes de tasas conocen). Pares sin USD/USDT en ninguno de los dos
-    lados deben resolverse en currency_service pivoteando por USD, no acá.
+    lados deben resolverse en currency/services/ pivoteando por USD, no acá.
 
     VEF (bolívar) se resuelve con su propio cliente (fetch_vef_rate, dolarapi.com) en
     vez de con fetch_fiat_rates (Open Exchange Rates) - pedido explícito del usuario:

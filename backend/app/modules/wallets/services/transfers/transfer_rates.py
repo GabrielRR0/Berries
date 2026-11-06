@@ -33,7 +33,7 @@ def record_transfer_rate_observation(
     una tabla nueva - el par (from.currency, to.currency) es distinto del par que
     usa la tasa oficial (ej. USD/VEF), así que nunca se mezclan ni se pisan entre
     sí. Guarda ambas direcciones, mismo criterio que refresh_all_active_currencies
-    en currency_service.py. rate = "cuántas unidades de quote equivalen a 1 de
+    en currency/services/. rate = "cuántas unidades de quote equivalen a 1 de
     base" (misma convención que el resto de ExchangeRate).
 
     transfer_id vincula esta fila con la transferencia que la generó - permite que

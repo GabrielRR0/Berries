@@ -1,3 +1,5 @@
+"""Crear, listar y borrar billeteras."""
+
 import uuid
 from decimal import Decimal
 

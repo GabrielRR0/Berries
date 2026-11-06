@@ -36,7 +36,7 @@ def get_goal_summary(db: Session, user_id: uuid.UUID) -> dict[str, Decimal]:
     no aporta a "cuanto falta reunir en total", mismo criterio de alcance que
     get_debt_summary (que tambien excluye lo que ya no esta pendiente).
 
-    Bug real de la misma familia que el de analytics_service.py: cada Goal puede tener
+    Bug real de la misma familia que el de analytics/services/: cada Goal puede tener
     su propia moneda (Goal.currency_id), así que sumar total_saved/target_amount crudos
     de metas en monedas distintas mezclaba números sin convertir. Se convierte cada
     meta a User.default_currency antes de sumar - con la tasa EN VIVO (get_conversion_rate,

@@ -21,7 +21,7 @@ class GoalResource(BaseModel):
     goal_type: GoalType
     created_at: datetime
     completed_at: datetime | None
-    # Calculado por goal_service.to_goal_response (no es un campo real del modelo) -
+    # Calculado por goals/services/management/.to_goal_response (no es un campo real del modelo) -
     # cuanto falta reunir por mes, dado target_amount/total_saved/target_date/hoy.
     suggested_monthly_contribution: Decimal
     # Idem, derivado de si el GoalCheckIn mas reciente de esta meta tiene

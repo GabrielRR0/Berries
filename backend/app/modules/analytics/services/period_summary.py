@@ -12,7 +12,7 @@ sobre las filas ya traídas y decodificadas por el ORM. Los filtros de user_id/t
 fecha SÍ siguen resolviéndose en SQL (esas columnas quedaron sin encriptar a
 propósito, ver transaction_model.py).
 
-Conversión de moneda - fuente única de verdad (ver currency_service.py, regla
+Conversión de moneda - fuente única de verdad (ver currency/services/, regla
 IAS 21/ASC 830 documentada ahí): cada `Transaction` ya sabe su propia moneda
 (`transaction.currency`, snapshot congelado al crear/editar) y, si no es USD, ya trae
 `reference_amount_usd` - el valor en USD congelado UNA vez con la tasa vigente en

@@ -33,7 +33,7 @@ def update_transaction(
     wallet cuando no cambia).
 
     Nunca sobre una pata de transferencia (transfer_id no nulo) - esas se editan como
-    unidad completa desde su propio flujo, no una por una (ver transfer_service.py);
+    unidad completa desde su propio flujo, no una por una (ver wallets/services/transfers/);
     permitir editarlas acá dejaría el ledger de la transferencia inconsistente.
 
     reference_amount_usd se recalcula con la wallet/fecha NUEVAS (ver

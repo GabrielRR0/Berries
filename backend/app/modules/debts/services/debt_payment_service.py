@@ -1,3 +1,5 @@
+"""Registrar y borrar abonos a una deuda (opcionalmente moviendo una billetera)."""
+
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
@@ -14,7 +16,7 @@ from app.modules.debts.errors import DebtNotFoundError, DebtValidationError
 from app.modules.wallets import CurrencyMismatchError, InsufficientBalanceError
 from app.modules.wallets import get_wallet_owned_by_user
 
-# Categorías fijas (no vienen del catálogo de Category - ver transfer_service.py y sus
+# Categorías fijas (no vienen del catálogo de Category - ver wallets/services/transfers/ y sus
 # propias TRANSFER_CATEGORY/FEE_CATEGORY, mismo criterio: una etiqueta libre en texto,
 # no una fila de la tabla categories).
 DEBT_INCOME_CATEGORY = "Cobro de deuda"
@@ -77,7 +79,7 @@ def create_debt_payment(
         if debt.direction == "owed_to_user":
             # Le pagan al usuario: entra plata real a la billetera - cuenta como
             # ingreso real en Análisis (source="debt_payment" no está en la lista de
-            # exclusiones de analytics_service, a propósito: a diferencia de una
+            # exclusiones de analytics/services/, a propósito: a diferencia de una
             # transferencia entre wallets propias, esto SÍ es plata nueva).
             wallet.balance += amount
             transaction = Transaction(
@@ -128,7 +130,7 @@ def create_debt_payment(
 def delete_debt_payment(db: Session, debt_id: uuid.UUID, payment_id: uuid.UUID, user_id: uuid.UUID) -> None:
     """Si el pago había acreditado/debitado una billetera real, revierte ese delta y
     borra la Transaction asociada antes de borrar el pago - mismo criterio que
-    transaction_service.delete_transaction (nunca dejar el ledger inconsistente)."""
+    transactions/services/ledger.delete_transaction (nunca dejar el ledger inconsistente)."""
     debt = get_debt_owned_by_user(db, debt_id, user_id)
     payment = db.get(DebtPayment, payment_id)
     if payment is None or payment.debt_id != debt.id:

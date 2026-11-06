@@ -48,12 +48,12 @@ cd frontend && npx vitest run
 
 ## Decisiones de arquitectura
 
-Ver `docs/` (en progreso) y el historial de decisiones documentado en cada dominio (`backend/app/services/<dominio>/`). Resumen de las divergencias deliberadas respecto a los proyectos hermanos del portafolio (`s-rank`, `tayuya-check`):
+Ver `docs/` (en progreso) y el historial de decisiones documentado en cada módulo (`backend/app/modules/<modulo>/`, cada carpeta con su README). Cómo está organizado el backend: [docs/BACKEND-MODULAR.md](docs/BACKEND-MODULAR.md) y [docs/CONVENCIONES.md](docs/CONVENCIONES.md). Resumen de las divergencias deliberadas respecto a los proyectos hermanos del portafolio (`s-rank`, `tayuya-check`):
 
 1. **SQLAlchemy + Alembic** (los hermanos van directo con `supabase-py` sin ORM) — un libro mayor financiero con transferencias, cuotas y deudas se beneficia de modelado relacional real y migraciones versionadas.
 2. **El frontend nunca habla directo con Supabase**, en Berries toda la comunicación pasa por el backend.
 3. **Vue Router + Pinia** — Berries es una app multi-pantalla real con navegación por tabs y bastante estado compartido.
-4. **Vercel Cron Jobs** — Usada hoy para el refresco diario de tasas de cambio (`GET /api/cron/refresh-daily`, ver `app/routers/cron/cron_router.py` — evita que una moneda con inflación fuerte como VEF quede con una tasa vieja si nadie visita la app un día entero); planeada también para el escaneo diario de vencimientos/recordatorios (dominio `notifications`, construido de último a propósito). El `schedule` de `vercel.json` se declara siempre en UTC (Vercel no permite indicar zona horaria) — `"30 13 * * *"` es 9:30am hora de Venezuela (UTC-4), a propósito.
+4. **Vercel Cron Jobs** — Usada hoy para el refresco diario de tasas de cambio (`GET /api/cron/refresh-daily`, ver `backend/app/modules/currency/controllers/system/cron_controller.py` — evita que una moneda con inflación fuerte como VEF quede con una tasa vieja si nadie visita la app un día entero); planeada también para el escaneo diario de vencimientos/recordatorios (dominio `notifications`, construido de último a propósito). El `schedule` de `vercel.json` se declara siempre en UTC (Vercel no permite indicar zona horaria) — `"30 13 * * *"` es 9:30am hora de Venezuela (UTC-4), a propósito.
 
 Identidad visual: paleta negro/rojo, dark-only (ver `docs/design-reference/README.md`).
 

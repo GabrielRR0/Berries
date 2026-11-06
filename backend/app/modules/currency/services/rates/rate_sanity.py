@@ -1,3 +1,5 @@
+"""Chequeo de sensatez: descarta saltos de tasa imposibles."""
+
 from datetime import timedelta
 from decimal import Decimal
 

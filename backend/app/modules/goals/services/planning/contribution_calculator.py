@@ -1,3 +1,5 @@
+"""Cuánto falta reunir por mes para llegar a la fecha objetivo."""
+
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 

@@ -1,3 +1,5 @@
+"""Marcar cuotas como pagadas o pendientes."""
+
 import uuid
 from datetime import date, datetime, timezone
 

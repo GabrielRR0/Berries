@@ -27,7 +27,7 @@ def confirm_draft(
     occurred_at: datetime | None = None,
     fee: Decimal | None = None,
 ) -> tuple[Transaction, TransactionDraft]:
-    """Crea la transacción real (delega en transaction_service, que ya aplica el delta
+    """Crea la transacción real (delega en transactions/services/ledger, que ya aplica el delta
     de saldo al wallet) y marca el draft como confirmado. Si trae comisión, se registra
     como su propio gasto "Comisión" en la misma billetera, todo en un solo commit."""
     draft = get_draft_owned_by_user(db, draft_id, user_id)

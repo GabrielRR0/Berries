@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     # hasta que se configure un Client ID real de Google Cloud Console.
     google_client_id: str = ""
 
-    # --- Tasas de cambio --- (clientes reales aún sin conectar, ver services/currency/rates/)
+    # --- Tasas de cambio --- (clientes reales aún sin conectar, ver currency/services/rates/)
     open_exchange_rates_app_id: str = ""
     currency_cache_ttl_hours: int = 24
 

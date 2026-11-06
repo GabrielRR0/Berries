@@ -1,6 +1,8 @@
+"""Cliente del proveedor de OCR (apagado hasta configurar su clave)."""
+
 import base64
 
-import httpx
+from app.support import http_support
 
 from app.config import settings
 from app.modules.receipt_scanner.errors import OcrNotConfiguredError
@@ -25,7 +27,7 @@ def extract_text(image_bytes: bytes, filename: str) -> str:
     # ocr_provider_api_key esté vacío. Conectarlo de verdad es remover el early return de
     # arriba una vez exista una key real: la key va como query param `key=` (tal como
     # exige la API REST de Vision), y la imagen viaja en base64 dentro del body JSON.
-    response = httpx.post(
+    response = http_support.post(
         "https://vision.googleapis.com/v1/images:annotate",
         params={"key": settings.ocr_provider_api_key},
         json={

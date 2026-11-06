@@ -11,7 +11,7 @@ from app.modules.auth import User
 
 def get_savings_capacity(db: Session, user_id: uuid.UUID, months: int = 3) -> dict[str, Decimal | bool]:
     """Promedio de ingresos/gastos reales de los ultimos `months` meses calendario,
-    reusando get_monthly_comparison de analytics_service (ya resuelve la suma sobre
+    reusando get_monthly_comparison de analytics/services (ya resuelve la suma sobre
     Transaction.amount, que esta encriptado igual que los campos de Goal). Puramente
     informativo para Metas (ver GoalCard.vue/CreateGoalForm.vue) - nunca bloquea la
     creacion ni edicion de una meta, el usuario mantiene control total.

@@ -42,7 +42,7 @@ class ExchangeRate(Base):
     # tasa real - ver venezuela_rate_client.py/cache_refresh.py.
     is_estimated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     # Solo poblado cuando esta fila viene de una transferencia entre wallets en
-    # monedas distintas (ver transfer_service.py) - la tasa IMPLÍCITA real que el
+    # monedas distintas (ver wallets/services/transfers/) - la tasa IMPLÍCITA real que el
     # usuario obtuvo ese día/hora (ej. cuántos bolívares le dieron por sus USDT),
     # source="user-transfer". Comparte el mismo transfer_id que las Transaction de
     # esa transferencia (no es FK a una tabla "transfers", esa entidad no existe -

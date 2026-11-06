@@ -53,7 +53,7 @@ def get_conversion_rate_at(db: Session, from_currency: str, to_currency: str, at
     `at` (una fecha pasada), no la de ahora - bug real reportado por el usuario: un
     gasto en una moneda con inflación fuerte (ej. VEF) pierde sentido histórico si
     siempre se reconvierte con la tasa de HOY (3.000 VEF de hace un mes valían más
-    dólares que hoy). Usado por analytics_service.py para que un resumen de "los
+    dólares que hoy). Usado por analytics/services/ para que un resumen de "los
     últimos N meses" no reescriba el pasado cada vez que la tasa se mueve."""
     if from_currency == to_currency:
         return Decimal("1")
@@ -66,7 +66,7 @@ def get_conversion_rate_at(db: Session, from_currency: str, to_currency: str, at
 
 def convert_at(db: Session, amount: Decimal, from_currency: str, to_currency: str, at: datetime) -> Decimal:
     """Igual que convert, pero con la tasa vigente en `at` (una fecha pasada) - ver
-    get_conversion_rate_at. Usado por transaction_service.py para congelar el valor de
+    get_conversion_rate_at. Usado por transactions/services/ledger/ para congelar el valor de
     referencia en USD de una transacción backdateada con SU propia tasa histórica, no
     la de hoy."""
     if from_currency == to_currency:
@@ -79,8 +79,8 @@ def reference_fields_in_usd(
 ) -> tuple[Decimal | None, Decimal | None]:
     """Congela (reference_amount_usd, reference_rate) para `amount` en `currency` a la
     fecha `at`, usando get_conversion_rate_at (tasa histórica, ver docstring del
-    módulo) - fuente única para transaction_service.py (crear/editar/backfillear una
-    transaction) y para el self-heal de analytics_service.py.
+    módulo) - fuente única para transactions/services/ledger/ (crear/editar/backfillear una
+    transaction) y para el self-heal de analytics/services/.
 
     reference_rate queda en orientación "currency por USD" (ej. Bs por USD) - la forma
     en que el usuario pidió verla, no "USD por currency". (None, None) si currency ya

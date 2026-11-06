@@ -1,6 +1,8 @@
+"""Cliente de tasas fiat (Open Exchange Rates)."""
+
 from decimal import Decimal
 
-import httpx
+from app.support import http_support
 
 from app.config import settings
 
@@ -34,7 +36,7 @@ def fetch_fiat_rates() -> tuple[dict[str, Decimal], bool]:
     # Llamado real a Open Exchange Rates — queda escrito pero es inalcanzable mientras
     # open_exchange_rates_app_id esté vacío. Conectarlo de verdad es remover el early
     # return de arriba una vez exista una key real.
-    response = httpx.get(
+    response = http_support.get(
         "https://openexchangerates.org/api/latest.json",
         params={"app_id": settings.open_exchange_rates_app_id, "base": "USD"},
         timeout=10.0,

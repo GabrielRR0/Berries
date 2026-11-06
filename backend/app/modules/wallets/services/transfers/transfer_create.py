@@ -40,7 +40,7 @@ def execute_transfer(
     "Comisión", source="manual" (no "transfer") - a diferencia de las 2 patas de la
     transferencia (que son plata que solo cambia de lugar, no un gasto real), la
     comision SI es plata que se pierde, asi que debe contar como gasto real en
-    Analisis/Metas (ver analytics_service, que excluye source="transfer") y verse en
+    Analisis/Metas (ver analytics/services, que excluye source="transfer") y verse en
     Movimientos como cualquier otro gasto manual (ver TransactionList.vue, que le da
     tratamiento neutro solo a source="transfer"). Las 3 filas comparten `transfer_id`
     para que delete_transaction() las borre/revierta juntas - eliminar la comision

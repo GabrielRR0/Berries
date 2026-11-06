@@ -1,3 +1,5 @@
+"""Registro, login con contraseña y login con Google."""
+
 import uuid
 
 from sqlalchemy import func, select

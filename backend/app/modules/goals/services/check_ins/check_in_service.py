@@ -1,3 +1,5 @@
+"""Aportes mensuales (check-ins) a una meta, y abandonar una meta."""
+
 import uuid
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
@@ -18,7 +20,7 @@ def get_goals_needing_check_in(db: Session, on_date: date) -> list[Goal]:
     """Scan GLOBAL a proposito (sin filtro de usuario) - mismo criterio que
     get_due_installments: listo para un futuro cron aunque hoy se llame on-demand
     desde el mount de GoalsMain.vue (Berry no tiene cron real, ver
-    services/currency/rates/cache_refresh.py para el mismo criterio de "chequeo al
+    currency/services/rates/cache_refresh.py para el mismo criterio de "chequeo al
     acceder"). Una meta necesita check-in si esta activa, ya paso al menos un mes
     calendario completo desde que se creo (el mes de alta queda exento - pedir un
     check-in el mismo mes que se crea la meta se siente prematuro), y no tiene todavia

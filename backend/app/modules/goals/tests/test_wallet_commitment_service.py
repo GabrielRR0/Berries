@@ -40,7 +40,7 @@ def test_get_committed_amounts_excludes_unlinked_check_ins(db):
 
 def test_get_committed_amounts_excludes_completed_and_abandoned_goals(db):
     """Completar/abandonar una meta libera su reserva - mismo criterio que
-    goal_service.get_goal_summary, que ya solo suma metas activas."""
+    goals/services/management/.get_goal_summary, que ya solo suma metas activas."""
     user = register_user(db, "ana@example.com", "clave12345", "Ana")
     wallet = create_wallet(db, user.id, "Cash", "USD", Decimal("1000"))
     completed_goal = create_goal(db, user.id, "TV", Decimal("100"), "USD", _FUTURE)

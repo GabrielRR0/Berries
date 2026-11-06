@@ -13,7 +13,7 @@ python manage.py migrate:rollback     # revierte la última migración aplicada
 python manage.py make:migration "mensaje"   # genera una migración nueva
 ```
 
-`make:migration` compara los modelos de `app/models/` contra la base actual y genera el archivo solo. Conviene siempre revisarlo a mano antes de correr `migrate` — a veces no detecta bien un cambio de tipo de columna.
+`make:migration` compara los modelos de `app/modules/*/models/` (vía `app/database/registry.py`) contra la base actual y genera el archivo solo. Conviene siempre revisarlo a mano antes de correr `migrate` — a veces no detecta bien un cambio de tipo de columna.
 
 ## Un archivo por tabla
 

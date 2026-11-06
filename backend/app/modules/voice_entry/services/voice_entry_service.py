@@ -1,3 +1,5 @@
+"""Convertir un dictado en borrador de movimiento."""
+
 import uuid
 from decimal import Decimal
 

@@ -119,7 +119,7 @@ def test_transfer_without_fee_creates_only_the_paired_legs(db):
     assert income_leg.source == "transfer"
     assert income_leg.description == "Transferencia desde FaceBank"
 
-    # Comparten el mismo transfer_id (ver transaction_service.delete_transaction,
+    # Comparten el mismo transfer_id (ver transactions/services/ledger/.delete_transaction,
     # que borra ambas patas juntas usando esta misma clave).
     assert expense_leg.transfer_id is not None
     assert expense_leg.transfer_id == income_leg.transfer_id

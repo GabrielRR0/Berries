@@ -1,3 +1,5 @@
+"""Entender una meta dicha por voz para precargar el formulario (no guarda nada)."""
+
 import uuid
 from datetime import date
 

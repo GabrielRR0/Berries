@@ -1,3 +1,5 @@
+"""Listar, crear, borrar, ocultar y restaurar categorías."""
+
 import uuid
 
 from sqlalchemy import select
@@ -22,7 +24,7 @@ def list_categories_for_user(
     """Categorías visibles para este usuario: todas las por defecto (user_id is None)
     mas las propias que se creo. Por defecto EXCLUYE las que este usuario ocultó -
     `include_hidden=True` las trae igual (solo lo usa la pantalla de Ajustes, para
-    poder mostrarlas con opción de "restaurar", ver categories_router.py). `kind`
+    poder mostrarlas con opción de "restaurar", ver categories/controllers/). `kind`
     filtra por tipo exacto o "both" (una categoría "both" sirve tanto para ingresos
     como gastos, ver category_model.py)."""
     stmt = select(Category)

@@ -1,3 +1,5 @@
+"""Leer la foto de un recibo y crear un borrador de movimiento."""
+
 import uuid
 from decimal import Decimal
 

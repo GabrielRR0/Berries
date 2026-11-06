@@ -16,7 +16,7 @@ from app.modules.wallets import Wallet
 
 class WalletCurrencyConverter:
     """Convierte el monto de una transacción a `target_currency`, leyendo el valor ya
-    congelado por transaction_service.py (`transaction.reference_amount_usd`) en vez de
+    congelado por transactions/services/ledger/ (`transaction.reference_amount_usd`) en vez de
     recalcular una tasa histórica en cada consulta - ver docstring del módulo. Memoiza
     el mapa wallet->moneda (solo como respaldo, ver más abajo) y la tasa USD->target
     (una sola, no por transacción/día - el salto final es siempre en vivo). Se crea UNA
@@ -43,7 +43,7 @@ class WalletCurrencyConverter:
         # transaction.currency (snapshot propio) es la fuente normal; el mapa por
         # wallet_id queda solo como respaldo para filas viejísimas que el backfill
         # todavía no alcanzó a poblar (currency_id NULL) - ver
-        # transaction_service.backfill_reference_amounts.
+        # transactions/services/ledger/.backfill_reference_amounts.
         currency = transaction.currency or self._currency_by_wallet_id.get(
             transaction.wallet_id, self._target_currency
         )
@@ -81,10 +81,10 @@ def user_default_currency(db: Session, user_id: uuid.UUID) -> str:
 
 def transactions_in_range(db: Session, user_id: uuid.UUID, kind: str, start: datetime, end: datetime) -> list[Transaction]:
     # source != "transfer" excluye las dos patas que crea una transferencia entre
-    # wallets propias (ver transfer_service.py) - mover plata de una wallet a otra no es
+    # wallets propias (ver wallets/services/transfers/) - mover plata de una wallet a otra no es
     # ingreso ni gasto real, mismo criterio que ya aplica el frontend a mano en
     # IncomeExpenseSummary.vue/TransactionsMain.vue. La comision de una transferencia SI
-    # se incluye (se crea con source="manual", ver transfer_service.py) porque esa si es
+    # se incluye (se crea con source="manual", ver wallets/services/transfers/) porque esa si es
     # un gasto real.
     #
     # joinedload(Transaction.currency_ref): WalletCurrencyConverter.amount_of() lee

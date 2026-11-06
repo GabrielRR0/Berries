@@ -44,28 +44,48 @@ Con `FAKE_DATA_MODE=true` en `.env`, el login acepta cualquier email/contraseña
 
 ## Estructura
 
+El backend está organizado **por módulo**, no por capa: todo lo de un dominio (rutas,
+lo que entra y sale, lógica, tablas, errores y pruebas) vive en una carpeta. La guía
+completa está en [../docs/BACKEND-MODULAR.md](../docs/BACKEND-MODULAR.md) y las reglas en
+[../docs/CONVENCIONES.md](../docs/CONVENCIONES.md); cada carpeta tiene su `README.md`.
+
 ```
 backend/
-├── manage.py               # comandos de administración (ver arriba)
-├── alembic/                 # cambios de la base de datos — ver alembic/README.md
+├── manage.py            comandos de administración (despacha a commands/ de cada módulo)
+├── alembic/             migraciones de la base — ver alembic/README.md
+├── conftest.py          base de prueba en memoria y fixtures (client, db)
 ├── app/
-│   ├── main.py               # arranca la aplicación y conecta todo
-│   ├── config.py              # configuración, lee el .env
-│   ├── core/                   # cosas que usa toda la app — ver app/core/README.md
-│   ├── models/                  # cómo se ve cada tabla — ver app/models/README.md
-│   ├── schemas/                  # forma de lo que entra/sale por la API — ver app/schemas/README.md
-│   ├── routers/                   # los endpoints — ver app/routers/README.md
-│   ├── services/                   # las reglas de negocio — ver app/services/README.md
-│   └── shared/                      # reservado para el futuro, hoy vacío
-└── tests/                    # pruebas automáticas — ver tests/README.md
+│   ├── main.py          app = create_app()
+│   ├── bootstrap/       arma la app: middlewares, errores, rutas
+│   ├── config/          ÚNICA capa que lee variables de entorno
+│   ├── database/        conexión, Base, tipos de columna y registro de modelos
+│   ├── common/          seguridad, errores de dominio, cifrado de columnas
+│   ├── support/         envoltorios de paquetes de terceros (nadie importa el paquete directo)
+│   ├── routes/          un archivo de rutas por módulo, todo bajo /api
+│   └── modules/         un módulo por dominio:
+│       ├── auth/ wallets/ transactions/ categories/ currency/ debts/ goals/
+│       └── analytics/ voice_entry/ receipt_scanner/ health/ dev_tools/
+└── tests/
+    ├── e2e/             pruebas por HTTP, una carpeta por módulo
+    └── architecture/    contrato de la API y reglas de arquitectura
 ```
 
-Cada dominio (auth, wallets, transactions, currency, debts, analytics, voiceEntry, receiptScanner) tiene su propia carpeta dentro de `models/`, `schemas/`, `routers/` y `services/` — para entender un dominio completo hay que mirar esas cuatro carpetas juntas.
+Un módulo (referencia viva: `app/modules/debts/`):
+
+```
+debts/
+  __init__.py            API pública: lo único que otros módulos importan
+  controllers/private/user/   las rutas, en la carpeta de quién puede usarlas
+  contracts/dto/         lo que ENTRA (CreateDebtDto...)
+  contracts/resources/   lo que SALE (DebtResource...)
+  services/__init__.py   fachada; un archivo por caso de uso
+  models/  errors.py  tests/
+```
 
 ## Variables de entorno críticas (sin default — la app no arranca si faltan)
 
 - `DATABASE_URL`
 - `JWT_SECRET`
-- `MASTER_ENCRYPTION_KEY` — encripta los datos financieros del usuario a nivel de columna (ver `app/core/README.md`). **Si se pierde, los datos ya guardados quedan ilegibles para siempre** — hacer backup de esta clave por separado de la base de datos.
+- `MASTER_ENCRYPTION_KEY` — encripta los datos financieros del usuario a nivel de columna (ver `app/common/crypto/README.md`). **Si se pierde, los datos ya guardados quedan ilegibles para siempre** — hacer backup de esta clave por separado de la base de datos.
 
 Ver `.env.example` para la lista completa, con comentarios de por qué cada una tiene o no tiene default.

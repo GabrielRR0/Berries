@@ -1,3 +1,5 @@
+"""Borrar la cuenta propia con todos sus datos."""
+
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 

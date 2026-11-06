@@ -1,3 +1,5 @@
+"""Cuánto de cada billetera está apartado para metas activas, y el saldo disponible."""
+
 import uuid
 from decimal import Decimal
 
@@ -19,9 +21,9 @@ def get_committed_amounts_for_user(db: Session, user_id: uuid.UUID) -> dict[uuid
     ACTIVAS del usuario - pedido explicito del usuario: mostrar, ademas del saldo real
     de siempre, un "disponible" que descuenta esto. amount_saved es EncryptedDecimal
     (Fernet con IV aleatorio) - NUNCA se puede sumar por SQL (mismo motivo que
-    analytics_service.py/transaction_service.py), asi que se traen las filas y se suma
+    analytics/services/ y transactions/services/ledger/), asi que se traen las filas y se suma
     en Python. Solo metas activas cuentan: completar/abandonar una meta libera su
-    reserva (mismo criterio que goal_service.get_goal_summary, que ya solo suma metas
+    reserva (mismo criterio que goals/services/management.get_goal_summary, que ya solo suma metas
     activas)."""
     stmt = (
         select(GoalCheckIn)

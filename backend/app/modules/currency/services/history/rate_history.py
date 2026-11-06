@@ -19,7 +19,7 @@ def get_rate_history(db: Session, code: str, months: int = 6, against: str = "US
     `against` por default es "USD" (la tasa oficial/de mercado, ver cache_refresh.py).
     Pasar "USDT" trae en cambio la serie de tasas IMPLÍCITAS reales que el propio
     usuario obtuvo en sus transferencias USDT<->`code` (ver
-    transfer_service._record_transfer_rate_observation) - pedido explícito del
+    wallets/services/transfers/transfer_rates.py) - pedido explícito del
     usuario: poder comparar la tasa oficial contra la que él de verdad consigue."""
     against_id = get_currency_by_code(db, against).id
     quote_id = get_currency_by_code(db, code).id

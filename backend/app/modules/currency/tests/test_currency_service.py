@@ -77,7 +77,7 @@ def test_get_fresh_rate_refreshes_when_stale(db):
 
 # --- get_conversion_rate_at (bug real reportado por el usuario: un gasto viejo en una
 # moneda con inflación fuerte no debe reconvertirse con la tasa de HOY - ver docstring
-# de analytics_service.py) ------------------------------------------------------------
+# de analytics/services/) ------------------------------------------------------------
 
 
 def test_get_conversion_rate_at_uses_the_rate_valid_on_that_date_not_the_newest_one(db):
@@ -254,7 +254,7 @@ def test_get_rate_history_defaults_to_usd_and_returns_ascending_by_fetched_at(db
 
 def test_get_rate_history_against_a_currency_other_than_usd(db):
     """Serie de tasas IMPLÍCITAS reales de las transferencias del usuario (ver
-    transfer_service._record_transfer_rate_observation) - independiente de la serie
+    wallets/services/transfers/transfer_rates.py) - independiente de la serie
     oficial USD->VEF, aunque comparta la misma tabla."""
     usdt = get_currency_by_code(db, "USDT")
     vef = get_currency_by_code(db, "VEF")
@@ -359,7 +359,7 @@ def test_backfill_historical_vef_rates_skips_days_older_than_the_requested_windo
     assert inserted == 1
 
 
-# --- refresh_all_active_currencies (cron diario de Vercel, ver cron_router.py) -------
+# --- refresh_all_active_currencies (cron diario de Vercel, ver currency/controllers/system/cron_controller.py) -------
 
 
 def test_refresh_all_active_currencies_only_refreshes_currencies_actually_in_use(db):

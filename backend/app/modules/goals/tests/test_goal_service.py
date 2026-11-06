@@ -155,7 +155,7 @@ def test_get_goal_summary_only_counts_active_goals(db):
 
 
 def test_get_goal_summary_converts_goals_in_different_currencies_before_summing(db):
-    """Bug real de la misma familia que analytics_service.py: cada Goal puede tener su
+    """Bug real de la misma familia que analytics/services/: cada Goal puede tener su
     propia moneda - sumar total_target crudo de una meta en USD y otra en VEF sin
     convertir mezclaba números sin sentido (240 + 3650 = 3890, en vez de 240 + 100)."""
     user = register_user(db, "ana@example.com", "clave12345", "Ana")  # default_currency USD

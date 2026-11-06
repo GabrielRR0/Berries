@@ -1,6 +1,8 @@
+"""Cliente de tasas cripto (USDT)."""
+
 from decimal import Decimal
 
-import httpx
+from app.support import http_support
 
 # CoinGecko free endpoint no requiere API key, pero esta primera implementación deja
 # igualmente el cliente sin conectar de verdad (ver plan de arquitectura: "conexión real
@@ -22,7 +24,7 @@ def fetch_crypto_rates() -> tuple[dict[str, Decimal], bool]:
 
     # Llamado real a CoinGecko — queda escrito pero inalcanzable mientras
     # _ENABLE_REAL_CALL sea False.
-    response = httpx.get(
+    response = http_support.get(
         "https://api.coingecko.com/api/v3/simple/price",
         params={"ids": "tether", "vs_currencies": "usd"},
         timeout=10.0,

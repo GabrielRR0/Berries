@@ -8,8 +8,8 @@ una única clave simétrica (MASTER_ENCRYPTION_KEY) - esto es "encriptado en rep
 nivel de columna", no un sistema de KMS con rotación/versionado de claves (fuera de
 alcance de este pedido). Como cada valor se encripta con un IV distinto, el mismo
 texto plano da un ciphertext distinto cada vez - por eso el filtro/agregación por
-categoría o monto ya NO puede hacerse en SQL (ver analytics_service.py y
-transaction_service.py, que ahora traen las filas y filtran/suman en Python)."""
+categoría o monto ya NO puede hacerse en SQL (ver analytics/services/ y
+transactions/services/ledger/, que ahora traen las filas y filtran/suman en Python)."""
 
 from decimal import Decimal
 from functools import lru_cache
@@ -48,7 +48,7 @@ class EncryptedString(TypeDecorator):
 class EncryptedDecimal(TypeDecorator):
     """Monto encriptado (balance de wallet, amount de transaction/installment,
     total_amount de debt). Se guarda como texto cifrado, no Numeric - ya no se puede
-    sumar/promediar del lado de SQL (ver analytics_service.py, que agrega en Python
+    sumar/promediar del lado de SQL (ver analytics/services/, que agrega en Python
     por esto mismo)."""
 
     impl = Text

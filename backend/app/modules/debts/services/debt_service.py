@@ -1,3 +1,5 @@
+"""Crear, listar y borrar deudas, y la respuesta con lo pagado y lo que falta."""
+
 import uuid
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal

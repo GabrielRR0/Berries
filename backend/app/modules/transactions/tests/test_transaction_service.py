@@ -78,7 +78,7 @@ def test_create_transaction_freezes_a_reference_amount_in_usd_for_a_non_usd_wall
 def test_create_transaction_uses_the_historical_rate_of_its_own_occurred_at_not_todays(db):
     """Bug real que este campo existe para evitar: un gasto backdateado (ver el campo
     de fecha de TransactionForm.vue) debe congelar la tasa vigente EN esa fecha, no la
-    de "ahora" - mismo criterio que get_conversion_rate_at usa para analytics_service.py."""
+    de "ahora" - mismo criterio que get_conversion_rate_at usa para analytics/services/."""
     user = _user(db)
     wallet = create_wallet(db, user.id, "Banco Vnz", "VEF")
     vef = get_currency_by_code(db, "VEF")
