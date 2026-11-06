@@ -90,6 +90,11 @@ export function parseBinancePayList(text: string, fallbackDirection?: RowDirecti
   return rows
 }
 
+function readPaidWith(lines: string[]): number | null {
+  const value = findValueAfterLabel(lines, LABELS.paidWith)
+  return value ? (readAmount(normalizeForMatch(value))?.amount ?? null) : null
+}
+
 // "Detalles del pago" de un solo movimiento.
 export function extractBinancePay(text: string): BankMovementScan {
   const lines = toLines(text)
@@ -115,6 +120,9 @@ export function extractBinancePay(text: string): BankMovementScan {
   }
   const labelDirection: RowDirection | null = fromIndex !== -1 ? 'in' : toIndex !== -1 ? 'out' : null
   const direction = headline?.direction ?? labelDirection
+  // El numero grande del encabezado a veces no sale en el OCR (paso con "-270 USDT"): en un envio
+  // el mismo monto aparece en "Pagado con".
+  const amount = headline?.amount ?? readPaidWith(lines)
 
   const stamp = (findValueAfterLabel(lines, LABELS.time) ?? '').match(PAY_STAMP)
   const orderId = findValueAfterLabel(lines, LABELS.orderId)?.match(/\d{8,}/)?.[0] ?? null
@@ -124,7 +132,7 @@ export function extractBinancePay(text: string): BankMovementScan {
     kind: 'bank_movement',
     bank: 'binance',
     direction: direction === 'in' ? 'credit' : direction === 'out' ? 'debit' : null,
-    amount: headline?.amount ?? null,
+    amount,
     currency: 'USDT',
     occurredOn: stamp ? stamp[1]! : null,
     time: stamp ? stamp[2]! : null,
