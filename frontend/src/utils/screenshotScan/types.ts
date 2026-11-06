@@ -12,13 +12,15 @@ export interface P2PTransferScan {
   fee: number | null
   // Importe en moneda local que llega a la otra billetera.
   convertedAmount: number | null
-  // Codigo de la moneda local usado por Berry (Bs -> VEF); null si no se reconoce.
+  // Codigo de la moneda local usado por Berry (Bs -> VEF, $ -> USD); null si no se reconoce.
   fiatCurrency: string | null
   unitPrice: number | null
   // YYYY-MM-DD en hora local, el mismo formato del <input type="date">.
   occurredOn: string | null
   orderNumber: string | null
   counterparty: string | null
+  // "Metodo de pago" tal como lo muestra Binance (ej. "Zinli USD"); null si no aparece.
+  paymentMethod: string | null
   completed: boolean | null
   warnings: string[]
 }
@@ -27,7 +29,8 @@ export interface P2PTransferScan {
 // A diferencia de la orden P2P no trae las dos patas: solo el dinero que sale
 // (o entra) de una cuenta, que el usuario registra como gasto/ingreso o como
 // transferencia hacia otra de sus billeteras.
-export type BankName = 'bdv' | 'facebank'
+// 'binance' = Binance Pay (envios y recibos de USDT entre usuarios), no P2P.
+export type BankName = 'bdv' | 'facebank' | 'binance'
 
 export interface BankMovementScan {
   kind: 'bank_movement'
@@ -40,6 +43,9 @@ export interface BankMovementScan {
   reference: string | null
   // Concepto / causa tal como lo muestra el banco.
   description: string | null
+  // HH:mm y la fecha-hora completa con segundos, solo si el comprobante las muestra.
+  time?: string | null
+  stamp?: string | null
   warnings: string[]
 }
 

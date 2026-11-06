@@ -11,6 +11,8 @@ import {
   ORDER_START_GLOBAL,
   TIME_OF_DAY_GLOBAL,
 } from './dictionary/imageKindWords'
+import { parseBinancePayList } from './binancePayParser'
+import { MIN_PAY_LIST_ITEMS, PAY_LIST_ITEM_GLOBAL } from './dictionary/binancePayLabels'
 import { makeRow } from './movementRows'
 import type { ScanRow } from './movementRows'
 import { groupSegments } from './ocrLayout'
@@ -20,9 +22,11 @@ import { scanText } from './scanText'
 import { normalizeForMatch } from './textLines'
 import type { ScanResult } from './types'
 
+const MISSING_DATE_FLAG = 'Falta la fecha.'
+
 // Que clase de captura es, mirando el texto: un estado de cuenta en tabla, una lista de ordenes P2P,
-// una lista de movimientos del banco, un solo movimiento o algo que no se reconoce.
-export type ImageKind = 'bank_statement' | 'p2p_orders' | 'bank_list' | 'single' | 'unknown'
+// una lista de movimientos del banco, la lista de Binance Pay, un solo movimiento o algo que no se reconoce.
+export type ImageKind = 'bank_statement' | 'p2p_orders' | 'bank_list' | 'binance_pay' | 'single' | 'unknown'
 
 export function classifyImageKind(text: string, options: { allowStatement?: boolean } = {}): ImageKind {
   const normalized = normalizeForMatch(text)
@@ -42,6 +46,9 @@ export function classifyImageKind(text: string, options: { allowStatement?: bool
     return 'p2p_orders'
   }
 
+  // Lista "Activos > Pay" de Binance: varios "Pay -40 USDT". Ver dictionary/binancePayLabels.ts.
+  if ((normalized.match(PAY_LIST_ITEM_GLOBAL) ?? []).length >= MIN_PAY_LIST_ITEMS) return 'binance_pay'
+
   const times = (normalized.match(TIME_OF_DAY_GLOBAL) ?? []).length
   const amounts = (normalized.match(BOLIVAR_AMOUNT_GLOBAL) ?? []).length
   if (times >= MIN_LIST_TIMES && amounts >= MIN_LIST_AMOUNTS) return 'bank_list'
@@ -53,22 +60,34 @@ export function classifyImageKind(text: string, options: { allowStatement?: bool
 export function rowsFromSingleScan(scan: ScanResult): ScanRow[] {
   if (scan.kind === 'p2p_transfer') {
     if (scan.amount === null || scan.convertedAmount === null) return []
-    if (scan.direction === 'buy') return []
+    // Vender USDT: salen USDT (con su comision) y llega la moneda local.
+    // Comprar USDT (ej. con dolares de Zinli o Wally): sale la moneda local y llegan los USDT
+    // recibidos, que ya vienen sin la comision.
+    const isBuy = scan.direction === 'buy'
+    const fee = isBuy ? 0 : (scan.fee ?? 0)
+    const flags = [...scan.warnings, ...(scan.occurredOn ? [] : [MISSING_DATE_FLAG])]
+    if (!scan.fiatCurrency) flags.push('No se reconoció la moneda del importe.')
     return [
       makeRow({
         source: 'p2p_order',
         amount: scan.convertedAmount,
         currency: scan.fiatCurrency,
-        direction: 'in',
+        direction: isBuy ? 'out' : 'in',
         occurredOn: scan.occurredOn,
-        description: `Binance P2P${scan.counterparty ? ` · ${scan.counterparty}` : ''}`,
+        description: ['Binance P2P', scan.counterparty, scan.paymentMethod].filter(Boolean).join(' · '),
         reference: scan.orderNumber,
-        // En una transferencia la comision es del lado que envia (USDT).
-        fee: scan.fee ?? 0,
-        flags: [...scan.warnings, ...(scan.occurredOn ? [] : ['Falta la fecha.'])],
+        // En una transferencia la comision es del lado que envia (USDT al vender).
+        fee,
+        flags,
         action: 'transfer',
         sentAmount: scan.amount,
-        p2p: { usdt: scan.amount + (scan.fee ?? 0), price: scan.unitPrice, orderNumber: scan.orderNumber, counterparty: scan.counterparty },
+        p2p: {
+          usdt: scan.amount + fee,
+          price: scan.unitPrice,
+          orderNumber: scan.orderNumber,
+          counterparty: scan.counterparty,
+          paymentMethod: scan.paymentMethod,
+        },
       }),
     ]
   }
@@ -85,11 +104,25 @@ export function rowsFromSingleScan(scan: ScanResult): ScanRow[] {
         occurredOn: scan.occurredOn,
         description: scan.description ?? '',
         reference: scan.reference,
-        flags: [...scan.warnings, ...(scan.occurredOn ? [] : ['Falta la fecha.'])],
+        time: scan.time ?? null,
+        stamp: scan.stamp ?? null,
+        flags: [...scan.warnings, ...(scan.occurredOn ? [] : [MISSING_DATE_FLAG])],
       }),
     ]
   }
   return []
+}
+
+// Algunas pantallas no muestran la fecha (el detalle de una orden P2P la esconde en la parte
+// plegada): se usa la que el usuario eligio al subir, avisando para que la revise.
+function withDefaultDate(rows: ScanRow[], defaultDate: string | null): ScanRow[] {
+  if (!defaultDate) return rows
+  for (const row of rows) {
+    if (row.occurredOn) continue
+    row.occurredOn = defaultDate
+    row.flags = [...row.flags.filter((flag) => flag !== MISSING_DATE_FLAG), 'La captura no muestra la fecha: se usó la elegida al subir.']
+  }
+  return rows
 }
 
 export interface LayoutInput {
@@ -155,6 +188,12 @@ export function rowsFromImage(layout: LayoutInput, options: RowsFromImageOptions
     const rows = parseP2pOrderList(groupSegments(layout.words, layout.width), options.today)
     return { kind, rows, readCount: rows.length }
   }
+  if (kind === 'binance_pay') {
+    // El signo del monto dice si entro o salio; si el OCR lo perdio, desempata lo que eligio el usuario.
+    const scope = options.scope ?? 'all'
+    const rows = parseBinancePayList(layout.text, scope === 'received' ? 'in' : scope === 'expenses' ? 'out' : undefined)
+    return { kind, rows: keepScope(rows, scope), readCount: rows.length }
+  }
   if (kind === 'bank_list') {
     const scope = options.scope ?? 'all'
     const rows = parseBankList(groupSegments(layout.words, layout.width), {
@@ -171,7 +210,7 @@ export function rowsFromImage(layout: LayoutInput, options: RowsFromImageOptions
     return { kind, rows: keepScope(rows, scope), readCount: rows.length }
   }
   if (kind === 'single') {
-    const rows = rowsFromSingleScan(scanText(layout.text))
+    const rows = withDefaultDate(rowsFromSingleScan(scanText(layout.text)), options.defaultDate)
     return { kind, rows: keepScope(rows, options.scope ?? 'all'), readCount: rows.length }
   }
   return { kind, rows: [], readCount: 0 }

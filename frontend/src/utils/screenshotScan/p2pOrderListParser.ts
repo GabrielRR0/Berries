@@ -1,5 +1,6 @@
 import { CANCELLED_PATTERN } from './dictionary/statusWords'
 import { P2P_FOOTER_STAMP, P2P_ORDER_LABELS, P2P_ORDER_START, P2P_SELL_START } from './dictionary/p2pOrderLabels'
+import { fiatCurrencyOf } from './fiatCurrency'
 import { makeRow, to24h } from './movementRows'
 import type { ScanRow } from './movementRows'
 import { parseLocalizedNumber } from './numbers'
@@ -7,9 +8,12 @@ import type { Segment } from './ocrLayout'
 import { normalizeForMatch } from './textLines'
 
 // "Historial de ordenes" de Binance P2P: una tarjeta por orden con el importe en
-// moneda local, el precio, la cantidad de USDT, el numero de orden y, abajo, el
-// apodo de la contraparte con la fecha (MM-DD hh:mm:ss, sin ano). Las etiquetas
-// estan en dictionary/p2pOrderLabels.ts.
+// moneda local (Bs o $), el precio, la cantidad de USDT (total al vender, recibida al
+// comprar), el numero de orden y, abajo, el apodo de la contraparte con la fecha
+// (MM-DD hh:mm:ss, sin ano). Las etiquetas estan en dictionary/p2pOrderLabels.ts.
+
+// Diferencia tolerada entre el importe y USDT x precio (la comision la explica).
+const AMOUNT_MISMATCH = 0.03
 
 function numberAfter(line: string): number | null {
   const token = line.match(/\d[\d.,]*/)?.[0]
@@ -99,22 +103,30 @@ export function parseP2pOrderList(segments: Segment[], today: Date): ScanRow[] {
     }
 
     const priceToken = priceLine ? numberAfter(priceLine) : null
+    // Bs (banco venezolano) o $ (Zinli, Wally y otras billeteras en dolares), segun el simbolo
+    // del importe y del precio.
+    const currency = fiatCurrencyOf([fiatLine, priceLine], priceToken)
     const flags: string[] = []
     if (!occurredOn) flags.push('Falta la fecha.')
+    if (!currency) flags.push('No se reconoció la moneda del importe.')
+    // El OCR a veces lee "$30" como "530": el importe debe rondar USDT x precio.
+    if (priceToken !== null && Math.abs(usdt * priceToken - amount) / amount > AMOUNT_MISMATCH) {
+      flags.push('El importe no coincide con la cantidad por el precio. Revisa los montos.')
+    }
 
     rows.push(
       makeRow({
         source: 'p2p_order',
         amount,
-        currency: 'VEF',
-        // Vender USDT: llegan Bs. Comprar USDT: salen Bs.
+        currency,
+        // Vender USDT: llega la moneda local. Comprar USDT: sale la moneda local.
         direction,
         occurredOn,
         time: stamp ? to24h(stamp[3]!) : null,
         description: `Binance P2P${counterparty ? ` · ${counterparty}` : ''}`,
         reference: orderNumber,
         flags,
-        // Cada orden se propone como la transferencia USDT <-> Bs que es, con los USDT ya
+        // Cada orden se propone como la transferencia USDT <-> moneda local que es, con los USDT ya
         // conocidos. Si despues se enlaza con un abono del banco (ver matchP2pOrders.ts), la
         // transferencia pasa a ese abono y esta fila se oculta para no contarla dos veces.
         action: 'transfer',

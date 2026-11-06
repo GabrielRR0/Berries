@@ -131,7 +131,10 @@ const canContinueFromCaptures = computed(() => capture.visibleRows.value.length 
 
 const hasP2pOrders = computed(() => capture.images.value.some((image) => image.kind === 'p2p_orders' && image.status === 'done'))
 const hasUnlinkedReceived = computed(() =>
-  capture.visibleRows.value.some((row) => row.source === 'bank' && row.direction === 'in' && row.action !== 'transfer' && row.action !== 'skip'),
+  capture.visibleRows.value.some(
+    // Un recibido en USDT (Binance Pay) ya esta en USDT: no le falta ninguna orden P2P.
+    (row) => row.source === 'bank' && row.currency !== 'USDT' && row.direction === 'in' && row.action !== 'transfer' && row.action !== 'skip',
+  ),
 )
 // Sugerencia: si hay recibidos sin USDT conocidos y no se subio el historial P2P, conviene subirlo.
 const suggestP2pCapture = computed(() => hasUnlinkedReceived.value && !hasP2pOrders.value)
