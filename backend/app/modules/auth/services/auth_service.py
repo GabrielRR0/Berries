@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.support.password_support import hash_password, verify_password
 from app.modules.auth.models.user_model import User
-from app.modules.auth.contracts.auth_schemas import WalletSeedRequest
+from app.modules.auth.contracts.dto import WalletSeedDto
 from app.modules.auth.errors import BetaLimitReachedError, EmailAlreadyRegisteredError, InvalidCredentialsError
 from app.modules.currency import get_currency_by_code
 from app.modules.dev_tools import get_or_create_demo_user
@@ -20,7 +20,7 @@ def register_user(
     password: str,
     display_name: str | None,
     default_currency: str = "USD",
-    wallets: list[WalletSeedRequest] | None = None,
+    wallets: list[WalletSeedDto] | None = None,
 ) -> User:
     active_users = db.scalar(select(func.count()).select_from(User))
     if active_users is not None and active_users >= settings.max_beta_users:
@@ -54,7 +54,7 @@ def _create_user_from_google(
     db: Session,
     identity: GoogleIdentity,
     default_currency: str,
-    wallets: list[WalletSeedRequest] | None = None,
+    wallets: list[WalletSeedDto] | None = None,
 ) -> User:
     active_users = db.scalar(select(func.count()).select_from(User))
     if active_users is not None and active_users >= settings.max_beta_users:
@@ -88,7 +88,7 @@ def login_or_register_with_google(
     db: Session,
     id_token: str | None,
     default_currency: str = "USD",
-    wallets: list[WalletSeedRequest] | None = None,
+    wallets: list[WalletSeedDto] | None = None,
 ) -> User:
     """Verifica el ID token de Google y resuelve a un User, en este orden: 1) ya existe
     una cuenta vinculada a este google_sub -> esa; 2) existe una cuenta con el mismo

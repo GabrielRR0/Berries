@@ -3,7 +3,7 @@ from decimal import Decimal
 import pytest
 
 from app.config import settings
-from app.modules.auth.contracts.auth_schemas import WalletSeedRequest
+from app.modules.auth.contracts.dto import WalletSeedDto
 from app.modules.auth.services import auth_service
 from app.modules.auth.services.auth_service import (
     authenticate_user,
@@ -62,8 +62,8 @@ def test_register_user_rejects_an_unsupported_default_currency(db):
 
 def test_register_user_creates_wallets_from_the_wizard(db):
     wallets = [
-        WalletSeedRequest(name="Facebank", currency="USD", initial_balance=Decimal("150.50")),
-        WalletSeedRequest(name="Banco de Venezuela", currency="VEF", initial_balance=Decimal("0")),
+        WalletSeedDto(name="Facebank", currency="USD", initial_balance=Decimal("150.50")),
+        WalletSeedDto(name="Banco de Venezuela", currency="VEF", initial_balance=Decimal("0")),
     ]
 
     user = register_user(db, "nora@example.com", "clave12345", None, wallets=wallets)
@@ -83,7 +83,7 @@ def test_register_user_with_no_wallets_starts_empty(db):
 
 
 def test_register_user_rejects_a_wallet_with_an_unsupported_currency(db):
-    wallets = [WalletSeedRequest(name="Rara", currency="XYZ")]
+    wallets = [WalletSeedDto(name="Rara", currency="XYZ")]
 
     with pytest.raises(UnsupportedCurrencyError):
         register_user(db, "paula@example.com", "clave12345", None, wallets=wallets)

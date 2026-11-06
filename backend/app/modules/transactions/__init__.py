@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from app.common.modules import public_api
 
 if TYPE_CHECKING:
-    from app.modules.transactions.contracts.transaction_schemas import DraftResponse
+    from app.modules.transactions.contracts.resources import DraftResource
     from app.modules.transactions.errors import TransactionValidationError
     from app.modules.transactions.models.transaction_draft_model import TransactionDraft
     from app.modules.transactions.models.transaction_model import Transaction

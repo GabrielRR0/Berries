@@ -26,7 +26,7 @@ class Debt(Base):
     # FK a currencies - antes texto libre a proposito (una deuda podia estar en
     # cualquier moneda); pedido explicito del usuario de restringirlo a las mismas
     # monedas que ofrece Billeteras, consistente en toda la app. "currency" como
-    # @property (mismo criterio que Wallet.currency) para que DebtResponse.model_
+    # @property (mismo criterio que Wallet.currency) para que DebtResource.model_
     # validate(debt) siga leyendo un string ahí sin tocar el schema.
     currency_id: Mapped[CurrencyFk]
     currency_ref: Mapped["Currency"] = relationship("Currency")

@@ -40,7 +40,7 @@ class Goal(Base):
     # SIN encriptar: 3 valores fijos usados en filtros WHERE, mismo criterio que
     # Debt.direction. "active" | "completed" | "abandoned".
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")
-    # SIN encriptar: vocabulario fijo chico (ver GoalType en goal_schemas.py), no texto
+    # SIN encriptar: vocabulario fijo chico (ver GoalType en contracts/enums.py), no texto
     # libre - decide que icono usa GoalCard.vue/CreateGoalForm.vue. "custom" = el
     # usuario no eligio ninguna plantilla, el titulo sigue siendo el unico dato real.
     goal_type: Mapped[str] = mapped_column(String(30), nullable=False, default="custom")

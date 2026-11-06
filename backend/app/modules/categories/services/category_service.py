@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.modules.categories.models.category_model import Category
 from app.modules.categories.models.hidden_category_model import HiddenCategory
-from app.modules.categories.contracts.category_schemas import CategoryResponse, Kind
+from app.modules.categories.contracts.enums import Kind
+from app.modules.categories.contracts.resources import CategoryResource
 from app.modules.categories.errors import CategoryNotFoundError, CategoryPermissionError, CategoryValidationError
 
 _VALID_KINDS = ("income", "expense", "both")
@@ -93,8 +94,8 @@ def unhide_category(db: Session, user_id: uuid.UUID, category_id: uuid.UUID) -> 
         db.commit()
 
 
-def build_category_response(category: Category, hidden_ids: frozenset[uuid.UUID] = frozenset()) -> CategoryResponse:
-    return CategoryResponse(
+def build_category_response(category: Category, hidden_ids: frozenset[uuid.UUID] = frozenset()) -> CategoryResource:
+    return CategoryResource(
         id=category.id,
         name=category.name,
         kind=category.kind,

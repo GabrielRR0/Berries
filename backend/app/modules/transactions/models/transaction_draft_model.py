@@ -25,7 +25,7 @@ class TransactionDraft(Base):
     parsed_amount: Mapped[Decimal | None] = mapped_column(EncryptedDecimal, nullable=True)
     # FK a currencies (nullable: un borrador puede no tener moneda detectada todavia).
     # "parsed_currency" como @property (mismo criterio que Wallet.currency) para que
-    # DraftResponse.model_validate(draft) siga leyendo un string|None ahí.
+    # DraftResource.model_validate(draft) siga leyendo un string|None ahí.
     parsed_currency_id: Mapped[NullableCurrencyFk]
     parsed_currency_ref: Mapped["Currency | None"] = relationship("Currency")
 

@@ -6,17 +6,9 @@ from sqlalchemy.orm import Session
 from app.common.security import get_current_user
 from app.database import get_db
 from app.modules.auth import User
-from app.modules.debts.contracts.debt_schemas import (
-    Direction,
-    DebtCreateRequest,
-    DebtPaymentCreateRequest,
-    DebtPaymentResponse,
-    DebtPaymentVoiceParseRequest,
-    DebtPaymentVoiceParseResponse,
-    DebtResponse,
-    DebtSummaryResponse,
-    InstallmentResponse,
-)
+from app.modules.debts.contracts.dto import CreateDebtDto, CreateDebtPaymentDto, ParseDebtPaymentVoiceDto
+from app.modules.debts.contracts.enums import Direction
+from app.modules.debts.contracts.resources import DebtPaymentResource, DebtPaymentVoiceParseResource, DebtResource, DebtSummaryResource, InstallmentResource
 from app.modules.debts.services.debt_payment_service import create_debt_payment, delete_debt_payment
 from app.modules.debts.services.payment_voice_parser import parse_debt_payment_transcript
 from app.modules.debts.services.debt_service import (
@@ -35,10 +27,10 @@ from app.modules.wallets import CurrencyMismatchError, InsufficientBalanceError,
 router = APIRouter()
 
 
-@router.post("", response_model=DebtResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=DebtResource, status_code=status.HTTP_201_CREATED)
 async def create(
-    payload: DebtCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> DebtResponse:
+    payload: CreateDebtDto, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+) -> DebtResource:
     try:
         debt = create_debt(
             db,
@@ -57,20 +49,20 @@ async def create(
     return build_debt_response(debt)
 
 
-@router.get("", response_model=list[DebtResponse])
+@router.get("", response_model=list[DebtResource])
 async def list_mine(
     direction: Direction | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> list[DebtResponse]:
+) -> list[DebtResource]:
     debts = list_debts_for_user(db, current_user.id, direction=direction)
     return [build_debt_response(d) for d in debts]
 
 
-@router.get("/summary", response_model=DebtSummaryResponse)
-async def summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> DebtSummaryResponse:
+@router.get("/summary", response_model=DebtSummaryResource)
+async def summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> DebtSummaryResource:
     totals = get_debt_summary(db, current_user.id)
-    return DebtSummaryResponse(**totals)
+    return DebtSummaryResource(**totals)
 
 
 @router.delete("/{debt_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -83,13 +75,13 @@ async def delete(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
-@router.post("/{debt_id}/installments/{installment_id}/pay", response_model=InstallmentResponse)
+@router.post("/{debt_id}/installments/{installment_id}/pay", response_model=InstallmentResource)
 async def pay(
     debt_id: uuid.UUID,
     installment_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> InstallmentResponse:
+) -> InstallmentResource:
     try:
         get_debt_owned_by_user(db, debt_id, current_user.id)
         installment = mark_installment_paid(db, installment_id, current_user.id)
@@ -97,31 +89,31 @@ async def pay(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except InstallmentAlreadyPaidError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
-    return InstallmentResponse.model_validate(installment)
+    return InstallmentResource.model_validate(installment)
 
 
-@router.post("/{debt_id}/installments/{installment_id}/unpay", response_model=InstallmentResponse)
+@router.post("/{debt_id}/installments/{installment_id}/unpay", response_model=InstallmentResource)
 async def unpay(
     debt_id: uuid.UUID,
     installment_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> InstallmentResponse:
+) -> InstallmentResource:
     try:
         get_debt_owned_by_user(db, debt_id, current_user.id)
         installment = mark_installment_unpaid(db, installment_id, current_user.id)
     except DebtNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return InstallmentResponse.model_validate(installment)
+    return InstallmentResource.model_validate(installment)
 
 
-@router.post("/{debt_id}/payments", response_model=DebtPaymentResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{debt_id}/payments", response_model=DebtPaymentResource, status_code=status.HTTP_201_CREATED)
 async def add_payment(
     debt_id: uuid.UUID,
-    payload: DebtPaymentCreateRequest,
+    payload: CreateDebtPaymentDto,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> DebtPaymentResponse:
+) -> DebtPaymentResource:
     try:
         payment = create_debt_payment(
             db,
@@ -138,7 +130,7 @@ async def add_payment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (DebtValidationError, UnsupportedCurrencyError, CurrencyMismatchError, InsufficientBalanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return DebtPaymentResponse.model_validate(payment)
+    return DebtPaymentResource.model_validate(payment)
 
 
 @router.delete("/{debt_id}/payments/{payment_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -154,17 +146,17 @@ async def remove_payment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
-@router.post("/{debt_id}/payments/parse-voice", response_model=DebtPaymentVoiceParseResponse)
+@router.post("/{debt_id}/payments/parse-voice", response_model=DebtPaymentVoiceParseResource)
 async def parse_payment_voice(
     debt_id: uuid.UUID,
-    payload: DebtPaymentVoiceParseRequest,
+    payload: ParseDebtPaymentVoiceDto,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> DebtPaymentVoiceParseResponse:
+) -> DebtPaymentVoiceParseResource:
     try:
         parsed = parse_debt_payment_transcript(db, debt_id, current_user.id, payload.transcript)
     except DebtNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return DebtPaymentVoiceParseResponse(
+    return DebtPaymentVoiceParseResource(
         amount=parsed.amount, currency=parsed.currency, paid_at=parsed.paid_at, note=parsed.note
     )

@@ -17,7 +17,7 @@ class Wallet(Base):
     # FK a currencies (ver Currency) en vez de string libre - pedido explicito del
     # usuario: una billetera solo puede estar en una de las monedas que la app
     # ofrece, no en cualquier texto (evita typos y monedas inconsistentes entre si).
-    # "currency" queda como @property (abajo) que devuelve el código - WalletResponse
+    # "currency" queda como @property (abajo) que devuelve el código - WalletResource
     # se arma con model_validate(wallet) (from_attributes=True) y espera un string ahí,
     # igual que antes de este cambio; así ningún schema/router necesita tocarse.
     currency_id: Mapped[CurrencyFk]

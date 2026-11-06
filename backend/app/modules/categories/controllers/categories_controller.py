@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from app.common.security import get_current_user
 from app.database import get_db
 from app.modules.auth import User
-from app.modules.categories.contracts.category_schemas import CategoryCreateRequest, CategoryResponse, Kind
+from app.modules.categories.contracts.dto import CreateCategoryDto
+from app.modules.categories.contracts.enums import Kind
+from app.modules.categories.contracts.resources import CategoryResource
 from app.modules.categories.services.category_service import (
     build_category_response,
     create_category,
@@ -21,7 +23,7 @@ from app.modules.categories.errors import CategoryNotFoundError, CategoryPermiss
 router = APIRouter()
 
 
-@router.get("", response_model=list[CategoryResponse])
+@router.get("", response_model=list[CategoryResource])
 async def list_mine(
     kind: Kind | None = Query(default=None),
     # Solo la pantalla de Ajustes pide include_hidden=true (para poder restaurar una
@@ -30,16 +32,16 @@ async def list_mine(
     include_hidden: bool = Query(default=False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> list[CategoryResponse]:
+) -> list[CategoryResource]:
     categories = list_categories_for_user(db, current_user.id, kind=kind, include_hidden=include_hidden)
     hidden_ids = get_hidden_category_ids(db, current_user.id) if include_hidden else frozenset()
     return [build_category_response(category, hidden_ids) for category in categories]
 
 
-@router.post("", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=CategoryResource, status_code=status.HTTP_201_CREATED)
 async def create(
-    payload: CategoryCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> CategoryResponse:
+    payload: CreateCategoryDto, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+) -> CategoryResource:
     try:
         category = create_category(db, current_user.id, payload.name, payload.kind)
     except CategoryValidationError as exc:

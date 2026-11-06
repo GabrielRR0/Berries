@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.modules.debts.models.debt_model import Debt
 from app.modules.debts.models.installment_model import Installment
-from app.modules.debts.contracts.debt_schemas import DebtPaymentResponse, DebtResponse, InstallmentResponse
+from app.modules.debts.contracts.resources import DebtPaymentResource, DebtResource, InstallmentResource
 from app.modules.currency import get_currency_by_code
 from app.modules.debts.errors import DebtNotFoundError, DebtValidationError
 
@@ -98,12 +98,12 @@ def get_debt_remaining_amount(debt: Debt) -> Decimal:
     return remaining if remaining > 0 else Decimal("0")
 
 
-def build_debt_response(debt: Debt) -> DebtResponse:
-    """DebtResponse tiene 2 campos calculados que no son atributos reales del modelo
+def build_debt_response(debt: Debt) -> DebtResource:
+    """DebtResource tiene 2 campos calculados que no son atributos reales del modelo
     (amount_paid, remaining_amount) - se arma a mano en vez de
-    DebtResponse.model_validate(debt), que solo lee atributos que existen tal cual en
+    DebtResource.model_validate(debt), que solo lee atributos que existen tal cual en
     el objeto ORM."""
-    return DebtResponse(
+    return DebtResource(
         id=debt.id,
         user_id=debt.user_id,
         counterparty_name=debt.counterparty_name,
@@ -112,8 +112,8 @@ def build_debt_response(debt: Debt) -> DebtResponse:
         currency=debt.currency,
         description=debt.description,
         created_at=debt.created_at,
-        installments=[InstallmentResponse.model_validate(i) for i in debt.installments],
-        payments=[DebtPaymentResponse.model_validate(p) for p in debt.payments],
+        installments=[InstallmentResource.model_validate(i) for i in debt.installments],
+        payments=[DebtPaymentResource.model_validate(p) for p in debt.payments],
         amount_paid=get_debt_paid_amount(debt),
         remaining_amount=get_debt_remaining_amount(debt),
     )

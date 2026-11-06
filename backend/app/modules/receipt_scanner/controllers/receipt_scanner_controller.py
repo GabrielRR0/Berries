@@ -4,19 +4,19 @@ from sqlalchemy.orm import Session
 from app.common.security import get_current_user
 from app.database import get_db
 from app.modules.auth import User
-from app.modules.receipt_scanner.contracts.receipt_scanner_schemas import DraftResponse
+from app.modules.transactions import DraftResource
 from app.modules.receipt_scanner.errors import OcrNotConfiguredError
 from app.modules.receipt_scanner.services.receipt_scanner_service import submit_receipt_scan
 
 router = APIRouter()
 
 
-@router.post("", response_model=DraftResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=DraftResource, status_code=status.HTTP_201_CREATED)
 async def create(
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> DraftResponse:
+) -> DraftResource:
     image_bytes = await image.read()
     try:
         draft = submit_receipt_scan(
@@ -28,4 +28,4 @@ async def create(
         )
     except OcrNotConfiguredError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
-    return DraftResponse.model_validate(draft)
+    return DraftResource.model_validate(draft)

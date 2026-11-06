@@ -99,7 +99,7 @@ def update_check_in(
     su nota) - pedido explicito del usuario: un aporte que quedo como "ingreso futuro"
     se puede re-enlazar a una billetera real una vez que esa plata efectivamente llego.
     Nunca toca amount_saved/period_month/new_target_date - reemplazo completo de
-    wallet_id/note (ver GoalCheckInUpdateRequest). No exige que la meta siga activa:
+    wallet_id/note (ver UpdateGoalCheckInDto). No exige que la meta siga activa:
     recalificar de donde salio una plata vieja tiene sentido aunque la meta ya se haya
     completado o abandonado."""
     goal = get_goal_owned_by_user(db, goal_id, user_id)

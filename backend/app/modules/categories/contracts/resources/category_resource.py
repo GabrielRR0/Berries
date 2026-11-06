@@ -1,17 +1,11 @@
 import uuid
-from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
-Kind = Literal["income", "expense", "both"]
-
-
-class CategoryCreateRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=80)
-    kind: Kind
+from app.modules.categories.contracts.enums import Kind
 
 
-class CategoryResponse(BaseModel):
+class CategoryResource(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID

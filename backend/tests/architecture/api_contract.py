@@ -1,7 +1,7 @@
 """Foto del contrato HTTP de la API, independiente de cómo se llamen las clases.
 
 Toma el OpenAPI de la app, reemplaza cada `$ref` por el schema al que apunta y quita
-los `title` (que salen del nombre de la clase). Así, renombrar `DebtResponse` a
+los `title` (que salen del nombre de la clase). Así, renombrar `DebtResource` a
 `DebtResource` no cambia la foto, pero cambiar una URL, un método, un parámetro,
 un campo, un código de estado o si la ruta pide sesión, sí.
 """

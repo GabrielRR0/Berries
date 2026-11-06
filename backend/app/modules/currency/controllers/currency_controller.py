@@ -6,14 +6,14 @@ from sqlalchemy.orm import Session
 from app.common.security import get_current_user
 from app.database import get_db
 from app.modules.auth import User
-from app.modules.currency.contracts.currency_schemas import ConversionResponse, RateHistoryPoint, RateHistoryResponse
+from app.modules.currency.contracts.resources import ConversionResource, RateHistoryPointResource, RateHistoryResource
 from app.modules.currency.services.currency_service import convert, get_conversion_rate, get_rate_history
 from app.modules.currency.errors import UnsupportedCurrencyError
 
 router = APIRouter()
 
 
-@router.get("/convert", response_model=ConversionResponse)
+@router.get("/convert", response_model=ConversionResource)
 async def convert_endpoint(
     # Sin gt=0 a proposito (bug real encontrado en vivo): esto tambien lo usa
     # BalanceCard.vue para convertir el BALANCE de una wallet a la moneda de
@@ -27,15 +27,15 @@ async def convert_endpoint(
     db: Session = Depends(get_db),
     # Requiere solo *un* usuario válido, no dueño de nada en particular en este endpoint.
     current_user: User = Depends(get_current_user),
-) -> ConversionResponse:
+) -> ConversionResource:
     from_currency = from_.upper()
     to_currency = to.upper()
     converted_amount = convert(db, amount, from_currency, to_currency)
     rate_used = get_conversion_rate(db, from_currency, to_currency)
-    return ConversionResponse(converted_amount=converted_amount, rate_used=rate_used)
+    return ConversionResource(converted_amount=converted_amount, rate_used=rate_used)
 
 
-@router.get("/history", response_model=RateHistoryResponse)
+@router.get("/history", response_model=RateHistoryResource)
 async def history(
     code: str = Query(),
     months: int = Query(default=6, ge=1, le=24),
@@ -46,18 +46,18 @@ async def history(
     against: str = Query(default="USD"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> RateHistoryResponse:
+) -> RateHistoryResource:
     currency = code.upper()
     against_currency = against.upper()
     try:
         rows = get_rate_history(db, currency, months, against=against_currency)
     except UnsupportedCurrencyError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return RateHistoryResponse(
+    return RateHistoryResource(
         code=currency,
         quote=against_currency,
         points=[
-            RateHistoryPoint(fetched_at=row.fetched_at, rate=row.rate, source=row.source, is_estimated=row.is_estimated)
+            RateHistoryPointResource(fetched_at=row.fetched_at, rate=row.rate, source=row.source, is_estimated=row.is_estimated)
             for row in rows
         ],
     )

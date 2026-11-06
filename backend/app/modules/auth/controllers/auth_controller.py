@@ -6,15 +6,8 @@ from app.database import get_db
 from app.common.security import get_client_ip, limiter
 from app.common.security import create_access_token
 from app.modules.auth.models.user_model import User
-from app.modules.auth.contracts.auth_schemas import (
-    GoogleCheckRequest,
-    GoogleCheckResponse,
-    GoogleLoginRequest,
-    TokenResponse,
-    UserLoginRequest,
-    UserRegisterRequest,
-    UserResponse,
-)
+from app.modules.auth.contracts.dto import GoogleCheckDto, GoogleLoginDto, LoginDto, RegisterUserDto
+from app.modules.auth.contracts.resources import GoogleCheckResource, TokenResource, UserResource
 from app.modules.auth.services.account_deletion_service import delete_own_account
 from app.modules.auth.services.auth_service import (
     authenticate_user,
@@ -30,9 +23,9 @@ from app.support.turnstile_support import TurnstileVerificationError, verify_tur
 router = APIRouter()
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=TokenResource, status_code=status.HTTP_201_CREATED)
 @limiter.limit("10/minute")
-async def register(request: Request, payload: UserRegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
+async def register(request: Request, payload: RegisterUserDto, db: Session = Depends(get_db)) -> TokenResource:
     try:
         verify_turnstile(payload.turnstile_token, get_client_ip(request))
         user = register_user(
@@ -53,12 +46,12 @@ async def register(request: Request, payload: UserRegisterRequest, db: Session =
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     token = create_access_token(subject=str(user.id))
-    return TokenResponse(access_token=token, user=UserResponse.model_validate(user))
+    return TokenResource(access_token=token, user=UserResource.model_validate(user))
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResource)
 @limiter.limit("10/minute")
-async def login(request: Request, payload: UserLoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+async def login(request: Request, payload: LoginDto, db: Session = Depends(get_db)) -> TokenResource:
     try:
         verify_turnstile(payload.turnstile_token, get_client_ip(request))
         user = authenticate_user(db, payload.email, payload.password)
@@ -68,12 +61,12 @@ async def login(request: Request, payload: UserLoginRequest, db: Session = Depen
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
 
     token = create_access_token(subject=str(user.id))
-    return TokenResponse(access_token=token, user=UserResponse.model_validate(user))
+    return TokenResource(access_token=token, user=UserResource.model_validate(user))
 
 
-@router.post("/google", response_model=TokenResponse)
+@router.post("/google", response_model=TokenResource)
 @limiter.limit("10/minute")
-async def google_login(request: Request, payload: GoogleLoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+async def google_login(request: Request, payload: GoogleLoginDto, db: Session = Depends(get_db)) -> TokenResource:
     try:
         user = login_or_register_with_google(
             db, payload.id_token, default_currency=payload.default_currency, wallets=payload.wallets
@@ -86,25 +79,25 @@ async def google_login(request: Request, payload: GoogleLoginRequest, db: Sessio
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     token = create_access_token(subject=str(user.id))
-    return TokenResponse(access_token=token, user=UserResponse.model_validate(user))
+    return TokenResource(access_token=token, user=UserResource.model_validate(user))
 
 
-@router.post("/google/check", response_model=GoogleCheckResponse)
+@router.post("/google/check", response_model=GoogleCheckResource)
 @limiter.limit("20/minute")
 async def google_check(
-    request: Request, payload: GoogleCheckRequest, db: Session = Depends(get_db)
-) -> GoogleCheckResponse:
+    request: Request, payload: GoogleCheckDto, db: Session = Depends(get_db)
+) -> GoogleCheckResource:
     try:
         exists = google_account_exists(db, payload.id_token)
     except GoogleAuthError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    return GoogleCheckResponse(exists=exists)
+    return GoogleCheckResource(exists=exists)
 
 
-@router.get("/me", response_model=UserResponse)
-async def me(current_user: User = Depends(get_current_user)) -> UserResponse:
-    return UserResponse.model_validate(current_user)
+@router.get("/me", response_model=UserResource)
+async def me(current_user: User = Depends(get_current_user)) -> UserResource:
+    return UserResource.model_validate(current_user)
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

@@ -38,13 +38,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.modules.auth import User
 from app.modules.transactions import Transaction
 from app.modules.wallets import Wallet
-from app.modules.analytics.contracts.analytics_schemas import (
-    CategoryBreakdownItem,
-    CategoryMonthlyTrendItem,
-    CategoryMonthlyTrendResponse,
-    MonthlyComparisonItem,
-    PeriodSummaryResponse,
-)
+from app.modules.analytics.contracts.resources import CategoryBreakdownItemResource, CategoryMonthlyTrendItemResource, CategoryMonthlyTrendResource, MonthlyComparisonItemResource, PeriodSummaryResource
 from app.modules.analytics.errors import InvalidPeriodError
 from app.modules.currency import get_conversion_rate, reference_fields_in_usd
 
@@ -194,7 +188,7 @@ def _net_savings_for_month(
     return income - expense
 
 
-def get_period_summary(db: Session, user_id: uuid.UUID, month: str | None = None) -> PeriodSummaryResponse:
+def get_period_summary(db: Session, user_id: uuid.UUID, month: str | None = None) -> PeriodSummaryResource:
     """Totales de ingreso/gasto/ahorro neto del mes dado (o el actual), más el ahorro
     neto del mes calendario inmediatamente anterior para el delta mes-a-mes. Todos los
     montos quedan convertidos a User.default_currency (ver _WalletCurrencyConverter)."""
@@ -209,7 +203,7 @@ def get_period_summary(db: Session, user_id: uuid.UUID, month: str | None = None
     previous_month = _shift_month(resolved_month, -1)
     previous_period_net_savings = _net_savings_for_month(db, user_id, previous_month, converter)
 
-    return PeriodSummaryResponse(
+    return PeriodSummaryResource(
         period=resolved_month,
         total_income=total_income,
         total_expense=total_expense,
@@ -220,7 +214,7 @@ def get_period_summary(db: Session, user_id: uuid.UUID, month: str | None = None
 
 def get_category_breakdown(
     db: Session, user_id: uuid.UUID, kind: str, month: str | None = None
-) -> list[CategoryBreakdownItem]:
+) -> list[CategoryBreakdownItemResource]:
     """Desglose por categoría de un `kind` ("income"/"expense") en el mes dado (o el
     actual), ordenado descendente por total. `percentage` es la participación de cada
     categoría sobre el total de ese type+month; 0.0 para todas si ese total es 0 (nunca
@@ -239,7 +233,7 @@ def get_category_breakdown(
     grand_total = sum((total for _, total in totals), Decimal("0"))
 
     items = [
-        CategoryBreakdownItem(
+        CategoryBreakdownItemResource(
             category=category,
             total=total,
             percentage=float(total / grand_total * 100) if grand_total > 0 else 0.0,
@@ -250,7 +244,7 @@ def get_category_breakdown(
     return items
 
 
-def get_monthly_comparison(db: Session, user_id: uuid.UUID, months: int = 6) -> list[MonthlyComparisonItem]:
+def get_monthly_comparison(db: Session, user_id: uuid.UUID, months: int = 6) -> list[MonthlyComparisonItemResource]:
     """Una entrada por mes calendario, de más antiguo a más reciente, terminando en el
     mes actual — exactamente `months` meses consecutivos, incluyendo los que no
     tuvieron transacciones (con totales en cero, nunca se omiten)."""
@@ -265,7 +259,7 @@ def get_monthly_comparison(db: Session, user_id: uuid.UUID, months: int = 6) -> 
         total_income = _sum_amount(db, user_id, "income", start, end, converter)
         total_expense = _sum_amount(db, user_id, "expense", start, end, converter)
         items.append(
-            MonthlyComparisonItem(
+            MonthlyComparisonItemResource(
                 month=month,
                 total_income=total_income,
                 total_expense=total_expense,
@@ -277,7 +271,7 @@ def get_monthly_comparison(db: Session, user_id: uuid.UUID, months: int = 6) -> 
 
 def get_category_monthly_trend(
     db: Session, user_id: uuid.UUID, kind: str, months: int = 6, top_n: int = 5
-) -> CategoryMonthlyTrendResponse:
+) -> CategoryMonthlyTrendResource:
     """Cuánto se movió cada categoría mes a mes en la ventana pedida (ej. "cuánto gasté
     en Mercado cada uno de los últimos 6 meses") — a diferencia de get_category_breakdown
     (un solo mes, forma de torta), acá se repite la misma agrupación por categoría una
@@ -308,7 +302,7 @@ def get_category_monthly_trend(
     other_categories = [category for category, _ in ranked_categories[top_n:]]
 
     items = [
-        CategoryMonthlyTrendItem(
+        CategoryMonthlyTrendItemResource(
             category=category,
             monthly_totals=[month_totals.get(category, Decimal("0")) for month_totals in totals_by_month],
         )
@@ -317,7 +311,7 @@ def get_category_monthly_trend(
 
     if other_categories:
         items.append(
-            CategoryMonthlyTrendItem(
+            CategoryMonthlyTrendItemResource(
                 category=_OTHER_CATEGORY_LABEL,
                 monthly_totals=[
                     sum((month_totals.get(category, Decimal("0")) for category in other_categories), Decimal("0"))
@@ -326,4 +320,4 @@ def get_category_monthly_trend(
             )
         )
 
-    return CategoryMonthlyTrendResponse(months=ordered_months, categories=items)
+    return CategoryMonthlyTrendResource(months=ordered_months, categories=items)

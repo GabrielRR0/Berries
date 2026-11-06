@@ -30,7 +30,7 @@ class GoalCheckIn(Base):
     amount_saved: Mapped[Decimal] = mapped_column(EncryptedDecimal, nullable=False)
     # SIN encriptar: son fechas de calendario, no revelan monto ni comportamiento de
     # gasto - se necesitan legibles para derivar si el ultimo check-in de una meta
-    # poospuso (GoalResponse.last_check_in_postponed) sin desencriptar nada. Ambas None
+    # poospuso (GoalResource.last_check_in_postponed) sin desencriptar nada. Ambas None
     # si este check-in no poospuso la meta.
     previous_target_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     new_target_date: Mapped[date | None] = mapped_column(Date, nullable=True)

@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from app.modules.auth import User
 from app.modules.goals.models.goal_check_in_model import GoalCheckIn
 from app.modules.goals.models.goal_model import Goal
-from app.modules.goals.contracts.goal_schemas import GoalResponse, GoalType, Status
+from app.modules.goals.contracts.enums import GoalType, Status
+from app.modules.goals.contracts.resources import GoalResource
 from app.modules.analytics import get_monthly_comparison
 from app.modules.currency import get_currency_by_code
 from app.modules.currency import get_conversion_rate
@@ -221,13 +222,13 @@ def _last_check_in_postponed(goal: Goal) -> bool:
     return latest.new_target_date is not None
 
 
-def build_goal_response(goal: Goal, today: date | None = None) -> GoalResponse:
-    """GoalResponse tiene 2 campos calculados que no son atributos reales del modelo
+def build_goal_response(goal: Goal, today: date | None = None) -> GoalResource:
+    """GoalResource tiene 2 campos calculados que no son atributos reales del modelo
     (suggested_monthly_contribution, last_check_in_postponed) - se arma a mano en vez
-    de GoalResponse.model_validate(goal), que solo lee atributos que existen tal cual
+    de GoalResource.model_validate(goal), que solo lee atributos que existen tal cual
     en el objeto ORM."""
     today = today or date.today()
-    return GoalResponse(
+    return GoalResource(
         id=goal.id,
         user_id=goal.user_id,
         title=goal.title,

@@ -6,13 +6,8 @@ from sqlalchemy.orm import Session
 from app.common.security import get_current_user
 from app.database import get_db
 from app.modules.auth import User
-from app.modules.wallets.contracts.wallet_schemas import (
-    TransferRequest,
-    TransferResponse,
-    TransferUpdateRequest,
-    WalletCreateRequest,
-    WalletResponse,
-)
+from app.modules.wallets.contracts.dto import CreateTransferDto, CreateWalletDto, UpdateTransferDto
+from app.modules.wallets.contracts.resources import TransferResource, WalletResource
 from app.modules.currency import UnsupportedCurrencyError
 from app.modules.wallets.errors import (
     CurrencyMismatchError,
@@ -26,26 +21,26 @@ from app.modules.wallets.services.wallet_service import create_wallet, delete_wa
 router = APIRouter()
 
 
-@router.post("", response_model=WalletResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=WalletResource, status_code=status.HTTP_201_CREATED)
 async def create(
-    payload: WalletCreateRequest,
+    payload: CreateWalletDto,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> WalletResponse:
+) -> WalletResource:
     try:
         wallet = create_wallet(db, current_user.id, payload.name, payload.currency, payload.initial_balance)
     except UnsupportedCurrencyError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return WalletResponse.model_validate(wallet)
+    return WalletResource.model_validate(wallet)
 
 
-@router.get("", response_model=list[WalletResponse])
+@router.get("", response_model=list[WalletResource])
 async def list_mine(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> list[WalletResponse]:
+) -> list[WalletResource]:
     wallets = list_wallets_for_user(db, current_user.id)
-    return [WalletResponse.model_validate(wallet) for wallet in wallets]
+    return [WalletResource.model_validate(wallet) for wallet in wallets]
 
 
 @router.delete("/{wallet_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -60,12 +55,12 @@ async def delete(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
-@router.post("/transfer", response_model=TransferResponse)
+@router.post("/transfer", response_model=TransferResource)
 async def transfer(
-    payload: TransferRequest,
+    payload: CreateTransferDto,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> TransferResponse:
+) -> TransferResource:
     try:
         from_wallet, to_wallet = execute_transfer(
             db,
@@ -86,19 +81,19 @@ async def transfer(
     except CurrencyMismatchError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    return TransferResponse(
-        from_wallet=WalletResponse.model_validate(from_wallet),
-        to_wallet=WalletResponse.model_validate(to_wallet),
+    return TransferResource(
+        from_wallet=WalletResource.model_validate(from_wallet),
+        to_wallet=WalletResource.model_validate(to_wallet),
     )
 
 
-@router.patch("/transfer/{transfer_id}", response_model=TransferResponse)
+@router.patch("/transfer/{transfer_id}", response_model=TransferResource)
 async def update(
     transfer_id: uuid.UUID,
-    payload: TransferUpdateRequest,
+    payload: UpdateTransferDto,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> TransferResponse:
+) -> TransferResource:
     try:
         from_wallet, to_wallet = update_transfer(
             db,
@@ -116,7 +111,7 @@ async def update(
     except CurrencyMismatchError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    return TransferResponse(
-        from_wallet=WalletResponse.model_validate(from_wallet),
-        to_wallet=WalletResponse.model_validate(to_wallet),
+    return TransferResource(
+        from_wallet=WalletResource.model_validate(from_wallet),
+        to_wallet=WalletResource.model_validate(to_wallet),
     )

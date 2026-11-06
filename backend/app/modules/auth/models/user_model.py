@@ -27,7 +27,7 @@ class User(Base):
     # de texto libre. Sin default de Python: register_user() la resuelve buscando el
     # código "USD" en la tabla, no hay forma de hardcodear un UUID acá. "default_
     # currency" como @property (mismo criterio que Wallet.currency) para que
-    # AuthResponse/UserResponse (model_validate, from_attributes=True) sigan leyendo
+    # AuthResponse/UserResource (model_validate, from_attributes=True) sigan leyendo
     # un string ahí sin tocar el schema.
     default_currency_id: Mapped[CurrencyFk]
     default_currency_ref: Mapped["Currency"] = relationship("Currency")

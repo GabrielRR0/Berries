@@ -7,21 +7,9 @@ from sqlalchemy.orm import Session
 from app.common.security import get_current_user
 from app.database import get_db
 from app.modules.auth import User
-from app.modules.goals.contracts.goal_schemas import (
-    GoalCheckInCreateRequest,
-    GoalCheckInResponse,
-    GoalCheckInUpdateRequest,
-    GoalCreateRequest,
-    GoalResponse,
-    GoalSavingsCapacityResponse,
-    GoalSummaryResponse,
-    GoalUpdateRequest,
-    GoalVoicePreviewRequest,
-    GoalVoicePreviewResponse,
-    PendingCheckInResponse,
-    Status,
-    WalletCommitmentResponse,
-)
+from app.modules.goals.contracts.dto import CreateGoalCheckInDto, CreateGoalDto, GoalVoicePreviewDto, UpdateGoalCheckInDto, UpdateGoalDto
+from app.modules.goals.contracts.enums import Status
+from app.modules.goals.contracts.resources import GoalCheckInResource, GoalResource, GoalSavingsCapacityResource, GoalSummaryResource, GoalVoicePreviewResource, PendingCheckInResource, WalletCommitmentResource
 from app.modules.goals.services.check_in_service import (
     abandon_goal,
     get_goals_needing_check_in_for_user,
@@ -54,10 +42,10 @@ from app.modules.wallets import CurrencyMismatchError, WalletNotFoundError
 router = APIRouter()
 
 
-@router.post("", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=GoalResource, status_code=status.HTTP_201_CREATED)
 async def create(
-    payload: GoalCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> GoalResponse:
+    payload: CreateGoalDto, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+) -> GoalResource:
     try:
         goal = create_goal(
             db,
@@ -78,7 +66,7 @@ async def create(
     return build_goal_response(goal)
 
 
-@router.get("", response_model=list[GoalResponse])
+@router.get("", response_model=list[GoalResource])
 async def list_mine(
     # alias="status": el parametro Python se llama status_filter (el nombre "status" ya
     # esta tomado por el modulo status de fastapi, importado arriba para los codigos
@@ -87,47 +75,47 @@ async def list_mine(
     status_filter: Status | None = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> list[GoalResponse]:
+) -> list[GoalResource]:
     goals = list_goals_for_user(db, current_user.id, status=status_filter)
     return [build_goal_response(goal) for goal in goals]
 
 
-@router.get("/summary", response_model=GoalSummaryResponse)
-async def summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> GoalSummaryResponse:
+@router.get("/summary", response_model=GoalSummaryResource)
+async def summary(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> GoalSummaryResource:
     totals = get_goal_summary(db, current_user.id)
-    return GoalSummaryResponse(**totals)
+    return GoalSummaryResource(**totals)
 
 
-@router.get("/wallet-commitments", response_model=list[WalletCommitmentResponse])
+@router.get("/wallet-commitments", response_model=list[WalletCommitmentResource])
 async def wallet_commitments(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> list[WalletCommitmentResponse]:
+) -> list[WalletCommitmentResource]:
     # Declarado antes de "/{goal_id}" a proposito - mismo motivo que summary/
     # savings-capacity/pending-check-ins de aca abajo (un "/{goal_id}" de un solo
     # segmento los taparia si se registrara antes).
     committed = get_committed_amounts_for_user(db, current_user.id)
     return [
-        WalletCommitmentResponse(wallet_id=wallet_id, committed_amount=amount)
+        WalletCommitmentResource(wallet_id=wallet_id, committed_amount=amount)
         for wallet_id, amount in committed.items()
     ]
 
 
-@router.get("/savings-capacity", response_model=GoalSavingsCapacityResponse)
+@router.get("/savings-capacity", response_model=GoalSavingsCapacityResource)
 async def savings_capacity(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> GoalSavingsCapacityResponse:
+) -> GoalSavingsCapacityResource:
     capacity = get_savings_capacity(db, current_user.id)
-    return GoalSavingsCapacityResponse(**capacity)
+    return GoalSavingsCapacityResource(**capacity)
 
 
-@router.get("/pending-check-ins", response_model=list[PendingCheckInResponse])
+@router.get("/pending-check-ins", response_model=list[PendingCheckInResource])
 async def pending_check_ins(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> list[PendingCheckInResponse]:
+) -> list[PendingCheckInResource]:
     today = date.today()
     goals = get_goals_needing_check_in_for_user(db, current_user.id, today)
     return [
-        PendingCheckInResponse(
+        PendingCheckInResource(
             goal_id=goal.id,
             title=goal.title,
             currency=goal.currency,
@@ -138,10 +126,10 @@ async def pending_check_ins(
     ]
 
 
-@router.get("/{goal_id}", response_model=GoalResponse)
+@router.get("/{goal_id}", response_model=GoalResource)
 async def get_one(
     goal_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> GoalResponse:
+) -> GoalResource:
     # Declarado DESPUES de los GET de path estatico (summary/savings-capacity/
     # pending-check-ins) a proposito: FastAPI resuelve por orden de registro, un
     # "/{goal_id}" de un solo segmento antes de esos los taparia.
@@ -152,14 +140,14 @@ async def get_one(
     return build_goal_response(goal)
 
 
-@router.post("/voice-preview", response_model=GoalVoicePreviewResponse)
+@router.post("/voice-preview", response_model=GoalVoicePreviewResource)
 async def voice_preview(
-    payload: GoalVoicePreviewRequest,
+    payload: GoalVoicePreviewDto,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> GoalVoicePreviewResponse:
+) -> GoalVoicePreviewResource:
     parsed = parse_goal_voice_entry(db, current_user.id, current_user.default_currency, payload.transcript)
-    return GoalVoicePreviewResponse(
+    return GoalVoicePreviewResource(
         title=parsed.title,
         amount=parsed.amount,
         amount_is_monthly=parsed.amount_is_monthly,
@@ -168,13 +156,13 @@ async def voice_preview(
     )
 
 
-@router.patch("/{goal_id}", response_model=GoalResponse)
+@router.patch("/{goal_id}", response_model=GoalResource)
 async def update(
     goal_id: uuid.UUID,
-    payload: GoalUpdateRequest,
+    payload: UpdateGoalDto,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> GoalResponse:
+) -> GoalResource:
     try:
         goal = update_goal(
             db,
@@ -204,13 +192,13 @@ async def delete(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
-@router.post("/{goal_id}/check-ins", response_model=GoalCheckInResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{goal_id}/check-ins", response_model=GoalCheckInResource, status_code=status.HTTP_201_CREATED)
 async def create_check_in(
     goal_id: uuid.UUID,
-    payload: GoalCheckInCreateRequest,
+    payload: CreateGoalCheckInDto,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> GoalCheckInResponse:
+) -> GoalCheckInResource:
     try:
         check_in = record_check_in(
             db,
@@ -227,17 +215,17 @@ async def create_check_in(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except (GoalValidationError, CurrencyMismatchError, InsufficientAvailableBalanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return GoalCheckInResponse.model_validate(check_in)
+    return GoalCheckInResource.model_validate(check_in)
 
 
-@router.patch("/{goal_id}/check-ins/{check_in_id}", response_model=GoalCheckInResponse)
+@router.patch("/{goal_id}/check-ins/{check_in_id}", response_model=GoalCheckInResource)
 async def update_check_in_endpoint(
     goal_id: uuid.UUID,
     check_in_id: uuid.UUID,
-    payload: GoalCheckInUpdateRequest,
+    payload: UpdateGoalCheckInDto,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> GoalCheckInResponse:
+) -> GoalCheckInResource:
     try:
         check_in = update_check_in(
             db,
@@ -251,24 +239,24 @@ async def update_check_in_endpoint(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (CurrencyMismatchError, InsufficientAvailableBalanceError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return GoalCheckInResponse.model_validate(check_in)
+    return GoalCheckInResource.model_validate(check_in)
 
 
-@router.get("/{goal_id}/check-ins", response_model=list[GoalCheckInResponse])
+@router.get("/{goal_id}/check-ins", response_model=list[GoalCheckInResource])
 async def list_check_ins(
     goal_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> list[GoalCheckInResponse]:
+) -> list[GoalCheckInResource]:
     try:
         check_ins = list_check_ins_for_goal(db, goal_id, current_user.id)
     except GoalNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return [GoalCheckInResponse.model_validate(check_in) for check_in in check_ins]
+    return [GoalCheckInResource.model_validate(check_in) for check_in in check_ins]
 
 
-@router.post("/{goal_id}/abandon", response_model=GoalResponse)
+@router.post("/{goal_id}/abandon", response_model=GoalResource)
 async def abandon(
     goal_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
-) -> GoalResponse:
+) -> GoalResource:
     try:
         goal = abandon_goal(db, goal_id, current_user.id)
     except GoalNotFoundError as exc:

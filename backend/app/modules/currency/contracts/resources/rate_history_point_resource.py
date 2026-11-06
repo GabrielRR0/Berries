@@ -4,16 +4,7 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 
-class ConversionResponse(BaseModel):
-    converted_amount: Decimal
-    rate_used: Decimal
-
-
-class RefreshDailyResponse(BaseModel):
-    refreshed_currencies: list[str]
-
-
-class RateHistoryPoint(BaseModel):
+class RateHistoryPointResource(BaseModel):
     fetched_at: datetime
     rate: Decimal
     # None en filas viejas, previas a que ExchangeRate guardara procedencia - ver
@@ -21,9 +12,3 @@ class RateHistoryPoint(BaseModel):
     # (no como "sí es real"), nunca al revés.
     source: str | None
     is_estimated: bool
-
-
-class RateHistoryResponse(BaseModel):
-    code: str
-    quote: str
-    points: list[RateHistoryPoint]
