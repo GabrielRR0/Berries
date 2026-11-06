@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from app.services.currency.supported_currencies import SUPPORTED_CURRENCIES
+from app.modules.currency import SUPPORTED_CURRENCIES
 
 revision: str = "202608300001"
 down_revision: Union[str, None] = "202608280006"

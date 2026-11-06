@@ -2,6 +2,13 @@
 
 Frontend: Vue 3 + Vite (`frontend/`). Backend: FastAPI (`backend/`). Cómo correr: ver `README.md`.
 
+## Convenciones del backend
+
+- **Por módulo:** todo un dominio vive en `backend/app/modules/<modulo>/` (controllers por
+  acceso, `contracts/dto` y `contracts/resources`, services con fachada, models, errors).
+  Leer `docs/BACKEND-MODULAR.md` y `docs/CONVENCIONES.md` antes de crear o tocar un módulo.
+- `pytest` incluye `tests/architecture/`: el contrato de la API y las reglas de estructura.
+
 ## Convenciones del frontend
 
 - **Modular:** la lógica va en composables (`src/composables/`) y utilidades

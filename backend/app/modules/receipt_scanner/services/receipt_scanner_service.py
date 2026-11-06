@@ -1,0 +1,42 @@
+"""Leer la foto de un recibo y crear un borrador de movimiento."""
+
+import uuid
+from decimal import Decimal
+
+from sqlalchemy.orm import Session
+
+from app.modules.transactions import TransactionDraft
+from app.modules.receipt_scanner.services.ocr.vision_client import extract_text
+from app.modules.transactions import create_draft
+from app.modules.transactions import parse_transaction_entities
+
+
+def submit_receipt_scan(
+    db: Session,
+    user_id: uuid.UUID,
+    default_currency: str,
+    image_bytes: bytes,
+    filename: str,
+) -> TransactionDraft:
+    """Orquesta el flujo de OCR completo: extrae el texto de la foto del recibo, extrae
+    monto/moneda/categoría con el parser compartido, y persiste el resultado como un
+    TransactionDraft pendiente de revisión.
+
+    OcrNotConfiguredError se deja propagar tal cual (no se maneja acá) — es el router
+    quien la traduce a una respuesta HTTP limpia.
+    """
+    text = extract_text(image_bytes, filename)
+    parsed = parse_transaction_entities(text, default_currency)
+
+    parsed_amount = Decimal(str(parsed.amount)) if parsed.amount is not None else None
+
+    return create_draft(
+        db,
+        user_id=user_id,
+        source="ocr",
+        raw_input=text,
+        parsed_amount=parsed_amount,
+        parsed_currency=parsed.currency,
+        parsed_category=parsed.category,
+        parsed_description=parsed.description,
+    )

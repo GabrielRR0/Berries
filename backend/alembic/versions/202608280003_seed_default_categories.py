@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from app.services.transactions.categories.default_categories import DEFAULT_CATEGORIES
+from app.modules.categories import DEFAULT_CATEGORIES
 
 revision: str = "202608280003"
 down_revision: Union[str, None] = "202608280002"

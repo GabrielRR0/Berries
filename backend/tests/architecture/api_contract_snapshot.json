@@ -1,0 +1,8693 @@
+{
+ "/api/analytics/categories": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "type",
+     "required": true,
+     "schema": {
+      "enum": [
+       "income",
+       "expense"
+      ],
+      "type": "string"
+     }
+    },
+    {
+     "in": "query",
+     "name": "month",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "category": {
+           "type": "string"
+          },
+          "percentage": {
+           "type": "number"
+          },
+          "total": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "category",
+          "total",
+          "percentage"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/analytics/categories/trend": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "type",
+     "required": true,
+     "schema": {
+      "enum": [
+       "income",
+       "expense"
+      ],
+      "type": "string"
+     }
+    },
+    {
+     "in": "query",
+     "name": "months",
+     "required": false,
+     "schema": {
+      "default": 6,
+      "maximum": 24,
+      "minimum": 1,
+      "type": "integer"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "categories": {
+          "items": {
+           "properties": {
+            "category": {
+             "type": "string"
+            },
+            "monthly_totals": {
+             "items": {
+              "type": "string"
+             },
+             "type": "array"
+            }
+           },
+           "required": [
+            "category",
+            "monthly_totals"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         },
+         "months": {
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "months",
+         "categories"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/analytics/monthly": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "months",
+     "required": false,
+     "schema": {
+      "default": 6,
+      "maximum": 24,
+      "minimum": 1,
+      "type": "integer"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "month": {
+           "type": "string"
+          },
+          "net": {
+           "type": "string"
+          },
+          "total_expense": {
+           "type": "string"
+          },
+          "total_income": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "month",
+          "total_income",
+          "total_expense",
+          "net"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/analytics/summary": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "month",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "net_savings": {
+          "type": "string"
+         },
+         "period": {
+          "type": "string"
+         },
+         "previous_period_net_savings": {
+          "type": "string"
+         },
+         "total_expense": {
+          "type": "string"
+         },
+         "total_income": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "period",
+         "total_income",
+         "total_expense",
+         "net_savings",
+         "previous_period_net_savings"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/auth/google": {
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "default_currency": {
+         "default": "USD",
+         "maxLength": 10,
+         "type": "string"
+        },
+        "id_token": {
+         "type": "string"
+        },
+        "wallets": {
+         "items": {
+          "properties": {
+           "currency": {
+            "maxLength": 10,
+            "minLength": 1,
+            "type": "string"
+           },
+           "initial_balance": {
+            "anyOf": [
+             {
+              "minimum": 0.0,
+              "type": "number"
+             },
+             {
+              "type": "string"
+             }
+            ],
+            "default": "0"
+           },
+           "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+           }
+          },
+          "required": [
+           "name",
+           "currency"
+          ],
+          "type": "object"
+         },
+         "type": "array"
+        }
+       },
+       "required": [
+        "id_token"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "access_token": {
+          "type": "string"
+         },
+         "token_type": {
+          "default": "bearer",
+          "type": "string"
+         },
+         "user": {
+          "properties": {
+           "created_at": {
+            "format": "date-time",
+            "type": "string"
+           },
+           "default_currency": {
+            "type": "string"
+           },
+           "display_name": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "email": {
+            "type": "string"
+           },
+           "id": {
+            "format": "uuid",
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "email",
+           "display_name",
+           "default_currency",
+           "created_at"
+          ],
+          "type": "object"
+         }
+        },
+        "required": [
+         "access_token",
+         "user"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "/api/auth/google/check": {
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "id_token": {
+         "type": "string"
+        }
+       },
+       "required": [
+        "id_token"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "exists": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "exists"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "/api/auth/login": {
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "email": {
+         "format": "email",
+         "type": "string"
+        },
+        "password": {
+         "type": "string"
+        },
+        "turnstile_token": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "email",
+        "password"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "access_token": {
+          "type": "string"
+         },
+         "token_type": {
+          "default": "bearer",
+          "type": "string"
+         },
+         "user": {
+          "properties": {
+           "created_at": {
+            "format": "date-time",
+            "type": "string"
+           },
+           "default_currency": {
+            "type": "string"
+           },
+           "display_name": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "email": {
+            "type": "string"
+           },
+           "id": {
+            "format": "uuid",
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "email",
+           "display_name",
+           "default_currency",
+           "created_at"
+          ],
+          "type": "object"
+         }
+        },
+        "required": [
+         "access_token",
+         "user"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "/api/auth/me": {
+  "delete": {
+   "responses": {
+    "204": {}
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  },
+  "get": {
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "default_currency": {
+          "type": "string"
+         },
+         "display_name": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "email": {
+          "type": "string"
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "email",
+         "display_name",
+         "default_currency",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/auth/register": {
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "default_currency": {
+         "default": "USD",
+         "maxLength": 10,
+         "type": "string"
+        },
+        "display_name": {
+         "anyOf": [
+          {
+           "maxLength": 120,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "email": {
+         "format": "email",
+         "type": "string"
+        },
+        "password": {
+         "maxLength": 128,
+         "minLength": 8,
+         "type": "string"
+        },
+        "turnstile_token": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "wallets": {
+         "items": {
+          "properties": {
+           "currency": {
+            "maxLength": 10,
+            "minLength": 1,
+            "type": "string"
+           },
+           "initial_balance": {
+            "anyOf": [
+             {
+              "minimum": 0.0,
+              "type": "number"
+             },
+             {
+              "type": "string"
+             }
+            ],
+            "default": "0"
+           },
+           "name": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+           }
+          },
+          "required": [
+           "name",
+           "currency"
+          ],
+          "type": "object"
+         },
+         "type": "array"
+        }
+       },
+       "required": [
+        "email",
+        "password"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "201": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "access_token": {
+          "type": "string"
+         },
+         "token_type": {
+          "default": "bearer",
+          "type": "string"
+         },
+         "user": {
+          "properties": {
+           "created_at": {
+            "format": "date-time",
+            "type": "string"
+           },
+           "default_currency": {
+            "type": "string"
+           },
+           "display_name": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "email": {
+            "type": "string"
+           },
+           "id": {
+            "format": "uuid",
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "email",
+           "display_name",
+           "default_currency",
+           "created_at"
+          ],
+          "type": "object"
+         }
+        },
+        "required": [
+         "access_token",
+         "user"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "/api/categories": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "kind",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "enum": [
+         "income",
+         "expense",
+         "both"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    {
+     "in": "query",
+     "name": "include_hidden",
+     "required": false,
+     "schema": {
+      "default": false,
+      "type": "boolean"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "is_default": {
+           "type": "boolean"
+          },
+          "is_hidden": {
+           "type": "boolean"
+          },
+          "kind": {
+           "enum": [
+            "income",
+            "expense",
+            "both"
+           ],
+           "type": "string"
+          },
+          "name": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "kind",
+          "is_default",
+          "is_hidden"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  },
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "kind": {
+         "enum": [
+          "income",
+          "expense",
+          "both"
+         ],
+         "type": "string"
+        },
+        "name": {
+         "maxLength": 80,
+         "minLength": 1,
+         "type": "string"
+        }
+       },
+       "required": [
+        "name",
+        "kind"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "201": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "is_default": {
+          "type": "boolean"
+         },
+         "is_hidden": {
+          "type": "boolean"
+         },
+         "kind": {
+          "enum": [
+           "income",
+           "expense",
+           "both"
+          ],
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "name",
+         "kind",
+         "is_default",
+         "is_hidden"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/categories/{category_id}": {
+  "delete": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "category_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "204": {},
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/categories/{category_id}/hide": {
+  "delete": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "category_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "204": {},
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  },
+  "post": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "category_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "204": {},
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/cron/refresh-daily": {
+  "get": {
+   "parameters": [
+    {
+     "in": "header",
+     "name": "authorization",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "refreshed_currencies": {
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "refreshed_currencies"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "/api/currency/convert": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "amount",
+     "required": true,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ]
+     }
+    },
+    {
+     "in": "query",
+     "name": "from",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "in": "query",
+     "name": "to",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "converted_amount": {
+          "type": "string"
+         },
+         "rate_used": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "converted_amount",
+         "rate_used"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/currency/history": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "code",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    },
+    {
+     "in": "query",
+     "name": "months",
+     "required": false,
+     "schema": {
+      "default": 6,
+      "maximum": 24,
+      "minimum": 1,
+      "type": "integer"
+     }
+    },
+    {
+     "in": "query",
+     "name": "against",
+     "required": false,
+     "schema": {
+      "default": "USD",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "code": {
+          "type": "string"
+         },
+         "points": {
+          "items": {
+           "properties": {
+            "fetched_at": {
+             "format": "date-time",
+             "type": "string"
+            },
+            "is_estimated": {
+             "type": "boolean"
+            },
+            "rate": {
+             "type": "string"
+            },
+            "source": {
+             "anyOf": [
+              {
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "fetched_at",
+            "rate",
+            "source",
+            "is_estimated"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         },
+         "quote": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "code",
+         "quote",
+         "points"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/debts": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "direction",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "enum": [
+         "owed_by_user",
+         "owed_to_user"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "amount_paid": {
+           "type": "string"
+          },
+          "counterparty_name": {
+           "type": "string"
+          },
+          "created_at": {
+           "format": "date-time",
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "direction": {
+           "type": "string"
+          },
+          "id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "installments": {
+           "default": [],
+           "items": {
+            "properties": {
+             "amount": {
+              "type": "string"
+             },
+             "debt_id": {
+              "format": "uuid",
+              "type": "string"
+             },
+             "due_date": {
+              "format": "date",
+              "type": "string"
+             },
+             "id": {
+              "format": "uuid",
+              "type": "string"
+             },
+             "paid_at": {
+              "anyOf": [
+               {
+                "format": "date-time",
+                "type": "string"
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "status": {
+              "type": "string"
+             }
+            },
+            "required": [
+             "id",
+             "debt_id",
+             "due_date",
+             "amount",
+             "status",
+             "paid_at"
+            ],
+            "type": "object"
+           },
+           "type": "array"
+          },
+          "payments": {
+           "default": [],
+           "items": {
+            "properties": {
+             "amount": {
+              "type": "string"
+             },
+             "applied_amount": {
+              "type": "string"
+             },
+             "created_at": {
+              "format": "date-time",
+              "type": "string"
+             },
+             "currency": {
+              "type": "string"
+             },
+             "debt_id": {
+              "format": "uuid",
+              "type": "string"
+             },
+             "id": {
+              "format": "uuid",
+              "type": "string"
+             },
+             "note": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "null"
+               }
+              ]
+             },
+             "paid_at": {
+              "format": "date",
+              "type": "string"
+             },
+             "wallet_id": {
+              "anyOf": [
+               {
+                "format": "uuid",
+                "type": "string"
+               },
+               {
+                "type": "null"
+               }
+              ]
+             }
+            },
+            "required": [
+             "id",
+             "debt_id",
+             "amount",
+             "currency",
+             "applied_amount",
+             "note",
+             "paid_at",
+             "wallet_id",
+             "created_at"
+            ],
+            "type": "object"
+           },
+           "type": "array"
+          },
+          "remaining_amount": {
+           "type": "string"
+          },
+          "total_amount": {
+           "type": "string"
+          },
+          "user_id": {
+           "format": "uuid",
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "user_id",
+          "counterparty_name",
+          "direction",
+          "total_amount",
+          "currency",
+          "description",
+          "created_at",
+          "amount_paid",
+          "remaining_amount"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  },
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "counterparty_name": {
+         "maxLength": 120,
+         "type": "string"
+        },
+        "currency": {
+         "maxLength": 10,
+         "type": "string"
+        },
+        "direction": {
+         "enum": [
+          "owed_by_user",
+          "owed_to_user"
+         ],
+         "type": "string"
+        },
+        "first_due_date": {
+         "anyOf": [
+          {
+           "format": "date",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "frequency_days": {
+         "default": 30,
+         "exclusiveMinimum": 0.0,
+         "type": "integer"
+        },
+        "installment_count": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "integer"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "total_amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ]
+        }
+       },
+       "required": [
+        "counterparty_name",
+        "direction",
+        "total_amount",
+        "currency"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "201": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "amount_paid": {
+          "type": "string"
+         },
+         "counterparty_name": {
+          "type": "string"
+         },
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "direction": {
+          "type": "string"
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "installments": {
+          "default": [],
+          "items": {
+           "properties": {
+            "amount": {
+             "type": "string"
+            },
+            "debt_id": {
+             "format": "uuid",
+             "type": "string"
+            },
+            "due_date": {
+             "format": "date",
+             "type": "string"
+            },
+            "id": {
+             "format": "uuid",
+             "type": "string"
+            },
+            "paid_at": {
+             "anyOf": [
+              {
+               "format": "date-time",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "status": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "id",
+            "debt_id",
+            "due_date",
+            "amount",
+            "status",
+            "paid_at"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         },
+         "payments": {
+          "default": [],
+          "items": {
+           "properties": {
+            "amount": {
+             "type": "string"
+            },
+            "applied_amount": {
+             "type": "string"
+            },
+            "created_at": {
+             "format": "date-time",
+             "type": "string"
+            },
+            "currency": {
+             "type": "string"
+            },
+            "debt_id": {
+             "format": "uuid",
+             "type": "string"
+            },
+            "id": {
+             "format": "uuid",
+             "type": "string"
+            },
+            "note": {
+             "anyOf": [
+              {
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "paid_at": {
+             "format": "date",
+             "type": "string"
+            },
+            "wallet_id": {
+             "anyOf": [
+              {
+               "format": "uuid",
+               "type": "string"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            }
+           },
+           "required": [
+            "id",
+            "debt_id",
+            "amount",
+            "currency",
+            "applied_amount",
+            "note",
+            "paid_at",
+            "wallet_id",
+            "created_at"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         },
+         "remaining_amount": {
+          "type": "string"
+         },
+         "total_amount": {
+          "type": "string"
+         },
+         "user_id": {
+          "format": "uuid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "user_id",
+         "counterparty_name",
+         "direction",
+         "total_amount",
+         "currency",
+         "description",
+         "created_at",
+         "amount_paid",
+         "remaining_amount"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/debts/summary": {
+  "get": {
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "total_owed_by_user": {
+          "type": "string"
+         },
+         "total_owed_to_user": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "total_owed_by_user",
+         "total_owed_to_user"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/debts/{debt_id}": {
+  "delete": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "debt_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "204": {},
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/debts/{debt_id}/installments/{installment_id}/pay": {
+  "post": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "debt_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    },
+    {
+     "in": "path",
+     "name": "installment_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "amount": {
+          "type": "string"
+         },
+         "debt_id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "due_date": {
+          "format": "date",
+          "type": "string"
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "paid_at": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "status": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "debt_id",
+         "due_date",
+         "amount",
+         "status",
+         "paid_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/debts/{debt_id}/installments/{installment_id}/unpay": {
+  "post": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "debt_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    },
+    {
+     "in": "path",
+     "name": "installment_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "amount": {
+          "type": "string"
+         },
+         "debt_id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "due_date": {
+          "format": "date",
+          "type": "string"
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "paid_at": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "status": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "debt_id",
+         "due_date",
+         "amount",
+         "status",
+         "paid_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/debts/{debt_id}/payments": {
+  "post": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "debt_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ]
+        },
+        "applied_amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "currency": {
+         "maxLength": 10,
+         "type": "string"
+        },
+        "note": {
+         "anyOf": [
+          {
+           "maxLength": 280,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "paid_at": {
+         "anyOf": [
+          {
+           "format": "date",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "wallet_id": {
+         "anyOf": [
+          {
+           "format": "uuid",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "amount",
+        "currency"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "201": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "amount": {
+          "type": "string"
+         },
+         "applied_amount": {
+          "type": "string"
+         },
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "debt_id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "note": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "paid_at": {
+          "format": "date",
+          "type": "string"
+         },
+         "wallet_id": {
+          "anyOf": [
+           {
+            "format": "uuid",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "debt_id",
+         "amount",
+         "currency",
+         "applied_amount",
+         "note",
+         "paid_at",
+         "wallet_id",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/debts/{debt_id}/payments/parse-voice": {
+  "post": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "debt_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "transcript": {
+         "minLength": 1,
+         "type": "string"
+        }
+       },
+       "required": [
+        "transcript"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "amount": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "currency": {
+          "type": "string"
+         },
+         "note": {
+          "type": "string"
+         },
+         "paid_at": {
+          "format": "date",
+          "type": "string"
+         }
+        },
+        "required": [
+         "amount",
+         "currency",
+         "paid_at",
+         "note"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/debts/{debt_id}/payments/{payment_id}": {
+  "delete": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "debt_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    },
+    {
+     "in": "path",
+     "name": "payment_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "204": {},
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/goals": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "status",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "enum": [
+         "active",
+         "completed",
+         "abandoned"
+        ],
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "completed_at": {
+           "anyOf": [
+            {
+             "format": "date-time",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "created_at": {
+           "format": "date-time",
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "goal_type": {
+           "enum": [
+            "study",
+            "business",
+            "course",
+            "housing",
+            "travel",
+            "vehicle",
+            "computer",
+            "phone",
+            "custom"
+           ],
+           "type": "string"
+          },
+          "id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "last_check_in_postponed": {
+           "type": "boolean"
+          },
+          "status": {
+           "enum": [
+            "active",
+            "completed",
+            "abandoned"
+           ],
+           "type": "string"
+          },
+          "suggested_monthly_contribution": {
+           "type": "string"
+          },
+          "target_amount": {
+           "type": "string"
+          },
+          "target_date": {
+           "format": "date",
+           "type": "string"
+          },
+          "total_saved": {
+           "type": "string"
+          },
+          "user_id": {
+           "format": "uuid",
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "user_id",
+          "title",
+          "target_amount",
+          "currency",
+          "target_date",
+          "total_saved",
+          "status",
+          "goal_type",
+          "created_at",
+          "completed_at",
+          "suggested_monthly_contribution",
+          "last_check_in_postponed"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  },
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "currency": {
+         "maxLength": 10,
+         "type": "string"
+        },
+        "goal_type": {
+         "default": "custom",
+         "enum": [
+          "study",
+          "business",
+          "course",
+          "housing",
+          "travel",
+          "vehicle",
+          "computer",
+          "phone",
+          "custom"
+         ],
+         "type": "string"
+        },
+        "initial_amount": {
+         "anyOf": [
+          {
+           "minimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ],
+         "default": "0"
+        },
+        "initial_amount_note": {
+         "anyOf": [
+          {
+           "maxLength": 500,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "initial_amount_wallet_id": {
+         "anyOf": [
+          {
+           "format": "uuid",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "target_amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ]
+        },
+        "target_date": {
+         "format": "date",
+         "type": "string"
+        }
+       },
+       "required": [
+        "title",
+        "target_amount",
+        "currency",
+        "target_date"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "201": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "completed_at": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "goal_type": {
+          "enum": [
+           "study",
+           "business",
+           "course",
+           "housing",
+           "travel",
+           "vehicle",
+           "computer",
+           "phone",
+           "custom"
+          ],
+          "type": "string"
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "last_check_in_postponed": {
+          "type": "boolean"
+         },
+         "status": {
+          "enum": [
+           "active",
+           "completed",
+           "abandoned"
+          ],
+          "type": "string"
+         },
+         "suggested_monthly_contribution": {
+          "type": "string"
+         },
+         "target_amount": {
+          "type": "string"
+         },
+         "target_date": {
+          "format": "date",
+          "type": "string"
+         },
+         "total_saved": {
+          "type": "string"
+         },
+         "user_id": {
+          "format": "uuid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "user_id",
+         "title",
+         "target_amount",
+         "currency",
+         "target_date",
+         "total_saved",
+         "status",
+         "goal_type",
+         "created_at",
+         "completed_at",
+         "suggested_monthly_contribution",
+         "last_check_in_postponed"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/goals/pending-check-ins": {
+  "get": {
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "currency": {
+           "type": "string"
+          },
+          "goal_id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "suggested_amount": {
+           "type": "string"
+          },
+          "target_date": {
+           "format": "date",
+           "type": "string"
+          }
+         },
+         "required": [
+          "goal_id",
+          "title",
+          "currency",
+          "target_date",
+          "suggested_amount"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/goals/savings-capacity": {
+  "get": {
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "avg_monthly_available": {
+          "type": "string"
+         },
+         "avg_monthly_expense": {
+          "type": "string"
+         },
+         "avg_monthly_income": {
+          "type": "string"
+         },
+         "has_enough_history": {
+          "type": "boolean"
+         }
+        },
+        "required": [
+         "avg_monthly_income",
+         "avg_monthly_expense",
+         "avg_monthly_available",
+         "has_enough_history"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/goals/summary": {
+  "get": {
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "total_saved": {
+          "type": "string"
+         },
+         "total_target": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "total_saved",
+         "total_target"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/goals/voice-preview": {
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "transcript": {
+         "maxLength": 2000,
+         "minLength": 1,
+         "type": "string"
+        }
+       },
+       "required": [
+        "transcript"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "amount": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "amount_is_monthly": {
+          "type": "boolean"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "target_date": {
+          "anyOf": [
+           {
+            "format": "date",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "title",
+         "amount",
+         "amount_is_monthly",
+         "currency",
+         "target_date"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/goals/wallet-commitments": {
+  "get": {
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "committed_amount": {
+           "type": "string"
+          },
+          "wallet_id": {
+           "format": "uuid",
+           "type": "string"
+          }
+         },
+         "required": [
+          "wallet_id",
+          "committed_amount"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/goals/{goal_id}": {
+  "delete": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "goal_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "204": {},
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  },
+  "get": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "goal_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "completed_at": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "goal_type": {
+          "enum": [
+           "study",
+           "business",
+           "course",
+           "housing",
+           "travel",
+           "vehicle",
+           "computer",
+           "phone",
+           "custom"
+          ],
+          "type": "string"
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "last_check_in_postponed": {
+          "type": "boolean"
+         },
+         "status": {
+          "enum": [
+           "active",
+           "completed",
+           "abandoned"
+          ],
+          "type": "string"
+         },
+         "suggested_monthly_contribution": {
+          "type": "string"
+         },
+         "target_amount": {
+          "type": "string"
+         },
+         "target_date": {
+          "format": "date",
+          "type": "string"
+         },
+         "total_saved": {
+          "type": "string"
+         },
+         "user_id": {
+          "format": "uuid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "user_id",
+         "title",
+         "target_amount",
+         "currency",
+         "target_date",
+         "total_saved",
+         "status",
+         "goal_type",
+         "created_at",
+         "completed_at",
+         "suggested_monthly_contribution",
+         "last_check_in_postponed"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  },
+  "patch": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "goal_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "currency": {
+         "maxLength": 10,
+         "type": "string"
+        },
+        "target_amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ]
+        },
+        "target_date": {
+         "format": "date",
+         "type": "string"
+        }
+       },
+       "required": [
+        "title",
+        "target_amount",
+        "currency",
+        "target_date"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "completed_at": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "goal_type": {
+          "enum": [
+           "study",
+           "business",
+           "course",
+           "housing",
+           "travel",
+           "vehicle",
+           "computer",
+           "phone",
+           "custom"
+          ],
+          "type": "string"
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "last_check_in_postponed": {
+          "type": "boolean"
+         },
+         "status": {
+          "enum": [
+           "active",
+           "completed",
+           "abandoned"
+          ],
+          "type": "string"
+         },
+         "suggested_monthly_contribution": {
+          "type": "string"
+         },
+         "target_amount": {
+          "type": "string"
+         },
+         "target_date": {
+          "format": "date",
+          "type": "string"
+         },
+         "total_saved": {
+          "type": "string"
+         },
+         "user_id": {
+          "format": "uuid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "user_id",
+         "title",
+         "target_amount",
+         "currency",
+         "target_date",
+         "total_saved",
+         "status",
+         "goal_type",
+         "created_at",
+         "completed_at",
+         "suggested_monthly_contribution",
+         "last_check_in_postponed"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/goals/{goal_id}/abandon": {
+  "post": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "goal_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "completed_at": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "goal_type": {
+          "enum": [
+           "study",
+           "business",
+           "course",
+           "housing",
+           "travel",
+           "vehicle",
+           "computer",
+           "phone",
+           "custom"
+          ],
+          "type": "string"
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "last_check_in_postponed": {
+          "type": "boolean"
+         },
+         "status": {
+          "enum": [
+           "active",
+           "completed",
+           "abandoned"
+          ],
+          "type": "string"
+         },
+         "suggested_monthly_contribution": {
+          "type": "string"
+         },
+         "target_amount": {
+          "type": "string"
+         },
+         "target_date": {
+          "format": "date",
+          "type": "string"
+         },
+         "total_saved": {
+          "type": "string"
+         },
+         "user_id": {
+          "format": "uuid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "user_id",
+         "title",
+         "target_amount",
+         "currency",
+         "target_date",
+         "total_saved",
+         "status",
+         "goal_type",
+         "created_at",
+         "completed_at",
+         "suggested_monthly_contribution",
+         "last_check_in_postponed"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/goals/{goal_id}/check-ins": {
+  "get": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "goal_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "amount_saved": {
+           "type": "string"
+          },
+          "created_at": {
+           "format": "date-time",
+           "type": "string"
+          },
+          "goal_id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "new_target_date": {
+           "anyOf": [
+            {
+             "format": "date",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "note": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "period_month": {
+           "format": "date",
+           "type": "string"
+          },
+          "previous_target_date": {
+           "anyOf": [
+            {
+             "format": "date",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "wallet_id": {
+           "anyOf": [
+            {
+             "format": "uuid",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          }
+         },
+         "required": [
+          "id",
+          "goal_id",
+          "period_month",
+          "amount_saved",
+          "previous_target_date",
+          "new_target_date",
+          "note",
+          "wallet_id",
+          "created_at"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  },
+  "post": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "goal_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "amount_saved": {
+         "anyOf": [
+          {
+           "minimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ]
+        },
+        "new_target_date": {
+         "anyOf": [
+          {
+           "format": "date",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "note": {
+         "anyOf": [
+          {
+           "maxLength": 500,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "wallet_id": {
+         "anyOf": [
+          {
+           "format": "uuid",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "amount_saved"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "201": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "amount_saved": {
+          "type": "string"
+         },
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "goal_id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "new_target_date": {
+          "anyOf": [
+           {
+            "format": "date",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "note": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "period_month": {
+          "format": "date",
+          "type": "string"
+         },
+         "previous_target_date": {
+          "anyOf": [
+           {
+            "format": "date",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "wallet_id": {
+          "anyOf": [
+           {
+            "format": "uuid",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "goal_id",
+         "period_month",
+         "amount_saved",
+         "previous_target_date",
+         "new_target_date",
+         "note",
+         "wallet_id",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/goals/{goal_id}/check-ins/{check_in_id}": {
+  "patch": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "goal_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    },
+    {
+     "in": "path",
+     "name": "check_in_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "note": {
+         "anyOf": [
+          {
+           "maxLength": 500,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "wallet_id": {
+         "anyOf": [
+          {
+           "format": "uuid",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "amount_saved": {
+          "type": "string"
+         },
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "goal_id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "new_target_date": {
+          "anyOf": [
+           {
+            "format": "date",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "note": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "period_month": {
+          "format": "date",
+          "type": "string"
+         },
+         "previous_target_date": {
+          "anyOf": [
+           {
+            "format": "date",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "wallet_id": {
+          "anyOf": [
+           {
+            "format": "uuid",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "goal_id",
+         "period_month",
+         "amount_saved",
+         "previous_target_date",
+         "new_target_date",
+         "note",
+         "wallet_id",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/health": {
+  "get": {
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "status": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "status"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "/api/receipt-scanner": {
+  "post": {
+   "requestBody": {
+    "content": {
+     "multipart/form-data": {
+      "schema": {
+       "properties": {
+        "image": {
+         "format": "binary",
+         "type": "string"
+        }
+       },
+       "required": [
+        "image"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "201": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "fee": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "occurred_at": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_amount": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_category": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_currency": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_description": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "raw_input": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "reference": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "source": {
+          "type": "string"
+         },
+         "status": {
+          "type": "string"
+         },
+         "suggested_wallet_id": {
+          "anyOf": [
+           {
+            "format": "uuid",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "txn_type": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "source",
+         "raw_input",
+         "parsed_amount",
+         "parsed_currency",
+         "parsed_category",
+         "parsed_description",
+         "suggested_wallet_id",
+         "txn_type",
+         "occurred_at",
+         "fee",
+         "reference",
+         "status",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/transactions": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "wallet_id",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    {
+     "in": "query",
+     "name": "category",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    {
+     "in": "query",
+     "name": "date_from",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    {
+     "in": "query",
+     "name": "date_to",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "format": "date-time",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "amount": {
+           "type": "string"
+          },
+          "category": {
+           "type": "string"
+          },
+          "created_at": {
+           "format": "date-time",
+           "type": "string"
+          },
+          "currency": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "occurred_at": {
+           "format": "date-time",
+           "type": "string"
+          },
+          "reference_amount_usd": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "reference_rate": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "source": {
+           "type": "string"
+          },
+          "transfer_id": {
+           "anyOf": [
+            {
+             "format": "uuid",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "type": {
+           "type": "string"
+          },
+          "wallet_id": {
+           "format": "uuid",
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "wallet_id",
+          "type",
+          "amount",
+          "currency",
+          "reference_amount_usd",
+          "reference_rate",
+          "category",
+          "description",
+          "occurred_at",
+          "source",
+          "transfer_id",
+          "created_at"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  },
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ]
+        },
+        "category": {
+         "maxLength": 80,
+         "minLength": 1,
+         "type": "string"
+        },
+        "import_key": {
+         "anyOf": [
+          {
+           "maxLength": 128,
+           "minLength": 8,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "occurred_at": {
+         "anyOf": [
+          {
+           "format": "date-time",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "source": {
+         "default": "manual",
+         "maxLength": 20,
+         "type": "string"
+        },
+        "type": {
+         "enum": [
+          "income",
+          "expense"
+         ],
+         "type": "string"
+        },
+        "wallet_id": {
+         "format": "uuid",
+         "type": "string"
+        }
+       },
+       "required": [
+        "wallet_id",
+        "type",
+        "amount",
+        "category"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "201": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "amount": {
+          "type": "string"
+         },
+         "category": {
+          "type": "string"
+         },
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "currency": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "occurred_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "reference_amount_usd": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "reference_rate": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "source": {
+          "type": "string"
+         },
+         "transfer_id": {
+          "anyOf": [
+           {
+            "format": "uuid",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "type": {
+          "type": "string"
+         },
+         "wallet_id": {
+          "format": "uuid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "wallet_id",
+         "type",
+         "amount",
+         "currency",
+         "reference_amount_usd",
+         "reference_rate",
+         "category",
+         "description",
+         "occurred_at",
+         "source",
+         "transfer_id",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/transactions/bulk": {
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "items": {
+         "items": {
+          "properties": {
+           "amount": {
+            "anyOf": [
+             {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+             },
+             {
+              "type": "string"
+             }
+            ]
+           },
+           "category": {
+            "maxLength": 80,
+            "minLength": 1,
+            "type": "string"
+           },
+           "import_key": {
+            "anyOf": [
+             {
+              "maxLength": 128,
+              "minLength": 8,
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "occurred_at": {
+            "anyOf": [
+             {
+              "format": "date-time",
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "source": {
+            "default": "manual",
+            "maxLength": 20,
+            "type": "string"
+           },
+           "type": {
+            "enum": [
+             "income",
+             "expense"
+            ],
+            "type": "string"
+           },
+           "wallet_id": {
+            "format": "uuid",
+            "type": "string"
+           }
+          },
+          "required": [
+           "wallet_id",
+           "type",
+           "amount",
+           "category"
+          ],
+          "type": "object"
+         },
+         "maxItems": 100,
+         "minItems": 1,
+         "type": "array"
+        }
+       },
+       "required": [
+        "items"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "201": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "amount": {
+           "type": "string"
+          },
+          "category": {
+           "type": "string"
+          },
+          "created_at": {
+           "format": "date-time",
+           "type": "string"
+          },
+          "currency": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "occurred_at": {
+           "format": "date-time",
+           "type": "string"
+          },
+          "reference_amount_usd": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "reference_rate": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "source": {
+           "type": "string"
+          },
+          "transfer_id": {
+           "anyOf": [
+            {
+             "format": "uuid",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "type": {
+           "type": "string"
+          },
+          "wallet_id": {
+           "format": "uuid",
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "wallet_id",
+          "type",
+          "amount",
+          "currency",
+          "reference_amount_usd",
+          "reference_rate",
+          "category",
+          "description",
+          "occurred_at",
+          "source",
+          "transfer_id",
+          "created_at"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/transactions/drafts": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "status",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": "pending"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "created_at": {
+           "format": "date-time",
+           "type": "string"
+          },
+          "fee": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "occurred_at": {
+           "anyOf": [
+            {
+             "format": "date-time",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "parsed_amount": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "parsed_category": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "parsed_currency": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "parsed_description": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "raw_input": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "reference": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "source": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string"
+          },
+          "suggested_wallet_id": {
+           "anyOf": [
+            {
+             "format": "uuid",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "txn_type": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          }
+         },
+         "required": [
+          "id",
+          "source",
+          "raw_input",
+          "parsed_amount",
+          "parsed_currency",
+          "parsed_category",
+          "parsed_description",
+          "suggested_wallet_id",
+          "txn_type",
+          "occurred_at",
+          "fee",
+          "reference",
+          "status",
+          "created_at"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/transactions/drafts/bulk": {
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "items": {
+         "items": {
+          "properties": {
+           "fee": {
+            "anyOf": [
+             {
+              "minimum": 0.0,
+              "type": "number"
+             },
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "occurred_at": {
+            "anyOf": [
+             {
+              "format": "date-time",
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "parsed_amount": {
+            "anyOf": [
+             {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+             },
+             {
+              "type": "string"
+             }
+            ]
+           },
+           "parsed_category": {
+            "anyOf": [
+             {
+              "maxLength": 80,
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "parsed_currency": {
+            "anyOf": [
+             {
+              "maxLength": 10,
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "parsed_description": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "raw_input": {
+            "anyOf": [
+             {
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "reference": {
+            "anyOf": [
+             {
+              "maxLength": 60,
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "source": {
+            "default": "screenshot",
+            "maxLength": 10,
+            "type": "string"
+           },
+           "suggested_wallet_id": {
+            "anyOf": [
+             {
+              "format": "uuid",
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           },
+           "txn_type": {
+            "anyOf": [
+             {
+              "enum": [
+               "income",
+               "expense"
+              ],
+              "type": "string"
+             },
+             {
+              "type": "null"
+             }
+            ]
+           }
+          },
+          "required": [
+           "parsed_amount"
+          ],
+          "type": "object"
+         },
+         "maxItems": 100,
+         "minItems": 1,
+         "type": "array"
+        }
+       },
+       "required": [
+        "items"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "201": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "created_at": {
+           "format": "date-time",
+           "type": "string"
+          },
+          "fee": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "occurred_at": {
+           "anyOf": [
+            {
+             "format": "date-time",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "parsed_amount": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "parsed_category": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "parsed_currency": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "parsed_description": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "raw_input": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "reference": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "source": {
+           "type": "string"
+          },
+          "status": {
+           "type": "string"
+          },
+          "suggested_wallet_id": {
+           "anyOf": [
+            {
+             "format": "uuid",
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "txn_type": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          }
+         },
+         "required": [
+          "id",
+          "source",
+          "raw_input",
+          "parsed_amount",
+          "parsed_currency",
+          "parsed_category",
+          "parsed_description",
+          "suggested_wallet_id",
+          "txn_type",
+          "occurred_at",
+          "fee",
+          "reference",
+          "status",
+          "created_at"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/transactions/drafts/{draft_id}": {
+  "patch": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "draft_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "fee": {
+         "anyOf": [
+          {
+           "minimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "occurred_at": {
+         "anyOf": [
+          {
+           "format": "date-time",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "parsed_amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "parsed_category": {
+         "anyOf": [
+          {
+           "maxLength": 80,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "parsed_currency": {
+         "anyOf": [
+          {
+           "maxLength": 10,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "parsed_description": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "reference": {
+         "anyOf": [
+          {
+           "maxLength": 60,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "suggested_wallet_id": {
+         "anyOf": [
+          {
+           "format": "uuid",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "txn_type": {
+         "anyOf": [
+          {
+           "enum": [
+            "income",
+            "expense"
+           ],
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "fee": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "occurred_at": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_amount": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_category": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_currency": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_description": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "raw_input": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "reference": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "source": {
+          "type": "string"
+         },
+         "status": {
+          "type": "string"
+         },
+         "suggested_wallet_id": {
+          "anyOf": [
+           {
+            "format": "uuid",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "txn_type": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "source",
+         "raw_input",
+         "parsed_amount",
+         "parsed_currency",
+         "parsed_category",
+         "parsed_description",
+         "suggested_wallet_id",
+         "txn_type",
+         "occurred_at",
+         "fee",
+         "reference",
+         "status",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/transactions/drafts/{draft_id}/confirm": {
+  "post": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "draft_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "fee": {
+         "anyOf": [
+          {
+           "minimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "final_amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ]
+        },
+        "final_category": {
+         "maxLength": 80,
+         "minLength": 1,
+         "type": "string"
+        },
+        "final_description": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "occurred_at": {
+         "anyOf": [
+          {
+           "format": "date-time",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "type": {
+         "enum": [
+          "income",
+          "expense"
+         ],
+         "type": "string"
+        },
+        "wallet_id": {
+         "format": "uuid",
+         "type": "string"
+        }
+       },
+       "required": [
+        "wallet_id",
+        "type",
+        "final_amount",
+        "final_category"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "amount": {
+          "type": "string"
+         },
+         "category": {
+          "type": "string"
+         },
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "currency": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "occurred_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "reference_amount_usd": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "reference_rate": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "source": {
+          "type": "string"
+         },
+         "transfer_id": {
+          "anyOf": [
+           {
+            "format": "uuid",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "type": {
+          "type": "string"
+         },
+         "wallet_id": {
+          "format": "uuid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "wallet_id",
+         "type",
+         "amount",
+         "currency",
+         "reference_amount_usd",
+         "reference_rate",
+         "category",
+         "description",
+         "occurred_at",
+         "source",
+         "transfer_id",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/transactions/drafts/{draft_id}/confirm-transfer": {
+  "post": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "draft_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "fee": {
+         "anyOf": [
+          {
+           "minimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ],
+         "default": "0"
+        },
+        "from_wallet_id": {
+         "format": "uuid",
+         "type": "string"
+        },
+        "occurred_at": {
+         "anyOf": [
+          {
+           "format": "date-time",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "sent_amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ]
+        },
+        "to_wallet_id": {
+         "anyOf": [
+          {
+           "format": "uuid",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        }
+       },
+       "required": [
+        "from_wallet_id",
+        "sent_amount"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "fee": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "occurred_at": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_amount": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_category": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_currency": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_description": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "raw_input": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "reference": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "source": {
+          "type": "string"
+         },
+         "status": {
+          "type": "string"
+         },
+         "suggested_wallet_id": {
+          "anyOf": [
+           {
+            "format": "uuid",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "txn_type": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "source",
+         "raw_input",
+         "parsed_amount",
+         "parsed_currency",
+         "parsed_category",
+         "parsed_description",
+         "suggested_wallet_id",
+         "txn_type",
+         "occurred_at",
+         "fee",
+         "reference",
+         "status",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/transactions/drafts/{draft_id}/discard": {
+  "post": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "draft_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "fee": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "occurred_at": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_amount": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_category": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_currency": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_description": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "raw_input": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "reference": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "source": {
+          "type": "string"
+         },
+         "status": {
+          "type": "string"
+         },
+         "suggested_wallet_id": {
+          "anyOf": [
+           {
+            "format": "uuid",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "txn_type": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "source",
+         "raw_input",
+         "parsed_amount",
+         "parsed_currency",
+         "parsed_category",
+         "parsed_description",
+         "suggested_wallet_id",
+         "txn_type",
+         "occurred_at",
+         "fee",
+         "reference",
+         "status",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/transactions/duplicates": {
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "keys": {
+         "items": {
+          "type": "string"
+         },
+         "maxItems": 300,
+         "type": "array"
+        }
+       },
+       "required": [
+        "keys"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "duplicates": {
+          "items": {
+           "type": "string"
+          },
+          "type": "array"
+         }
+        },
+        "required": [
+         "duplicates"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/transactions/{transaction_id}": {
+  "delete": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "transaction_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "204": {},
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  },
+  "patch": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "transaction_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ]
+        },
+        "category": {
+         "maxLength": 80,
+         "minLength": 1,
+         "type": "string"
+        },
+        "occurred_at": {
+         "format": "date-time",
+         "type": "string"
+        },
+        "type": {
+         "enum": [
+          "income",
+          "expense"
+         ],
+         "type": "string"
+        },
+        "wallet_id": {
+         "format": "uuid",
+         "type": "string"
+        }
+       },
+       "required": [
+        "wallet_id",
+        "type",
+        "amount",
+        "category",
+        "occurred_at"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "amount": {
+          "type": "string"
+         },
+         "category": {
+          "type": "string"
+         },
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "currency": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "occurred_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "reference_amount_usd": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "reference_rate": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "source": {
+          "type": "string"
+         },
+         "transfer_id": {
+          "anyOf": [
+           {
+            "format": "uuid",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "type": {
+          "type": "string"
+         },
+         "wallet_id": {
+          "format": "uuid",
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "wallet_id",
+         "type",
+         "amount",
+         "currency",
+         "reference_amount_usd",
+         "reference_rate",
+         "category",
+         "description",
+         "occurred_at",
+         "source",
+         "transfer_id",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/voice-entry": {
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "transcript": {
+         "maxLength": 2000,
+         "minLength": 1,
+         "type": "string"
+        }
+       },
+       "required": [
+        "transcript"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "201": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "fee": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "occurred_at": {
+          "anyOf": [
+           {
+            "format": "date-time",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_amount": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_category": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_currency": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "parsed_description": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "raw_input": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "reference": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "source": {
+          "type": "string"
+         },
+         "status": {
+          "type": "string"
+         },
+         "suggested_wallet_id": {
+          "anyOf": [
+           {
+            "format": "uuid",
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "txn_type": {
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         }
+        },
+        "required": [
+         "id",
+         "source",
+         "raw_input",
+         "parsed_amount",
+         "parsed_currency",
+         "parsed_category",
+         "parsed_description",
+         "suggested_wallet_id",
+         "txn_type",
+         "occurred_at",
+         "fee",
+         "reference",
+         "status",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/wallets": {
+  "get": {
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "balance": {
+           "type": "string"
+          },
+          "created_at": {
+           "format": "date-time",
+           "type": "string"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "name": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "currency",
+          "balance",
+          "created_at"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  },
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "currency": {
+         "maxLength": 10,
+         "minLength": 1,
+         "type": "string"
+        },
+        "initial_balance": {
+         "anyOf": [
+          {
+           "minimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ],
+         "default": "0"
+        },
+        "name": {
+         "maxLength": 120,
+         "minLength": 1,
+         "type": "string"
+        }
+       },
+       "required": [
+        "name",
+        "currency"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "201": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "balance": {
+          "type": "string"
+         },
+         "created_at": {
+          "format": "date-time",
+          "type": "string"
+         },
+         "currency": {
+          "type": "string"
+         },
+         "id": {
+          "format": "uuid",
+          "type": "string"
+         },
+         "name": {
+          "type": "string"
+         }
+        },
+        "required": [
+         "id",
+         "name",
+         "currency",
+         "balance",
+         "created_at"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/wallets/transfer": {
+  "post": {
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ]
+        },
+        "converted_amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "fee": {
+         "anyOf": [
+          {
+           "minimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ],
+         "default": "0"
+        },
+        "from_wallet_id": {
+         "format": "uuid",
+         "type": "string"
+        },
+        "import_key": {
+         "anyOf": [
+          {
+           "maxLength": 128,
+           "minLength": 8,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "note": {
+         "anyOf": [
+          {
+           "maxLength": 200,
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "occurred_at": {
+         "anyOf": [
+          {
+           "format": "date-time",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "to_wallet_id": {
+         "format": "uuid",
+         "type": "string"
+        }
+       },
+       "required": [
+        "from_wallet_id",
+        "to_wallet_id",
+        "amount"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "from_wallet": {
+          "properties": {
+           "balance": {
+            "type": "string"
+           },
+           "created_at": {
+            "format": "date-time",
+            "type": "string"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "id": {
+            "format": "uuid",
+            "type": "string"
+           },
+           "name": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "name",
+           "currency",
+           "balance",
+           "created_at"
+          ],
+          "type": "object"
+         },
+         "to_wallet": {
+          "properties": {
+           "balance": {
+            "type": "string"
+           },
+           "created_at": {
+            "format": "date-time",
+            "type": "string"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "id": {
+            "format": "uuid",
+            "type": "string"
+           },
+           "name": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "name",
+           "currency",
+           "balance",
+           "created_at"
+          ],
+          "type": "object"
+         }
+        },
+        "required": [
+         "from_wallet",
+         "to_wallet"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/wallets/transfer/{transfer_id}": {
+  "patch": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "transfer_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "requestBody": {
+    "content": {
+     "application/json": {
+      "schema": {
+       "properties": {
+        "amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ]
+        },
+        "converted_amount": {
+         "anyOf": [
+          {
+           "exclusiveMinimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ]
+        },
+        "fee": {
+         "anyOf": [
+          {
+           "minimum": 0.0,
+           "type": "number"
+          },
+          {
+           "type": "string"
+          }
+         ],
+         "default": "0"
+        },
+        "occurred_at": {
+         "format": "date-time",
+         "type": "string"
+        }
+       },
+       "required": [
+        "amount",
+        "occurred_at"
+       ],
+       "type": "object"
+      }
+     }
+    },
+    "required": true
+   },
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "from_wallet": {
+          "properties": {
+           "balance": {
+            "type": "string"
+           },
+           "created_at": {
+            "format": "date-time",
+            "type": "string"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "id": {
+            "format": "uuid",
+            "type": "string"
+           },
+           "name": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "name",
+           "currency",
+           "balance",
+           "created_at"
+          ],
+          "type": "object"
+         },
+         "to_wallet": {
+          "properties": {
+           "balance": {
+            "type": "string"
+           },
+           "created_at": {
+            "format": "date-time",
+            "type": "string"
+           },
+           "currency": {
+            "type": "string"
+           },
+           "id": {
+            "format": "uuid",
+            "type": "string"
+           },
+           "name": {
+            "type": "string"
+           }
+          },
+          "required": [
+           "id",
+           "name",
+           "currency",
+           "balance",
+           "created_at"
+          ],
+          "type": "object"
+         }
+        },
+        "required": [
+         "from_wallet",
+         "to_wallet"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/wallets/{wallet_id}": {
+  "delete": {
+   "parameters": [
+    {
+     "in": "path",
+     "name": "wallet_id",
+     "required": true,
+     "schema": {
+      "format": "uuid",
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "204": {},
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ }
+}

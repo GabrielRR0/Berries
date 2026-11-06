@@ -25,6 +25,9 @@ export const PAY_DETAIL_LABELS = {
   time: /^(hora|time)\b/,
   // El OCR lee "Id." como "1d." o "ld.".
   orderId: /^[il1]d\.?\s*de orden|^order id/,
+  // "Pagado con 270 USDT" (solo en un envio): el mismo monto del encabezado. Respaldo para cuando
+  // el OCR no lee el numero grande del encabezado.
+  paidWith: /^(pagado con|paid with)\b/,
 }
 
 // Que la diferencia de un comprobante de banco: titulo y frases propias de Pay.

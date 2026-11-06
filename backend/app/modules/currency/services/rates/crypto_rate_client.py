@@ -1,0 +1,34 @@
+"""Cliente de tasas cripto (USDT)."""
+
+from decimal import Decimal
+
+from app.support import http_support
+
+# CoinGecko free endpoint no requiere API key, pero esta primera implementación deja
+# igualmente el cliente sin conectar de verdad (ver plan de arquitectura: "conexión real
+# diferida" para todos los clientes de tasas) — el fallback cubre la demo de hoy.
+_FALLBACK_CRYPTO_RATES: dict[str, Decimal] = {
+    "USDT": Decimal("1.0"),
+}
+
+_ENABLE_REAL_CALL = False  # cambiar a True (o wirearlo a un setting) cuando se conecte de verdad
+
+
+def fetch_crypto_rates() -> tuple[dict[str, Decimal], bool]:
+    """Tasas cripto (USDT, ...) relativas a 1 USD.
+
+    Devuelve (rates, is_estimated). is_estimated=True mientras _ENABLE_REAL_CALL sea
+    False (se usa el placeholder de arriba, no una lectura de mercado)."""
+    if not _ENABLE_REAL_CALL:
+        return dict(_FALLBACK_CRYPTO_RATES), True
+
+    # Llamado real a CoinGecko — queda escrito pero inalcanzable mientras
+    # _ENABLE_REAL_CALL sea False.
+    response = http_support.get(
+        "https://api.coingecko.com/api/v3/simple/price",
+        params={"ids": "tether", "vs_currencies": "usd"},
+        timeout=10.0,
+    )
+    response.raise_for_status()
+    data = response.json()
+    return {"USDT": Decimal(str(data["tether"]["usd"]))}, False
