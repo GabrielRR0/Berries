@@ -18,7 +18,9 @@ Los patrones se comparan contra texto **en minúsculas y sin tildes** (`depósit
 | `documentSignals.ts` | Qué palabras identifican cada tipo de captura | Soportar otro banco o documento |
 | `statusWords.ts` | Completado / cancelado | Otros estados |
 | `binanceLabels.ts` | Etiquetas de "Detalles de la orden" de Binance P2P | Binance cambia un texto |
+| `binancePayLabels.ts` | Lista "Activos > Pay" y "Detalles del pago" de Binance Pay | Binance cambia un texto |
 | `p2pOrderLabels.ts` | Etiquetas del historial de órdenes P2P | Binance cambia un texto |
+| `fiatSymbols.ts` | Moneda del importe de una orden P2P (Bs, $, COP…) | Comprar/vender USDT con otra moneda |
 | `bankLabels.ts` | Etiquetas de los comprobantes de cada banco | Un banco cambia su comprobante |
 | `listPatterns.ts` | Montos y horas de las listas de movimientos | Otro formato de monto u hora |
 | `imageKindWords.ts` | Cómo distinguir una lista de un movimiento suelto | Ajustar la detección de listas |

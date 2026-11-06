@@ -28,6 +28,8 @@ export function matchP2pOrders(rows: ScanRow[]): ScanRow[] {
     for (const bankRow of bankRows) {
       if (bankRow.linkedOrderNumber !== null) continue
       if (bankRow.direction !== order.direction) continue
+      // 30 $ de Zinli no son 30 Bs del banco.
+      if (bankRow.currency && order.currency && bankRow.currency !== order.currency) continue
       if (Math.abs(bankRow.amount - order.amount) > AMOUNT_TOLERANCE) continue
 
       const bankTime = timestamp(bankRow)

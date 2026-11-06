@@ -5,6 +5,7 @@ import { normalizeForMatch } from './textLines'
 // Se prefiere lo que es unico en el origen:
 //  - orden P2P: su numero de orden (una sola huella para la orden y para el abono del banco
 //    con el que se enlazo, asi el segundo intento se detecta desde cualquiera de las dos capturas);
+//  - movimiento con fecha y hora al segundo (Binance Pay): esa marca, el sentido y el monto;
 //  - comprobante suelto: el numero de operacion o referencia;
 //  - fila de una lista: billetera + sentido + monto + fecha + hora + descripcion.
 // Sin fecha no hay huella: el resultado seria demasiado ambiguo.
@@ -16,6 +17,10 @@ function orderNumberOf(row: ScanRow): string | null {
 export function rowFingerprint(row: ScanRow): string | null {
   const orderNumber = orderNumberOf(row)
   if (orderNumber) return `p2p|${orderNumber}`
+
+  // Con la hora exacta (Binance Pay) basta con ella: la lista no trae el id de orden que si trae
+  // el detalle, y el apodo el OCR lo lee distinto en cada pantalla.
+  if (row.stamp) return `stamp|${row.currency ?? ''}|${row.direction}|${row.amount.toFixed(2)}|${row.stamp}`
 
   if (row.source === 'bank' && row.reference) return `ref|${row.currency ?? ''}|${row.reference}|${row.direction}`
 

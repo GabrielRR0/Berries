@@ -4,7 +4,9 @@
 //
 // Para soportar otro banco o documento: agregar una entrada aqui con sus palabras,
 // su tipo en DocumentType y su extractor en scanText.ts.
-export type DocumentType = 'binance_p2p' | 'bdv_pago_movil' | 'facebank_movement' | 'unknown'
+import { PAY_DETAIL_PHRASES, PAY_DETAIL_TITLE } from './binancePayLabels'
+
+export type DocumentType = 'binance_p2p' | 'binance_pay' | 'bdv_pago_movil' | 'facebank_movement' | 'unknown'
 
 export interface Signal {
   pattern: RegExp
@@ -31,6 +33,16 @@ export const DOCUMENT_SIGNALS: DocumentSignals[] = [
       { pattern: /cantidad total|total quantity/, points: 1 },
       { pattern: /precio de usdt|\bprice\b/, points: 1 },
       { pattern: /de orden|order (no|number|id)/, points: 1 },
+    ],
+  },
+  {
+    // "Detalles del pago" de Binance Pay (envio o recibo de USDT, no P2P).
+    type: 'binance_pay',
+    signals: [
+      { pattern: PAY_DETAIL_TITLE, points: 3 },
+      { pattern: PAY_DETAIL_PHRASES, points: 2 },
+      { pattern: /(^|\n)\s*[+\-−–—]\s*\d[\d.,]*\s*usdt\s*($|\n)/, points: 2 },
+      { pattern: /[il1]d\.?\s*de orden|order id/, points: 1 },
     ],
   },
   {

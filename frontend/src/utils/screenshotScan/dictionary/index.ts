@@ -3,11 +3,13 @@
 // la logica que lo usa.
 export * from './bankLabels'
 export * from './binanceLabels'
+export * from './binancePayLabels'
 export * from './categoryHints'
 export * from './dateWords'
 export * from './directionWords'
 export * from './documentSignals'
 export * from './feeWords'
+export * from './fiatSymbols'
 export * from './imageKindWords'
 export * from './p2pOrderLabels'
 export * from './statusWords'

@@ -5,6 +5,7 @@ import { useTransactionsStore } from '../../stores/transactions.store'
 import { useWalletsStore } from '../../stores/wallets.store'
 import { buildConfirmPlan, rowIssues } from '../../utils/screenshotScan/confirmPlan'
 import { matchP2pOrders } from '../../utils/screenshotScan/matchP2pOrders'
+import { mergeRepeatedRows } from '../../utils/screenshotScan/mergeRepeatedRows'
 import type { RowAction, ScanRow } from '../../utils/screenshotScan/movementRows'
 import { applyScanContext } from '../../utils/screenshotScan/applyScanContext'
 import type { TransferKind } from '../../utils/screenshotScan/applyScanContext'
@@ -50,6 +51,7 @@ const KIND_LABEL: Record<ImageKind, string> = {
   bank_statement: 'Estado de cuenta del banco',
   p2p_orders: 'Historial de órdenes P2P',
   bank_list: 'Lista de movimientos del banco',
+  binance_pay: 'Movimientos de Binance Pay',
   single: 'Un movimiento',
   unknown: 'No reconocida',
 }
@@ -148,11 +150,12 @@ export function useBulkCapture(initialWalletId = '') {
 
     // Si hay una captura del banco y una orden no encontro su abono, se avisa (puede ser de
     // otro dia o de otra cuenta); la orden sigue siendo una transferencia valida por si sola.
-    const hasBankRows = linkWithOrders && rows.value.some((row) => row.source === 'bank')
+    // Solo cuenta un movimiento en la moneda de la orden: los USDT de Binance Pay no son el abono en Bs.
+    const bankCurrencies = new Set(rows.value.filter((row) => row.source === 'bank').map((row) => row.currency))
     for (const row of rows.value) {
       if (row.source !== 'p2p_order' || row.linkedOrderNumber !== null) continue
       row.flags = row.flags.filter((flag) => flag !== UNMATCHED_ORDER_FLAG)
-      if (hasBankRows) row.flags.push(UNMATCHED_ORDER_FLAG)
+      if (linkWithOrders && bankCurrencies.has(row.currency)) row.flags.push(UNMATCHED_ORDER_FLAG)
     }
     reapplyDefaults()
   }
@@ -210,7 +213,7 @@ export function useBulkCapture(initialWalletId = '') {
         tracked.status = 'error'
         tracked.message =
           result.kind === 'unknown'
-            ? 'No se reconoció este tipo de captura. Por ahora se leen listas y estados de cuenta del banco, historial de órdenes P2P de Binance y comprobantes sueltos.'
+            ? 'No se reconoció este tipo de captura. Por ahora se leen listas y estados de cuenta del banco, historial de órdenes P2P y movimientos de Binance Pay, y comprobantes sueltos.'
             : result.readCount === 0
               ? 'No se pudo leer ningún movimiento en esta captura. Prueba con una captura más grande o más nítida, o con otra pantalla del banco.'
               : result.kind === 'p2p_orders' && (scope.value === 'expenses' || scope.value === 'received')
@@ -218,11 +221,15 @@ export function useBulkCapture(initialWalletId = '') {
                 : 'No hay movimientos de ese tipo en esta captura. Prueba con la opción "Todo".'
         return
       }
-      rows.value.push(...newRows)
+      // La lista de Binance Pay y el detalle de un pago pueden traer el mismo movimiento: no se repite.
+      const added = mergeRepeatedRows(rows.value, newRows)
+      rows.value.push(...added)
       relink()
       await markDuplicates(rows.value)
       tracked.status = 'done'
-      tracked.message = KIND_LABEL[result.kind]
+      tracked.rowCount = added.length
+      tracked.message =
+        added.length === 0 ? 'Ya estaba en otra captura: se completaron sus datos.' : KIND_LABEL[result.kind]
     } catch (error) {
       tracked.status = 'error'
       tracked.message = errorMessage(error, 'No se pudo leer la captura.')

@@ -12,7 +12,14 @@ export const BINANCE_LABELS = {
   // En pantallas angostas la etiqueta se parte en dos lineas ("Apodo del" /
   // "comprador Nelasurej"), por eso "comprador" es opcional aqui y se quita del valor.
   counterparty: /^(apodo del( (comprador|vendedor))?|(buyer|seller)'?s? nick ?name)/,
+  // Donde salio o llego la moneda local ("Zinli USD", "Pago Movil VES"): ayuda a elegir la billetera.
+  paymentMethod: /^(metodo de pago|payment method)\b/,
 }
+
+// Palabras del metodo de pago que no sirven para reconocer la billetera (monedas y ruido
+// del OCR, que suele leer "USD" como "uso").
+export const PAYMENT_METHOD_CURRENCY_TAG = /\s+(usd|uso|usdt|ves|vef|bs|eur|cop|ars)$/i
+export const PAYMENT_METHOD_NOISE = /^(usd|uso|usdt|ves|vef|bs|eur|cop|ars|pago|movil|transferencia|bancaria)$/
 
 // "Vender USDT" / "Comprar USDT": los verbos que significan vender (el resto es comprar).
 export const BINANCE_SELL_VERBS = ['vender', 'sell']

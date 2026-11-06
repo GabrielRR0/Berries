@@ -6,7 +6,8 @@ export const P2P_SELL_START = /^(vender|sell)/
 export const P2P_ORDER_LABELS = {
   fiatAmount: /^(importe|fiat amount|monto)\b/,
   unitPrice: /^(precio|price)\b/,
-  quantity: /^(cantidad total|total quantity|cantidad|quantity)\b/,
+  // Al vender la tarjeta muestra la cantidad total; al comprar, la cantidad recibida.
+  quantity: /^(cantidad total|total quantity|cantidad recibida|received quantity|cantidad|quantity)\b/,
   orderNumber: /^(orden|order)\b/,
 }
 

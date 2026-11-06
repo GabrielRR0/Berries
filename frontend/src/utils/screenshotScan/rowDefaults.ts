@@ -1,4 +1,5 @@
 import type { Wallet } from '../../services/wallets/interfaces/wallets.interface'
+import { paymentMethodHints } from './binanceP2pProfile'
 import { pickWallet } from './pickWallet'
 import { walletNameHints } from './movementDictionary'
 import type { ScanRow } from './movementRows'
@@ -22,13 +23,19 @@ function walletForBankRow(row: ScanRow, selected: Wallet | null, wallets: Wallet
 //  - Gasto / ingreso / pendiente de un banco: la billetera elegida en el primer paso.
 //  - Transferencia: del lado donde entra o sale el dinero esta esa billetera, y del
 //    otro lado la billetera en USDT (si hay una sola).
-//  - Orden P2P: USDT <-> la billetera en bolivares elegida (o la unica en VEF).
+//  - Orden P2P: USDT <-> la billetera elegida si es de la moneda de la orden (Bs, o $ de
+//    Zinli, Wally...), o la unica de esa moneda.
 export function applyRowDefaults(rows: ScanRow[], context: RowDefaultsContext): ScanRow[] {
   const selected = context.wallets.find((wallet) => wallet.id === context.selectedWalletId) ?? null
   // Si la billetera elegida es la de USDT, esa es la del otro lado de una operacion P2P.
   const usdtWalletId =
     selected?.currency === 'USDT' ? selected.id : pickWallet(context.wallets, 'USDT', walletNameHints('binance'))
-  const bolivarWalletId = selected?.currency === 'VEF' ? selected.id : pickWallet(context.wallets, 'VEF')
+  // La elegida en el primer paso si es de esa moneda; si no, la unica de la moneda o la que
+  // nombra el metodo de pago de la orden (ej. "Zinli USD" -> la billetera "Zinli").
+  const fiatWalletFor = (row: ScanRow) =>
+    selected && row.currency !== null && selected.currency === row.currency
+      ? selected.id
+      : pickWallet(context.wallets, row.currency, paymentMethodHints(row.p2p?.paymentMethod))
 
   for (const row of rows) {
     if (row.source === 'bank') {
@@ -43,12 +50,13 @@ export function applyRowDefaults(rows: ScanRow[], context: RowDefaultsContext): 
         }
       }
     } else {
-      // Orden P2P: vender USDT = salen USDT y entran Bs; comprar = al reves.
+      // Orden P2P: vender USDT = salen USDT y entra la moneda local; comprar = al reves.
+      const fiatWalletId = fiatWalletFor(row)
       if (row.direction === 'in') {
         row.fromWalletId = row.fromWalletId || usdtWalletId
-        row.toWalletId = row.toWalletId || bolivarWalletId
+        row.toWalletId = row.toWalletId || fiatWalletId
       } else {
-        row.fromWalletId = row.fromWalletId || bolivarWalletId
+        row.fromWalletId = row.fromWalletId || fiatWalletId
         row.toWalletId = row.toWalletId || usdtWalletId
       }
     }

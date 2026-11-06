@@ -1,16 +1,26 @@
-import { BINANCE_LABELS as LABELS, BINANCE_SELL_VERBS, SPANISH_LANGUAGE_PATTERN } from './dictionary/binanceLabels'
+import {
+  BINANCE_LABELS as LABELS,
+  BINANCE_SELL_VERBS,
+  PAYMENT_METHOD_CURRENCY_TAG,
+  PAYMENT_METHOD_NOISE,
+  SPANISH_LANGUAGE_PATTERN,
+} from './dictionary/binanceLabels'
+
+// Palabras del metodo de pago que pueden aparecer en el nombre de la billetera ("Zinli USD" -> ["zinli"]).
+export function paymentMethodHints(paymentMethod: string | null | undefined): string[] {
+  if (!paymentMethod) return []
+  return normalizeForMatch(paymentMethod)
+    .split(/\s+/)
+    .filter((word) => word.length >= 3 && !PAYMENT_METHOD_NOISE.test(word))
+}
 import { CANCELLED_PATTERN, COMPLETED_PATTERN } from './dictionary/statusWords'
+import { fiatCurrencyOf } from './fiatCurrency'
 import { parseDateToIso, parseLocalizedNumber } from './numbers'
 import { findValueAfterLabel, normalizeForMatch, toLines } from './textLines'
 import type { NumberLocale, P2PTransferScan } from './types'
 
 // Lee la pantalla "Detalles de la orden" de Binance P2P. Las etiquetas (espanol e
 // ingles) estan en dictionary/binanceLabels.ts.
-
-// Del simbolo de la moneda local que muestra la app al codigo que usa Berry.
-function fiatCurrencyFor(raw: string): string | null {
-  return /\b(bs|ves|vef)\b/i.test(raw.replace(/(\d)/, ' $1')) ? 'VEF' : null
-}
 
 function detectLocale(normalizedText: string): NumberLocale {
   return SPANISH_LANGUAGE_PATTERN.test(normalizedText) ? 'es' : 'en'
@@ -61,13 +71,22 @@ export function extractBinanceP2p(text: string): P2PTransferScan {
       .replace(/[^\p{L}\p{N}]+$/u, '')
       .trim() || null
 
+  const paymentMethod =
+    findValueAfterLabel(lines, LABELS.paymentMethod)
+      ?.replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      // La etiqueta de moneda que Binance pone al lado ("Zinli USD") no es parte del nombre.
+      .replace(PAYMENT_METHOD_CURRENCY_TAG, '')
+      .trim() || null
+
   const completed = COMPLETED_PATTERN.test(normalizedText) ? true : CANCELLED_PATTERN.test(normalizedText) ? false : null
 
   if (completed === false) warnings.push('La orden no figura como completada.')
   if (total !== null && unitPrice !== null && convertedAmount !== null) {
     const expected = total * unitPrice
     if (Math.abs(expected - convertedAmount) / convertedAmount > 0.02) {
-      warnings.push('El importe en Bs no coincide con la cantidad por el precio. Revisa los montos.')
+      warnings.push('El importe no coincide con la cantidad por el precio. Revisa los montos.')
     }
   }
 
@@ -77,11 +96,12 @@ export function extractBinanceP2p(text: string): P2PTransferScan {
     amount,
     fee,
     convertedAmount,
-    fiatCurrency: fiatRaw ? fiatCurrencyFor(fiatRaw) : null,
+    fiatCurrency: fiatRaw ? fiatCurrencyOf([fiatRaw, findValueAfterLabel(lines, LABELS.unitPrice)], unitPrice) : null,
     unitPrice,
     occurredOn,
     orderNumber,
     counterparty,
+    paymentMethod,
     completed,
     warnings,
   }

@@ -3,6 +3,8 @@
 // decide (que hacer con ella, categoria, billeteras). Lo mismo sirve para un
 // movimiento suelto, una lista del banco o una lista de ordenes P2P.
 export type RowAction = 'expense' | 'income' | 'transfer' | 'pending' | 'skip'
+// 'bank' = movimiento de una cuenta (banco, o la billetera USDT con Binance Pay); 'p2p_order' =
+// orden P2P de Binance, que mueve dinero entre dos billeteras.
 export type RowSource = 'bank' | 'p2p_order'
 export type RowDirection = 'in' | 'out'
 
@@ -12,12 +14,16 @@ export interface P2POrderInfo {
   price: number | null
   orderNumber: string | null
   counterparty: string | null
+  // "Metodo de pago" del detalle de la orden (ej. "Zinli USD"): sirve para elegir la billetera
+  // en moneda local. El historial de ordenes no lo muestra.
+  paymentMethod?: string | null
 }
 
 export interface ScanRow {
   id: string
   source: RowSource
-  // En la moneda de la captura (Bs en un banco venezolano). En una orden P2P es el importe en Bs.
+  // En la moneda de la captura (Bs en un banco venezolano). En una orden P2P es el importe en
+  // moneda local (Bs, o $ al cambiar desde Zinli, Wally...).
   amount: number
   currency: string | null
   direction: RowDirection
@@ -27,6 +33,9 @@ export interface ScanRow {
   time: string | null
   description: string
   reference: string | null
+  // Fecha y hora con segundos ("2026-10-31 19:48:46") cuando la captura la muestra (Binance Pay).
+  // Identifica el movimiento aunque el OCR lea distinto el apodo en la lista y en el detalle.
+  stamp: string | null
   // Comision cobrada junto con el movimiento (ya sumada a la fila, no es otra fila).
   fee: number
   // Avisos de lo que se infirio y conviene revisar.
@@ -62,6 +71,7 @@ export function makeRow(partial: Partial<ScanRow> & Pick<ScanRow, 'source' | 'am
     time: null,
     description: '',
     reference: null,
+    stamp: null,
     fee: 0,
     flags: [],
     action: partial.direction === 'in' ? 'income' : 'expense',
