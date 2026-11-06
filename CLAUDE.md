@@ -8,6 +8,10 @@ Frontend: Vue 3 + Vite (`frontend/`). Backend: FastAPI (`backend/`). Cómo corre
   acceso, `contracts/dto` y `contracts/resources`, services con fachada, models, errors).
   Leer `docs/BACKEND-MODULAR.md` y `docs/CONVENCIONES.md` antes de crear o tocar un módulo.
 - `pytest` incluye `tests/architecture/`: el contrato de la API y las reglas de estructura.
+- **Antes de dar algo por listo para subir:** `pytest` completo, que incluye
+  `test_vercel_bundle.py` (arma el paquete como Vercel y arranca la app en modo producción).
+  Vercel descarta del backend cualquier carpeta `public/`, `venv/`, `node_modules/`...:
+  nunca nombrar así una carpeta de `app/`.
 
 ## Convenciones del frontend
 

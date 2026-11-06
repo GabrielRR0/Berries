@@ -8,7 +8,7 @@ viva es `debts/`):
   __init__.py          API pública: lo único que otros módulos pueden importar
   README.md
   controllers/         las rutas, separadas por quién puede usarlas
-    public/              sin sesión                      public_group()
+    anonymous/           sin sesión                      public_group()
     private/user/        cualquier usuario con sesión    auth_group()
     system/              Vercel Cron                     cron_group()
   contracts/

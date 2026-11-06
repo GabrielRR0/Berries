@@ -8,6 +8,6 @@ Las rutas del módulo, separadas por **quién puede usarlas**. Cada archivo crea
 
 - **`me_controller.py`** — `GET /api/auth/me`, `DELETE /api/auth/me`
 
-## `public/` — sin sesión (`public_group()`)
+## `anonymous/` — sin sesión (`public_group()`)
 
 - **`auth_controller.py`** — `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/google`, `POST /api/auth/google/check`

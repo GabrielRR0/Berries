@@ -28,7 +28,7 @@ THIRD_PARTY = {
 }
 # Carpeta del controller -> grupo de acceso que debe declarar su router.
 CONTROLLER_FOLDERS = {
-    ("public",): PUBLIC,
+    ("anonymous",): PUBLIC,
     ("private", "user"): AUTH,
     ("system",): CRON,
 }
@@ -85,7 +85,7 @@ def test_controllers_only_talk_to_the_module_facade():
 
 
 def test_controller_folder_matches_its_access_group():
-    """`controllers/public/` usa public_group(), `controllers/private/user/` usa
+    """`controllers/anonymous/` usa public_group(), `controllers/private/user/` usa
     auth_group() y `controllers/system/` usa cron_group(). Abrir una carpeta dice
     quién puede usar esas rutas."""
     problems = []

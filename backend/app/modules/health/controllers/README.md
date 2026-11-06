@@ -4,6 +4,6 @@ Las rutas del módulo, separadas por **quién puede usarlas**. Cada archivo crea
 
 `__init__.py` lista los routers en el orden en que se registran: el que tiene una ruta `/{id}` va último para no tapar a las rutas fijas.
 
-## `public/` — sin sesión (`public_group()`)
+## `anonymous/` — sin sesión (`public_group()`)
 
 - **`health_controller.py`** — `GET /api/health`
