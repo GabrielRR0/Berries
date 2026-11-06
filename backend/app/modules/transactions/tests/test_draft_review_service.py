@@ -3,12 +3,9 @@ from decimal import Decimal
 import pytest
 
 from app.modules.auth import register_user
-from app.modules.transactions.services.drafts.draft_review_service import (
-    confirm_draft,
-    create_draft,
-    discard_draft,
-    list_drafts_for_user,
-)
+from app.modules.transactions.services.drafts.draft_confirm import confirm_draft
+from app.modules.transactions.services.drafts.draft_create import create_draft
+from app.modules.transactions.services.drafts.draft_review import discard_draft, list_drafts_for_user
 from app.modules.transactions.errors import DraftNotFoundError
 from app.modules.wallets import create_wallet
 

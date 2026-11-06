@@ -5,21 +5,14 @@ from decimal import Decimal
 import pytest
 
 from app.modules.auth import register_user
-from app.modules.goals.services.check_in_service import (
-    abandon_goal,
-    get_goals_needing_check_in,
-    get_goals_needing_check_in_for_user,
-    list_check_ins_for_goal,
-    record_check_in,
-    update_check_in,
-)
+from app.modules.goals.services.check_ins.check_in_service import abandon_goal, get_goals_needing_check_in, get_goals_needing_check_in_for_user, list_check_ins_for_goal, record_check_in, update_check_in
 from app.modules.goals.errors import (
     GoalNotActiveError,
     GoalNotFoundError,
     GoalValidationError,
     InsufficientAvailableBalanceError,
 )
-from app.modules.goals.services.goal_service import create_goal
+from app.modules.goals.services.management.goal_write import create_goal
 from app.modules.wallets import CurrencyMismatchError, WalletNotFoundError
 from app.modules.wallets import create_wallet
 

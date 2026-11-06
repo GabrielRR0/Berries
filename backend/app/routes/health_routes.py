@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 
-from app.modules.health.controllers.public.health_controller import router
+from app.modules.health import health_routers
 
 
 def register(api: APIRouter) -> None:
-    api.include_router(router)
+    for router in health_routers:
+        api.include_router(router)

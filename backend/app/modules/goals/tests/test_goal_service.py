@@ -11,16 +11,9 @@ from app.modules.goals.errors import (
     GoalValidationError,
     InsufficientAvailableBalanceError,
 )
-from app.modules.goals.services.goal_service import (
-    build_goal_response,
-    create_goal,
-    delete_goal,
-    get_goal_owned_by_user,
-    get_goal_summary,
-    get_savings_capacity,
-    list_goals_for_user,
-    update_goal,
-)
+from app.modules.goals.services.management.goal_read import build_goal_response, get_goal_owned_by_user, get_goal_summary, list_goals_for_user
+from app.modules.goals.services.management.goal_write import create_goal, delete_goal, update_goal
+from app.modules.goals.services.planning.savings_capacity import get_savings_capacity
 from app.modules.transactions import create_transaction
 from app.modules.wallets import CurrencyMismatchError, WalletNotFoundError
 from app.modules.wallets import create_wallet

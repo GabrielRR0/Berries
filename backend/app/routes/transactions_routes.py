@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 
-from app.modules.transactions.controllers.transactions_controller import router
+from app.modules.transactions import transactions_routers
 
 
 def register(api: APIRouter) -> None:
-    api.include_router(router, prefix="/transactions", tags=["transactions"])
+    for router in transactions_routers:
+        api.include_router(router, prefix="/transactions", tags=["transactions"])

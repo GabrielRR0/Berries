@@ -1,5 +1,5 @@
 from app.common.security import public_group
-from app.modules.health.contracts.resources.health_resource import HealthResource
+from app.modules.health.contracts.resources import HealthResource
 
 router = public_group()
 

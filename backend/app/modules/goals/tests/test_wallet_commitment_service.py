@@ -4,16 +4,12 @@ from decimal import Decimal
 import pytest
 
 from app.modules.auth import register_user
-from app.modules.goals.services.check_in_service import record_check_in
+from app.modules.goals.services.check_ins.check_in_service import record_check_in
 from app.modules.goals.errors import InsufficientAvailableBalanceError
-from app.modules.goals.services.goal_service import create_goal
+from app.modules.goals.services.management.goal_write import create_goal
 from app.modules.wallets import CurrencyMismatchError
 from app.modules.wallets import create_wallet
-from app.modules.goals.services.wallet_commitment_service import (
-    get_available_balance,
-    get_committed_amounts_for_user,
-    validate_and_get_wallet_for_commitment,
-)
+from app.modules.goals.services.planning.wallet_commitment_service import get_available_balance, get_committed_amounts_for_user, validate_and_get_wallet_for_commitment
 
 _FUTURE = date.today() + timedelta(days=90)
 

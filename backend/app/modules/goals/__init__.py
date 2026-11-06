@@ -8,9 +8,8 @@ from typing import TYPE_CHECKING
 from app.common.modules import public_api
 
 if TYPE_CHECKING:
-    from app.modules.goals.models.goal_check_in_model import GoalCheckIn
-    from app.modules.goals.models.goal_model import Goal
-    from app.modules.goals.services.check_in_service import record_check_in
-    from app.modules.goals.services.goal_service import create_goal
+    from app.modules.goals.controllers import goals_routers
+    from app.modules.goals.models import Goal, GoalCheckIn
+    from app.modules.goals.services import create_goal, record_check_in
 
 __getattr__, __dir__, __all__ = public_api(__name__, __file__)

@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 
-from app.modules.receipt_scanner.controllers.receipt_scanner_controller import router
+from app.modules.receipt_scanner import receipt_scanner_routers
 
 
 def register(api: APIRouter) -> None:
-    api.include_router(router, prefix="/receipt-scanner", tags=["receiptScanner"])
+    for router in receipt_scanner_routers:
+        api.include_router(router, prefix="/receipt-scanner", tags=["receiptScanner"])

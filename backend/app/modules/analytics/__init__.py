@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from app.common.modules import public_api
 
 if TYPE_CHECKING:
-    from app.modules.analytics.services.analytics_service import get_monthly_comparison
+    from app.modules.analytics.controllers import analytics_routers
+    from app.modules.analytics.services import get_monthly_comparison
 
 __getattr__, __dir__, __all__ = public_api(__name__, __file__)

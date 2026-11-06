@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 from app.common.modules import public_api
 
 if TYPE_CHECKING:
+    from app.modules.currency.commands.backfill_vef_rate_history import run as backfill_vef_rate_history_command
+    from app.modules.currency.commands.check_rates import run as check_rates_command
     from app.modules.currency.controllers import cron_routers, currency_routers
     from app.modules.currency.errors import UnsupportedCurrencyError
     from app.modules.currency.models import Currency, ExchangeRate

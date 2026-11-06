@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 
-from app.modules.goals.controllers.goals_controller import router
+from app.modules.goals import goals_routers
 
 
 def register(api: APIRouter) -> None:
-    api.include_router(router, prefix="/goals", tags=["goals"])
+    for router in goals_routers:
+        api.include_router(router, prefix="/goals", tags=["goals"])

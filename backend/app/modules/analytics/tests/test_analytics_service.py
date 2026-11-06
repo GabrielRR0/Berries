@@ -3,12 +3,8 @@ from decimal import Decimal
 
 from app.modules.currency import ExchangeRate
 from app.modules.transactions import Transaction
-from app.modules.analytics.services.analytics_service import (
-    get_category_breakdown,
-    get_category_monthly_trend,
-    get_monthly_comparison,
-    get_period_summary,
-)
+from app.modules.analytics.services.category_breakdown import get_category_breakdown, get_category_monthly_trend
+from app.modules.analytics.services.period_summary import get_monthly_comparison, get_period_summary
 from app.modules.auth import register_user
 from app.modules.currency import get_currency_by_code
 from app.modules.transactions import create_transaction

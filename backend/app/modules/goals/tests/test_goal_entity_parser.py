@@ -1,6 +1,6 @@
 from datetime import date
 
-from app.modules.goals.services.goal_entity_parser import parse_goal_entities
+from app.modules.goals.services.voice.goal_entity_parser import parse_goal_entities
 
 _TODAY = date(2026, 8, 28)
 

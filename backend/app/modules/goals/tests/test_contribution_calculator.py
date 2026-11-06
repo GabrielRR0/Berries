@@ -1,7 +1,7 @@
 from datetime import date
 from decimal import Decimal
 
-from app.modules.goals.services.contribution_calculator import compute_monthly_contribution
+from app.modules.goals.services.planning.contribution_calculator import compute_monthly_contribution
 
 
 def test_splits_remaining_amount_across_calendar_months():
