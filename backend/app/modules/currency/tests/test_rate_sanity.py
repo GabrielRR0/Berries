@@ -6,7 +6,8 @@ from sqlalchemy import select
 from app.modules.currency.models.exchange_rate_model import ExchangeRate
 from app.modules.auth import register_user
 from app.modules.currency.services.currency_lookup import get_currency_by_code
-from app.modules.currency.services.currency_service import audit_vef_rates, backfill_historical_vef_rates
+from app.modules.currency.services.history.vef_history import backfill_historical_vef_rates
+from app.modules.currency.services.history.vef_rate_audit import audit_vef_rates
 from app.modules.currency.services.rates.cache_refresh import get_fresh_rate
 from app.modules.currency.services.rates.rate_sanity import is_plausible_change
 from app.modules.transactions import create_transaction
@@ -111,7 +112,7 @@ def test_the_very_first_reading_has_nothing_to_compare_with_and_is_accepted(db, 
 
 def test_the_history_backfill_skips_a_day_that_jumps_from_the_previous_one(db, monkeypatch):
     monkeypatch.setattr(
-        "app.modules.currency.services.currency_service.fetch_vef_rate_history",
+        "app.modules.currency.services.rates.venezuela_rate_client.fetch_vef_rate_history",
         lambda: [
             (date(2026, 10, 7), Decimal("873.867")),
             (date(2026, 10, 8), Decimal("36.5")),  # dato corrupto del proveedor
@@ -128,7 +129,7 @@ def test_the_history_backfill_skips_a_day_that_jumps_from_the_previous_one(db, m
 
 def test_the_history_backfill_keeps_a_normal_series_intact(db, monkeypatch):
     monkeypatch.setattr(
-        "app.modules.currency.services.currency_service.fetch_vef_rate_history",
+        "app.modules.currency.services.rates.venezuela_rate_client.fetch_vef_rate_history",
         lambda: [(date(2026, 10, 7), Decimal("873.867")), (date(2026, 10, 8), Decimal("874.7321")), (date(2026, 10, 9), Decimal("875.6505"))],
     )
 
@@ -155,7 +156,7 @@ def test_the_audit_finds_a_bad_rate_and_the_transactions_frozen_with_it(db, monk
     assert round(transaction.reference_amount_usd) == 1000  # el sintoma que se vio en pantalla
 
     monkeypatch.setattr(
-        "app.modules.currency.services.currency_service.fetch_vef_rate_history", lambda: [(date(2026, 9, 21), Decimal("849.564"))]
+        "app.modules.currency.services.rates.venezuela_rate_client.fetch_vef_rate_history", lambda: [(date(2026, 9, 21), Decimal("849.564"))]
     )
     audit = audit_vef_rates(db)
 
@@ -167,7 +168,7 @@ def test_the_audit_finds_a_bad_rate_and_the_transactions_frozen_with_it(db, monk
 def test_the_audit_is_clean_when_everything_matches_the_published_rates(db, monkeypatch):
     _store_real_rate(db, Decimal("849.564"), datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc))
     monkeypatch.setattr(
-        "app.modules.currency.services.currency_service.fetch_vef_rate_history", lambda: [(date(2026, 9, 21), Decimal("849.564"))]
+        "app.modules.currency.services.rates.venezuela_rate_client.fetch_vef_rate_history", lambda: [(date(2026, 9, 21), Decimal("849.564"))]
     )
 
     audit = audit_vef_rates(db)
@@ -179,7 +180,7 @@ def test_the_audit_compares_a_weekend_with_the_last_business_day(db, monkeypatch
     # Sabado 3 de octubre: el BCV no publica; se compara con el viernes 2.
     _store_real_rate(db, Decimal("866.5612"), datetime(2026, 10, 3, 12, 0, tzinfo=timezone.utc))
     monkeypatch.setattr(
-        "app.modules.currency.services.currency_service.fetch_vef_rate_history", lambda: [(date(2026, 10, 2), Decimal("866.5612"))]
+        "app.modules.currency.services.rates.venezuela_rate_client.fetch_vef_rate_history", lambda: [(date(2026, 10, 2), Decimal("866.5612"))]
     )
 
     assert audit_vef_rates(db).is_clean

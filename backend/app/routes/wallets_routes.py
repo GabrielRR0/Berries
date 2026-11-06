@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 
-from app.modules.wallets.controllers.wallets_controller import router
+from app.modules.wallets import wallets_routers
 
 
 def register(api: APIRouter) -> None:
-    api.include_router(router, prefix="/wallets", tags=["wallets"])
+    for router in wallets_routers:
+        api.include_router(router, prefix="/wallets", tags=["wallets"])

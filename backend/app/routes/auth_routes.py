@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 
-from app.modules.auth.controllers.auth_controller import router
+from app.modules.auth import auth_routers
 
 
 def register(api: APIRouter) -> None:
-    api.include_router(router, prefix="/auth", tags=["auth"])
+    for router in auth_routers:
+        api.include_router(router, prefix="/auth", tags=["auth"])

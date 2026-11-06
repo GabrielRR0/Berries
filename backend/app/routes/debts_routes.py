@@ -1,7 +1,8 @@
 from fastapi import APIRouter
 
-from app.modules.debts.controllers.debts_controller import router
+from app.modules.debts import debts_routers
 
 
 def register(api: APIRouter) -> None:
-    api.include_router(router, prefix="/debts", tags=["debts"])
+    for router in debts_routers:
+        api.include_router(router, prefix="/debts", tags=["debts"])

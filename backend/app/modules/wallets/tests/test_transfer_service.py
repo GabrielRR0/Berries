@@ -15,13 +15,8 @@ from app.modules.wallets.errors import (
     TransferNotFoundError,
     WalletNotFoundError,
 )
-from app.modules.wallets.services.transfer_service import (
-    FEE_CATEGORY,
-    TRANSFER_CATEGORY,
-    TRANSFER_RATE_SOURCE,
-    execute_transfer,
-    update_transfer,
-)
+from app.modules.wallets.services import execute_transfer, update_transfer
+from app.modules.wallets.utils.transfer_labels import FEE_CATEGORY, TRANSFER_CATEGORY, TRANSFER_RATE_SOURCE
 from app.modules.wallets.services.wallet_service import create_wallet
 
 

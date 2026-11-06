@@ -1,14 +1,17 @@
-class GoalNotFoundError(Exception):
-    pass
+from app.common.errors import DomainError
 
 
-class GoalValidationError(Exception):
-    pass
+class GoalNotFoundError(DomainError):
+    status_code = 404
 
 
-class GoalNotActiveError(Exception):
-    pass
+class GoalValidationError(DomainError):
+    status_code = 400
 
 
-class InsufficientAvailableBalanceError(Exception):
-    pass
+class GoalNotActiveError(DomainError):
+    status_code = 409
+
+
+class InsufficientAvailableBalanceError(DomainError):
+    status_code = 400

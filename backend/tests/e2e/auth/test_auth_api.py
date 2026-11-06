@@ -162,7 +162,7 @@ def test_login_rejects_missing_turnstile_token_when_enabled(client, monkeypatch)
 
 def test_register_succeeds_with_a_valid_turnstile_token_when_enabled(client, monkeypatch):
     monkeypatch.setattr(settings, "turnstile_enabled", True)
-    monkeypatch.setattr("app.modules.auth.controllers.auth_controller.verify_turnstile", lambda token, ip: None)
+    monkeypatch.setattr("app.modules.auth.services.human_check.verify_turnstile", lambda token, ip: None)
 
     response = client.post(
         "/api/auth/register",

@@ -1,10 +1,13 @@
-class CategoryNotFoundError(Exception):
-    pass
+from app.common.errors import DomainError
 
 
-class CategoryValidationError(Exception):
-    pass
+class CategoryNotFoundError(DomainError):
+    status_code = 404
 
 
-class CategoryPermissionError(Exception):
-    pass
+class CategoryValidationError(DomainError):
+    status_code = 400
+
+
+class CategoryPermissionError(DomainError):
+    status_code = 409

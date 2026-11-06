@@ -102,3 +102,13 @@ def build_category_response(category: Category, hidden_ids: frozenset[uuid.UUID]
         is_default=category.user_id is None,
         is_hidden=category.id in hidden_ids,
     )
+
+
+def list_category_resources(
+    db: Session, user_id: uuid.UUID, kind: Kind | None = None, include_hidden: bool = False
+) -> list[CategoryResource]:
+    """Lo que devuelve GET /categories: con `include_hidden` cada categoría dice si el
+    usuario la ocultó (para poder restaurarla desde Ajustes)."""
+    categories = list_categories_for_user(db, user_id, kind=kind, include_hidden=include_hidden)
+    hidden_ids = get_hidden_category_ids(db, user_id) if include_hidden else frozenset()
+    return [build_category_response(category, hidden_ids) for category in categories]

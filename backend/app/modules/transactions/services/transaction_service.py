@@ -9,7 +9,7 @@ from app.modules.currency import ExchangeRate
 from app.modules.transactions.models.transaction_model import Transaction
 from app.modules.wallets import Wallet
 from app.modules.currency import reference_fields_in_usd
-from app.modules.transactions.errors import TransactionValidationError
+from app.modules.transactions.errors import TransactionNotFoundError, TransactionValidationError
 from app.modules.transactions.utils.import_key import seal_import_key
 
 # Tolerancia para decidir si un reference_amount_usd ya guardado "difiere" del
@@ -259,7 +259,7 @@ def delete_transaction(db: Session, transaction_id: uuid.UUID, user_id: uuid.UUI
     inconsistente (plata "desaparecida" de un wallet sin haber llegado nunca al otro)."""
     transaction = db.get(Transaction, transaction_id)
     if transaction is None or transaction.user_id != user_id:
-        raise TransactionValidationError("Transacción no encontrada o no pertenece al usuario")
+        raise TransactionNotFoundError("Transacción no encontrada o no pertenece al usuario")
 
     if transaction.transfer_id is not None:
         siblings = db.scalars(

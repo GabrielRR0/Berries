@@ -1,14 +1,17 @@
-class WalletNotFoundError(Exception):
-    pass
+from app.common.errors import DomainError
 
 
-class InsufficientBalanceError(Exception):
-    pass
+class WalletNotFoundError(DomainError):
+    status_code = 404
 
 
-class CurrencyMismatchError(Exception):
-    pass
+class InsufficientBalanceError(DomainError):
+    status_code = 400
 
 
-class TransferNotFoundError(Exception):
-    pass
+class CurrencyMismatchError(DomainError):
+    status_code = 400
+
+
+class TransferNotFoundError(DomainError):
+    status_code = 404

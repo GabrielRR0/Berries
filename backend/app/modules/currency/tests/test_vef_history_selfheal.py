@@ -8,7 +8,7 @@ from app.modules.currency.models.exchange_rate_model import ExchangeRate
 from app.modules.wallets import Wallet
 from app.modules.auth import register_user
 from app.modules.currency.services.currency_lookup import get_currency_by_code
-from app.modules.currency.services.currency_service import get_conversion_rate_at
+from app.modules.currency.services.conversion_service import get_conversion_rate_at
 from app.modules.transactions import TransactionValidationError
 from app.modules.transactions import create_transaction, create_transactions_bulk
 from app.modules.wallets import create_wallet
@@ -38,7 +38,7 @@ def history_calls(monkeypatch):
         calls.append(1)
         return HISTORY_API
 
-    monkeypatch.setattr("app.modules.currency.services.currency_service.fetch_vef_rate_history", fake_history)
+    monkeypatch.setattr("app.modules.currency.services.rates.venezuela_rate_client.fetch_vef_rate_history", fake_history)
     return calls
 
 
@@ -95,7 +95,7 @@ def test_the_provider_is_not_called_again_right_after_trying(db, monkeypatch):
     cada movimiento: hay un enfriamiento tras cada intento."""
     calls: list[int] = []
     monkeypatch.setattr(
-        "app.modules.currency.services.currency_service.fetch_vef_rate_history",
+        "app.modules.currency.services.rates.venezuela_rate_client.fetch_vef_rate_history",
         lambda: calls.append(1) or [(date(2026, 9, 28), SEPT_28_RATE)],
     )
     _store_vef_rate(db, SEPT_28_RATE, datetime(2026, 9, 28, 12, 0, tzinfo=timezone.utc))
@@ -111,7 +111,7 @@ def test_if_the_provider_fails_it_falls_back_to_the_closest_stored_rate(db, monk
     def broken_history():
         raise RuntimeError("dolarapi no responde")
 
-    monkeypatch.setattr("app.modules.currency.services.currency_service.fetch_vef_rate_history", broken_history)
+    monkeypatch.setattr("app.modules.currency.services.rates.venezuela_rate_client.fetch_vef_rate_history", broken_history)
     _store_vef_rate(db, SEPT_28_RATE, datetime(2026, 9, 28, 12, 0, tzinfo=timezone.utc))
 
     rate = get_conversion_rate_at(db, "VEF", "USD", datetime(2026, 10, 8, 12, 0, tzinfo=timezone.utc))
@@ -205,7 +205,7 @@ def test_the_bulk_import_stays_all_or_nothing_even_when_the_history_has_to_be_fe
 def test_one_update_covers_every_date_up_to_today_without_calling_again(db, history_calls, monkeypatch):
     """La serie llega completa en una sola respuesta: tras actualizar, ninguna fecha hasta el ultimo
     dia traido vuelve a consultar al proveedor, ni siquiera pasado el enfriamiento."""
-    import app.modules.currency.services.currency_service as currency_service
+    import app.modules.currency.services.history.vef_history as vef_history
 
     _store_vef_rate(db, SEPT_28_RATE, datetime(2026, 9, 28, 12, 48, tzinfo=timezone.utc))
 
@@ -213,7 +213,7 @@ def test_one_update_covers_every_date_up_to_today_without_calling_again(db, hist
     assert history_calls == [1]
 
     # Pasa el enfriamiento y se piden otras fechas dentro de lo ya traido (hasta el 9 de octubre).
-    monkeypatch.setattr(currency_service, "_last_vef_backfill_attempt", None)
+    monkeypatch.setattr(vef_history, "_last_vef_backfill_attempt", None)
     for day in (7, 8, 9):
         get_conversion_rate_at(db, "VEF", "USD", datetime(2026, 10, day, 15, 0, tzinfo=timezone.utc))
 
@@ -221,14 +221,14 @@ def test_one_update_covers_every_date_up_to_today_without_calling_again(db, hist
 
 
 def test_a_date_after_the_last_published_day_does_ask_again(db, history_calls, monkeypatch):
-    import app.modules.currency.services.currency_service as currency_service
+    import app.modules.currency.services.history.vef_history as vef_history
 
     _store_vef_rate(db, SEPT_28_RATE, datetime(2026, 9, 28, 12, 48, tzinfo=timezone.utc))
     get_conversion_rate_at(db, "VEF", "USD", datetime(2026, 10, 8, 12, 0, tzinfo=timezone.utc))
     assert history_calls == [1]
 
     # Ya con la serie hasta el 9; el 13 queda a mas de 3 dias de la ultima tasa guardada: dato nuevo.
-    monkeypatch.setattr(currency_service, "_last_vef_backfill_attempt", None)
+    monkeypatch.setattr(vef_history, "_last_vef_backfill_attempt", None)
     get_conversion_rate_at(db, "VEF", "USD", datetime(2026, 10, 13, 12, 0, tzinfo=timezone.utc))
 
     assert history_calls == [1, 1]

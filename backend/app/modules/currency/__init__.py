@@ -8,14 +8,14 @@ from typing import TYPE_CHECKING
 from app.common.modules import public_api
 
 if TYPE_CHECKING:
+    from app.modules.currency.controllers import cron_routers, currency_routers
     from app.modules.currency.errors import UnsupportedCurrencyError
-    from app.modules.currency.models.currency_model import Currency
-    from app.modules.currency.models.exchange_rate_model import ExchangeRate
-    from app.modules.currency.services.currency_lookup import get_currency_by_code
-    from app.modules.currency.services.currency_service import (
+    from app.modules.currency.models import Currency, ExchangeRate
+    from app.modules.currency.services import (
         audit_vef_rates,
         backfill_historical_vef_rates,
         get_conversion_rate,
+        get_currency_by_code,
         reference_fields_in_usd,
         reset_vef_history_guard,
     )

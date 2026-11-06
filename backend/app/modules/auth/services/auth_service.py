@@ -7,11 +7,23 @@ from app.config import settings
 from app.support.password_support import hash_password, verify_password
 from app.modules.auth.models.user_model import User
 from app.modules.auth.contracts.dto import WalletSeedDto
-from app.modules.auth.errors import BetaLimitReachedError, EmailAlreadyRegisteredError, InvalidCredentialsError
+from app.modules.auth.errors import (
+    BetaLimitReachedError,
+    EmailAlreadyRegisteredError,
+    GoogleLoginError,
+    InvalidCredentialsError,
+)
 from app.modules.currency import get_currency_by_code
 from app.modules.dev_tools import get_or_create_demo_user
 from app.modules.wallets import create_wallet
-from app.support.google_identity_support import GoogleIdentity, verify_google_id_token
+from app.support.google_identity_support import GoogleAuthError, GoogleIdentity, verify_google_id_token
+
+
+def _verify_google(id_token: str | None) -> GoogleIdentity:
+    try:
+        return verify_google_id_token(id_token)
+    except GoogleAuthError as exc:
+        raise GoogleLoginError(str(exc)) from exc
 
 
 def register_user(
@@ -97,7 +109,7 @@ def login_or_register_with_google(
     (con el mismo límite de beta que register_user). `wallets`/`default_currency` solo
     aplican en la rama de cuenta nueva - una cuenta que ya existía tiene sus propias
     billeteras y moneda, no se le pisan."""
-    identity = verify_google_id_token(id_token)
+    identity = _verify_google(id_token)
 
     by_sub = db.scalar(select(User).where(User.google_sub == identity.sub))
     if by_sub is not None:
@@ -120,7 +132,7 @@ def google_account_exists(db: Session, id_token: str | None) -> bool:
     con Google" loguea directo o manda al wizard completo de registro (una cuenta nueva
     de Google necesita billeteras/moneda, no solo un login silencioso con USD y cero
     billeteras)."""
-    identity = verify_google_id_token(id_token)
+    identity = _verify_google(id_token)
 
     by_sub = db.scalar(select(User).where(User.google_sub == identity.sub))
     if by_sub is not None:

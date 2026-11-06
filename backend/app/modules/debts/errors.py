@@ -1,10 +1,13 @@
-class DebtNotFoundError(Exception):
-    pass
+from app.common.errors import DomainError
 
 
-class DebtValidationError(Exception):
-    pass
+class DebtNotFoundError(DomainError):
+    status_code = 404
 
 
-class InstallmentAlreadyPaidError(Exception):
-    pass
+class DebtValidationError(DomainError):
+    status_code = 400
+
+
+class InstallmentAlreadyPaidError(DomainError):
+    status_code = 409

@@ -6,15 +6,10 @@ from sqlalchemy import select
 from app.modules.currency.models.exchange_rate_model import ExchangeRate
 from app.modules.auth import register_user
 from app.modules.currency.services.currency_lookup import get_currency_by_code
-from app.modules.currency.services.currency_service import (
-    backfill_historical_vef_rates,
-    convert,
-    convert_at,
-    get_conversion_rate,
-    get_conversion_rate_at,
-    get_rate_history,
-    refresh_all_active_currencies,
-)
+from app.modules.currency.services.conversion_service import convert, convert_at, get_conversion_rate, get_conversion_rate_at
+from app.modules.currency.services.history.rate_history import get_rate_history
+from app.modules.currency.services.history.vef_history import backfill_historical_vef_rates
+from app.modules.currency.services.rates.daily_refresh import refresh_all_active_currencies
 from app.modules.wallets import create_wallet
 
 
@@ -307,7 +302,7 @@ def test_backfill_historical_vef_rates_inserts_both_directions_for_each_day(db, 
     # conversión real (no solo que algún valor quedó guardado), justamente para que
     # una inversión de dirección como esa no pueda volver a pasar desapercibida.
     monkeypatch.setattr(
-        "app.modules.currency.services.currency_service.fetch_vef_rate_history",
+        "app.modules.currency.services.rates.venezuela_rate_client.fetch_vef_rate_history",
         lambda: [(date(2026, 8, 1), Decimal("800")), (date(2026, 8, 2), Decimal("810"))],
     )
 
@@ -341,7 +336,7 @@ def test_backfill_historical_vef_rates_inserts_both_directions_for_each_day(db, 
 
 def test_backfill_historical_vef_rates_is_idempotent(db, monkeypatch):
     monkeypatch.setattr(
-        "app.modules.currency.services.currency_service.fetch_vef_rate_history",
+        "app.modules.currency.services.rates.venezuela_rate_client.fetch_vef_rate_history",
         lambda: [(date(2026, 8, 1), Decimal("800"))],
     )
 
@@ -355,7 +350,7 @@ def test_backfill_historical_vef_rates_is_idempotent(db, monkeypatch):
 def test_backfill_historical_vef_rates_skips_days_older_than_the_requested_window(db, monkeypatch):
     too_old = (datetime.now(timezone.utc) - timedelta(days=400)).date()
     monkeypatch.setattr(
-        "app.modules.currency.services.currency_service.fetch_vef_rate_history",
+        "app.modules.currency.services.rates.venezuela_rate_client.fetch_vef_rate_history",
         lambda: [(too_old, Decimal("500")), (datetime.now(timezone.utc).date(), Decimal("850"))],
     )
 

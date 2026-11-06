@@ -78,12 +78,12 @@ def _mock_vef_rate(monkeypatch):
     parcheando la función en su propio módulo - no dependen de este mock global."""
     monkeypatch.setattr("app.modules.currency.services.rates.cache_refresh.fetch_vef_rate", lambda: (Decimal("36.5"), False))
     # Mismo criterio para el histórico (fetch_vef_rate_history, usado por
-    # backfill_historical_vef_rates - ver currency_service.py): sin este mock,
+    # backfill_historical_vef_rates - ver app/modules/currency/services/history/vef_history.py): sin este mock,
     # cualquier test que dispare refresh_all_active_currencies con VEF activo
     # terminaría pegándole de verdad al endpoint histórico de dolarapi.com. Vacío por
     # default (ningún día nuevo) - los tests que SÍ prueban el backfill lo mockean
     # explícitamente con datos propios.
-    monkeypatch.setattr("app.modules.currency.services.currency_service.fetch_vef_rate_history", lambda: [])
+    monkeypatch.setattr("app.modules.currency.services.rates.venezuela_rate_client.fetch_vef_rate_history", lambda: [])
     # La guardia de antiguedad de la serie VEF (ensure_vef_history_covers) guarda estado en
     # memoria de proceso (enfriamiento y dias ya comprobados): se reinicia entre tests para que
     # uno no afecte a otro.
