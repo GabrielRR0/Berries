@@ -1,7 +1,7 @@
 import { parseBankList } from './bankListParser'
 import { parseBankStatement } from './bankStatementParser'
 import { BANK_LIST_FORMATS, DEFAULT_COLOR_CODES_DIRECTION } from './dictionary/bankListFormats'
-import { MIN_STATEMENT_DATES, STATEMENT_DATE_GLOBAL, STATEMENT_KIND_SIGNALS } from './dictionary/bankStatementLabels'
+import { MIN_STATEMENT_DATES, MIN_STATEMENT_TITLED_DATES, STATEMENT_DATE_GLOBAL, STATEMENT_KIND_SIGNALS, STATEMENT_TYPE_WORD_GLOBAL } from './dictionary/bankStatementLabels'
 import {
   BOLIVAR_AMOUNT_GLOBAL,
   MIN_LIST_AMOUNTS,
@@ -33,12 +33,15 @@ export function classifyImageKind(text: string, options: { allowStatement?: bool
 
   // Estado de cuenta en tabla: aparecen sus titulos (Fecha, Descripcion/Concepto, Monto/Importe/Debito...)
   // y varias fechas de fila (un comprobante suelto trae una sola). Ver dictionary/bankStatementLabels.ts.
-  if (
-    options.allowStatement !== false &&
-    STATEMENT_KIND_SIGNALS.every((signal) => signal.test(normalized)) &&
-    (normalized.match(STATEMENT_DATE_GLOBAL) ?? []).length >= MIN_STATEMENT_DATES
-  ) {
-    return 'bank_statement'
+  if (options.allowStatement !== false) {
+    const dates = (normalized.match(STATEMENT_DATE_GLOBAL) ?? []).length
+    const hasTitles = STATEMENT_KIND_SIGNALS.every((signal) => signal.test(normalized))
+    const typeWords = (normalized.match(STATEMENT_TYPE_WORD_GLOBAL) ?? []).length
+    // Una captura recortada puede traer pocas filas (con titulos bastan dos) o ninguna fila de titulos (se
+    // reconoce por la palabra Debito / Credito de cada fila).
+    if ((hasTitles && dates >= MIN_STATEMENT_TITLED_DATES) || (dates >= MIN_STATEMENT_DATES && typeWords >= MIN_STATEMENT_DATES)) {
+      return 'bank_statement'
+    }
   }
 
   const orderStarts = (normalized.match(ORDER_START_GLOBAL) ?? []).length

@@ -13,7 +13,7 @@ import { FEE_CATEGORY } from './dictionary/feeWords'
 import { isFeeText, suggestCategory } from './movementDictionary'
 import { makeRow, to24h } from './movementRows'
 import type { ScanRow } from './movementRows'
-import { centerY } from './ocrLayout'
+import { centerY, dropGhostWords } from './ocrLayout'
 import type { OcrRegion, OcrWord } from './ocrLayout'
 import { parseLocalizedNumber } from './numbers'
 import { normalizeForMatch } from './textLines'
@@ -57,6 +57,10 @@ function headerHits(words: OcrWord[]): HeaderHit[] {
 // La fila de titulos es la que junta mas columnas distintas (un "Fecha desde" de un filtro, arriba de la
 // tabla, no se confunde con ella). Devuelve null si no hay una combinacion legible.
 function findColumns(words: OcrWord[]): Columns | null {
+  return findColumnsFromHeaders(words) ?? inferColumnsFromRows(words)
+}
+
+function findColumnsFromHeaders(words: OcrWord[]): Columns | null {
   const hits = headerHits(words)
   if (hits.length === 0) return null
 
@@ -119,6 +123,55 @@ function findColumns(words: OcrWord[]): Columns | null {
 
   const headerBottom = Math.max(...best.map((hit) => hit.word.y1))
   return { mode, starts, headerBottom }
+}
+
+// Una captura recortada puede haber perdido la fila de titulos (se hizo scroll en la pagina). Si las filas
+// traen fecha, referencia, la palabra Debito / Credito y montos, las columnas se deducen de DONDE caen esos
+// datos: cada tipo de dato vive siempre en su columna. Solo para la tabla con tipo (BDV en linea), donde el
+// dato de cada columna se reconoce por su forma; con menos de MIN_INFERRED_ROWS filas no se arriesga.
+const MIN_INFERRED_ROWS = 2
+const AMOUNT_SHAPE = /^-?\d[\d.]*,\d{2}$/
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b)
+  return sorted[Math.floor(sorted.length / 2)]!
+}
+
+function inferColumnsFromRows(words: OcrWord[]): Columns | null {
+  const dates = words.filter((word) => STATEMENT_DATE.test(word.text))
+  const types = words.filter((word) => /^(debito|credito)$/.test(normalizeForMatch(word.text)))
+  const references = words.filter((word) => /^\d{8,}$/.test(word.text))
+  if (dates.length < MIN_INFERRED_ROWS || types.length < MIN_INFERRED_ROWS) return null
+
+  const typeStart = median(types.map((word) => word.x0))
+  const amounts = words.filter((word) => AMOUNT_SHAPE.test(word.text) && word.x0 > typeStart)
+  if (amounts.length < MIN_INFERRED_ROWS) return null
+
+  // Monto y saldo: dos grupos de cifras a la derecha del tipo; el corte esta en el mayor hueco entre inicios.
+  const xs = amounts.map((word) => word.x0).sort((a, b) => a - b)
+  const gaps = xs.slice(1).map((x, i) => x - xs[i]!)
+  const biggest = Math.max(...gaps)
+  const splitAt = gaps.indexOf(biggest) + 1
+  const amountXs = xs.slice(0, splitAt)
+  const balanceXs = xs.slice(splitAt)
+  const height = Math.max(median(words.map((word) => word.y1 - word.y0)), 1)
+  if (amountXs.length === 0 || balanceXs.length === 0 || biggest < height) return null
+
+  const starts: Partial<Record<StatementColumn, number>> = {
+    date: Math.min(...dates.map((word) => word.x0)),
+    debit: typeStart,
+    amount: Math.min(...amountXs),
+    balance: Math.min(...balanceXs),
+  }
+  if (references.length > 0) {
+    starts.reference = median(references.map((word) => word.x0))
+    // La descripcion empieza donde termina la referencia.
+    starts.description = Math.max(...references.map((word) => word.x1)) + 1
+  } else {
+    starts.description = (starts.date + typeStart) / 2
+  }
+  // Sin titulos todo lo que hay es cuerpo de la tabla.
+  return { mode: 'typed', starts, headerBottom: -1 }
 }
 
 function columnOf(word: OcrWord, columns: Columns, tolerance: number): StatementColumn | null {
@@ -184,6 +237,20 @@ function checkBalanceChain(entries: Entry[]): void {
 
 const NUMERIC = /\d/
 
+// Un monto que el OCR parte en dos palabras ("5" y ".000,00") no son dos filas: se quedan solo las anclas
+// que no caen en la misma linea que la anterior.
+function dedupeAnchors(words: OcrWord[]): OcrWord[] {
+  const sorted = [...words].sort((a, b) => centerY(a) - centerY(b))
+  const kept: OcrWord[] = []
+  for (const word of sorted) {
+    const last = kept[kept.length - 1]
+    const height = Math.max(word.y1 - word.y0, 1)
+    if (last && Math.abs(centerY(word) - centerY(last)) <= height) continue
+    kept.push(word)
+  }
+  return kept
+}
+
 // Region (en coordenadas de la imagen) de la columna de descripcion de una tabla ya reconocida. Tesseract
 // lee mal las celdas de varias lineas cuando va con el resto de la pagina ("Eo BDV", "OM DON FAG"); si se
 // relee esta columna sola, como un bloque, el texto sale casi perfecto. Null si no hay tabla o columna.
@@ -229,7 +296,8 @@ function pairFeesByReference(rows: ScanRow[]): ScanRow[] {
   return rows.filter((row) => !merged.has(row))
 }
 
-export function parseBankStatement(words: OcrWord[], options: BankStatementOptions): ScanRow[] {
+export function parseBankStatement(rawWords: OcrWord[], options: BankStatementOptions): ScanRow[] {
+  const words = dropGhostWords(rawWords)
   const columns = findColumns(words)
   if (!columns) return []
 
@@ -247,11 +315,17 @@ export function parseBankStatement(words: OcrWord[], options: BankStatementOptio
   // ilegible no hace que los datos de dos filas se mezclen.
   let anchorWords: OcrWord[]
   if (columns.mode === 'typed') {
-    anchorWords = inColumn('debit').filter((word) => STATEMENT_DEBIT_OR_CREDIT_START.test(normalizeForMatch(word.text)))
+    // El OCR a veces lee mal la palabra de tipo ("DEBITO" -> "pero") y esa fila se fundiria con la vecina:
+    // el monto tambien sale una vez por fila, asi que se usa el que ubique mas filas.
+    const byType = dedupeAnchors(
+      inColumn('debit').filter((word) => STATEMENT_DEBIT_OR_CREDIT_START.test(normalizeForMatch(word.text))),
+    )
+    const byAmount = dedupeAnchors(inColumn('amount').filter((word) => NUMERIC.test(word.text)))
+    anchorWords = byAmount.length > byType.length ? byAmount : byType
   } else if (columns.mode === 'split') {
-    anchorWords = inColumn('debit', 'credit').filter((word) => NUMERIC.test(word.text))
+    anchorWords = dedupeAnchors(inColumn('debit', 'credit').filter((word) => NUMERIC.test(word.text)))
   } else {
-    anchorWords = inColumn('amount').filter((word) => NUMERIC.test(word.text))
+    anchorWords = dedupeAnchors(inColumn('amount').filter((word) => NUMERIC.test(word.text)))
   }
   if (anchorWords.length === 0) anchorWords = inColumn('date').filter((word) => STATEMENT_DATE.test(word.text))
   const anchors = [...anchorWords].sort((a, b) => centerY(a) - centerY(b))
@@ -297,13 +371,16 @@ export function parseBankStatement(words: OcrWord[], options: BankStatementOptio
         else if (STATEMENT_DEBIT.test(type)) direction = 'out'
         else {
           direction = amount?.negative ? 'out' : 'in'
-          flags.push('No se leyó si fue débito o crédito: se dedujo del signo del monto. Revisa.')
+          // Un monto con "-" es un debito sin dudas; sin signo (un credito, o un "-" que el OCR perdio) se avisa.
+          if (!amount?.negative) flags.push('No se leyó si fue débito o crédito: se dedujo del signo del monto. Revisa.')
         }
       } else {
         direction = amount?.negative ? 'out' : 'in'
       }
     }
     if (!amount || amount.value <= 0) continue
+    // Un resto de la fila que el recorte de la captura dejo cortada: sin fecha NI referencia no es un movimiento.
+    if (!dateMatch && !cell('reference').match(/\d{6,}/)) continue
 
     const description = cell('description')
     const balance = parseAmount(cell('balance'))

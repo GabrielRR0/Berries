@@ -93,10 +93,13 @@ describe('estado de cuenta en tabla (BDVenlinea personas)', () => {
     expect(rows.map((row) => row.amount)).toEqual([16000, 20000, 10000, 5100, 500, 2500, 4850, 6000, 12697.7])
   })
 
-  it('sin el titulo del monto no hay forma de leerla: devuelve vacio en vez de inventar', () => {
+  it('sin el titulo del monto, igual deduce la columna por la forma de las cifras (y el saldo sigue comprobando)', () => {
     const withoutAmount = BANK_STATEMENT_WORDS.filter((word) => word.text !== 'Monto')
 
-    expect(parseBankStatement(withoutAmount, { imageWidth: WIDTH, defaultDate: null })).toEqual([])
+    const rows = parseBankStatement(withoutAmount, { imageWidth: WIDTH, defaultDate: null })
+
+    expect(rows.map((row) => row.amount)).toEqual([16000, 20000, 10000, 5100, 500, 2500, 4850, 6000, 12697.7])
+    expect(rows.every((row) => row.flags.length === 0)).toBe(true)
   })
 
   it('si no se lee la fecha de una fila se usa la elegida al inicio, se avisa y NO se mezcla con la vecina', () => {
@@ -109,6 +112,90 @@ describe('estado de cuenta en tabla (BDVenlinea personas)', () => {
     expect(rows[0]!.flags.join(' ')).toContain('No se leyó la fecha')
     // La fila siguiente sigue intacta.
     expect(rows[1]).toMatchObject({ amount: 20000, occurredOn: '2026-09-20', time: '19:52' })
+  })
+
+  it('una palabra de tipo ilegible por completo ("DEBITO" -> "pero") no funde la fila con la vecina', () => {
+    // Pasa con las capturas reales de BDV: se pierde la fila entera y su comision.
+    let seen = 0
+    const unreadable = BANK_STATEMENT_WORDS.map((word) => (word.text === 'DEBITO' && seen++ === 3 ? { ...word, text: 'pero' } : word))
+    const rows = parseBankStatement(unreadable, { imageWidth: WIDTH, defaultDate: null })
+
+    expect(rows).toHaveLength(9)
+    expect(rows.map((row) => [row.amount, row.direction, row.fee])).toEqual(
+      parseBankStatement(BANK_STATEMENT_WORDS, { imageWidth: WIDTH, defaultDate: null }).map((row) => [row.amount, row.direction, row.fee]),
+    )
+    // El monto lleva "-": es un debito seguro, no hace falta pedir revision.
+    expect(rows.every((row) => row.flags.length === 0)).toBe(true)
+  })
+
+  it('los titulos mal leidos por el OCR ("Monto" -> "Monte", "Saldo" -> "Salde") no impiden leer la tabla', () => {
+    const misread = BANK_STATEMENT_WORDS.map((word) =>
+      word.text === 'Monto' ? { ...word, text: 'Monte' } : word.text === 'Saldo' ? { ...word, text: 'Salde' } : word,
+    )
+    const rows = parseBankStatement(misread, { imageWidth: WIDTH, defaultDate: null })
+
+    expect(rows).toHaveLength(9)
+    expect(rows.every((row) => row.flags.length === 0)).toBe(true)
+  })
+
+  it('las palabras fantasma de Tesseract (fragmentos de 1 px o tapados por otra palabra) no desordenan las filas', () => {
+    const first = BANK_STATEMENT_WORDS.find((word) => word.text === '0677241403397')!
+    const ghosts = [
+      // Un pedazo de la referencia, con su mismo alto, encima de ella.
+      { text: '4', x0: first.x0 + 20, x1: first.x0 + 28, y0: first.y0, y1: first.y1 },
+      // Un fragmento de 2 px de alto en la columna del monto.
+      { text: '.000,', x0: 1146, x1: 1179, y0: first.y1 + 5, y1: first.y1 + 7 },
+    ]
+    const rows = parseBankStatement([...BANK_STATEMENT_WORDS, ...ghosts], { imageWidth: WIDTH, defaultDate: null })
+
+    expect(rows).toHaveLength(9)
+    expect(rows[0]).toMatchObject({ amount: 16000, reference: '0677241403397' })
+  })
+
+  describe('captura recortada', () => {
+    const headerBottom = Math.max(...BANK_STATEMENT_WORDS.filter((word) => word.text === 'Fecha').map((word) => word.y1))
+    const withoutTitles = BANK_STATEMENT_WORDS.filter((word) => word.y0 > headerBottom + 5)
+    const amounts = (rows: ReturnType<typeof parseBankStatement>) => rows.map((row) => row.amount)
+
+    it('sin la fila de titulos deduce las columnas de donde caen los datos', () => {
+      const rows = parseBankStatement(withoutTitles, { imageWidth: WIDTH, defaultDate: null })
+
+      expect(amounts(rows)).toEqual([16000, 20000, 10000, 5100, 500, 2500, 4850, 6000, 12697.7])
+      expect(rows.map((row) => row.fee)).toEqual([0, 0, 0, 15.3, 14, 14, 14.55, 0, 0])
+      expect(rows[0]).toMatchObject({ direction: 'in', occurredOn: '2026-09-20', time: '19:58', reference: '0677241403397' })
+      expect(rows.every((row) => row.flags.length === 0)).toBe(true)
+    })
+
+    it('sin titulos, se reconoce por sus filas como estado de cuenta', () => {
+      const text = layoutOf(withoutTitles, WIDTH).text
+
+      expect(classifyImageKind(text)).toBe('bank_statement')
+      expect(rowsFromImage(layoutOf(withoutTitles, WIDTH), { today: TODAY, defaultDate: null }).rows).toHaveLength(9)
+    })
+
+    it('con los titulos a la vista, dos filas bastan', () => {
+      const firstTwoRows = BANK_STATEMENT_WORDS.filter((word) => word.y0 < 250)
+      const { kind, rows } = rowsFromImage(layoutOf(firstTwoRows, WIDTH), { today: TODAY, defaultDate: null })
+
+      expect(kind).toBe('bank_statement')
+      expect(amounts(rows)).toEqual([16000, 20000])
+    })
+
+    it('un resto de fila cortado por el borde (sin fecha ni referencia) no se toma por un movimiento', () => {
+      const sliver = [
+        { text: '25.53', x0: 1137, x1: 1190, y0: 100, y1: 115 },
+        { text: 'DEBITO', x0: 959, x1: 1013, y0: 100, y1: 115 },
+      ]
+      const rows = parseBankStatement([...withoutTitles, ...sliver], { imageWidth: WIDTH, defaultDate: null })
+
+      expect(amounts(rows)).toEqual([16000, 20000, 10000, 5100, 500, 2500, 4850, 6000, 12697.7])
+    })
+
+    it('con muy pocos datos no inventa columnas', () => {
+      const one = withoutTitles.filter((word) => word.y0 < 150)
+
+      expect(parseBankStatement(one, { imageWidth: WIDTH, defaultDate: null })).toEqual([])
+    })
   })
 
   it('una letra mal leida en DEBITO / CREDITO no desordena las filas', () => {
