@@ -116,6 +116,25 @@ export function replaceWordsInRegion(words: OcrWord[], region: OcrRegion, replac
   return [...words.filter((word) => !inside(word)), ...replacements.filter((word) => word.text.trim() !== '')]
 }
 
+// Tesseract a veces inventa "palabras fantasma" al leer una tabla con celdas de varias lineas: fragmentos de
+// uno o dos pixeles de alto ("-10-", ".000,") o pedazos de otra palabra que ya se leyo completa ("4" encima de
+// "0677246753749"). Desordenan las filas, asi que se descartan: las muy bajas y las que quedan (al menos a la
+// mitad) tapadas por una palabra con mas letras.
+export function dropGhostWords(words: OcrWord[]): OcrWord[] {
+  const usable = words.filter((word) => word.text.trim() !== '')
+  const minHeight = median(usable.map((word) => word.y1 - word.y0)) * 0.5
+  const tall = usable.filter((word) => word.y1 - word.y0 >= minHeight)
+  return tall.filter((word) => {
+    const area = Math.max((word.x1 - word.x0) * (word.y1 - word.y0), 1)
+    return !tall.some((other) => {
+      if (other === word || other.text.trim().length <= word.text.trim().length) return false
+      const width = Math.min(word.x1, other.x1) - Math.max(word.x0, other.x0)
+      const height = Math.min(word.y1, other.y1) - Math.max(word.y0, other.y0)
+      return width > 0 && height > 0 && (width * height) / area >= 0.5
+    })
+  })
+}
+
 export function scaleWords(words: OcrWord[], factor: number): OcrWord[] {
   if (factor === 1) return words
   return words.map((word) => ({

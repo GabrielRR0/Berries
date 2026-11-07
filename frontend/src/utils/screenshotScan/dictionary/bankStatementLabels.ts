@@ -6,11 +6,13 @@ export type StatementColumn = 'date' | 'reference' | 'description' | 'amount' | 
 
 // Como puede llamarse el titulo de cada columna (se compara al inicio de la palabra).
 export const STATEMENT_COLUMN_SYNONYMS: Record<StatementColumn, RegExp[]> = {
-  date: [/^fecha/],
-  reference: [/^referencia/, /^ref$/, /^nro/, /^numero/, /^documento/, /^comprobante/],
-  description: [/^descripcion/, /^concepto/, /^detalle/, /^observacion/],
-  amount: [/^monto/, /^importe/, /^valor/],
-  balance: [/^saldo/],
+  // Tesseract lee las ultimas letras de un titulo chico a su manera ("Monto" -> "Monte", "Saldo" -> "Salde"):
+  // por eso se comparan las primeras letras y no la palabra entera.
+  date: [/^fech/],
+  reference: [/^referen/, /^ref$/, /^nro/, /^numero/, /^documento/, /^comprobante/],
+  description: [/^descrip/, /^concepto/, /^detalle/, /^observacion/],
+  amount: [/^mont/, /^import/, /^valor/],
+  balance: [/^sald/],
   debit: [/^debito/, /^cargo/, /^retiro/],
   credit: [/^credito/, /^abono/, /^deposito/],
 }
@@ -29,6 +31,12 @@ export const STATEMENT_KIND_SIGNALS: RegExp[] = [
   /\b(monto|importe|debito|credito|cargo|abono)\b/,
 ]
 export const MIN_STATEMENT_DATES = 3
+// Con los titulos de la tabla a la vista (Fecha, Descripcion, Monto...) bastan dos fechas: una captura recortada
+// puede mostrar solo dos filas. Un comprobante suelto sigue sin pasar (trae una sola fecha).
+export const MIN_STATEMENT_TITLED_DATES = 2
+// Una captura recortada puede haber perdido los titulos: si trae varias fechas completas Y varias veces
+// la palabra Debito / Credito (una por fila), igual es un estado de cuenta con tipo.
+export const STATEMENT_TYPE_WORD_GLOBAL = /\b(debito|credito)\b/g
 export const STATEMENT_DATE_GLOBAL = /\d{2}[-/.]\d{2}[-/.]\d{4}/g
 
 // Una fecha de fila ("20-09-2026" o "20/09/2026") y su hora ("19:58"), a veces separadas por un guion.
