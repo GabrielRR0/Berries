@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { statementDescriptionRegion } from '../bankStatementParser'
+import { statementDescriptionRegion } from '../bankStatement'
 import {
   SMALL_TEXT_HEIGHT,
   medianWordHeight,

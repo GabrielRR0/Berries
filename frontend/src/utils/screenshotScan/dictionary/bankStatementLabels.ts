@@ -1,8 +1,12 @@
 // Estado de cuenta en TABLA (por ejemplo "BDVenlinea personas" en la web): una fila por movimiento y una
-// columna por dato. Cada banco los llama un poco distinto, asi que todo se reconoce por sinonimos; para
-// otro banco normalmente basta agregar el sinonimo que usa. Texto en minusculas y sin tildes.
+// columna por dato. Aqui va solo lo GENERICO del motor (nombres de columnas, fechas); lo que depende del
+// banco (moneda, palabras de debito/credito, forma de las cifras) vive en un perfil:
+// bankStatement/profiles/. Texto en minusculas y sin tildes.
 
 export type StatementColumn = 'date' | 'reference' | 'description' | 'amount' | 'balance' | 'debit' | 'credit'
+
+// Todas las columnas que reconoce el motor.
+export const STATEMENT_COLUMNS: StatementColumn[] = ['date', 'reference', 'description', 'amount', 'balance', 'debit', 'credit']
 
 // Como puede llamarse el titulo de cada columna (se compara al inicio de la palabra).
 export const STATEMENT_COLUMN_SYNONYMS: Record<StatementColumn, RegExp[]> = {
@@ -13,8 +17,8 @@ export const STATEMENT_COLUMN_SYNONYMS: Record<StatementColumn, RegExp[]> = {
   description: [/^descrip/, /^concepto/, /^detalle/, /^observacion/],
   amount: [/^mont/, /^import/, /^valor/],
   balance: [/^sald/],
-  debit: [/^debito/, /^cargo/, /^retiro/],
-  credit: [/^credito/, /^abono/, /^deposito/],
+  debit: [/^debit/, /^cargo/, /^retiro/],
+  credit: [/^credit/, /^abon/, /^deposit/],
 }
 
 // Como se reparten el debito y el credito en la tabla (se deduce de los titulos):
@@ -23,31 +27,9 @@ export const STATEMENT_COLUMN_SYNONYMS: Record<StatementColumn, RegExp[]> = {
 //  - 'signed': una sola columna de monto con signo (negativo = salio dinero).
 export type StatementMode = 'typed' | 'split' | 'signed'
 
-// Para reconocer la captura como un estado de cuenta: aparecen estos titulos (cada grupo es "cualquiera de")
-// y varias fechas de fila. Se evita confundirlo con un comprobante suelto, que trae una sola fecha.
-export const STATEMENT_KIND_SIGNALS: RegExp[] = [
-  /\bfecha\b/,
-  /\b(descripcion|concepto|detalle)\b/,
-  /\b(monto|importe|debito|credito|cargo|abono)\b/,
-]
-export const MIN_STATEMENT_DATES = 3
-// Con los titulos de la tabla a la vista (Fecha, Descripcion, Monto...) bastan dos fechas: una captura recortada
-// puede mostrar solo dos filas. Un comprobante suelto sigue sin pasar (trae una sola fecha).
-export const MIN_STATEMENT_TITLED_DATES = 2
-// Una captura recortada puede haber perdido los titulos: si trae varias fechas completas Y varias veces
-// la palabra Debito / Credito (una por fila), igual es un estado de cuenta con tipo.
-export const STATEMENT_TYPE_WORD_GLOBAL = /\b(debito|credito)\b/g
+// Una fecha dentro de todo el texto ("20-09-2026" o "20/09/2026"): cuenta cuantas filas trae la captura.
 export const STATEMENT_DATE_GLOBAL = /\d{2}[-/.]\d{2}[-/.]\d{4}/g
 
-// Una fecha de fila ("20-09-2026" o "20/09/2026") y su hora ("19:58"), a veces separadas por un guion.
+// Una fecha de fila y su hora ("19:58"), a veces separadas por un guion.
 export const STATEMENT_DATE = /(\d{2})[-/.](\d{2})[-/.](\d{4})/
 export const STATEMENT_TIME = /(\d{1,2}:\d{2})/
-
-export const STATEMENT_DEBIT = /debito|cargo|retiro/
-export const STATEMENT_CREDIT = /credito|abono|deposito/
-// Inicio de la palabra de la columna de tipo (Debito / Credito), tolerante a una letra mal leida: se usa
-// para ubicar cada fila (hay exactamente una por movimiento).
-export const STATEMENT_DEBIT_OR_CREDIT_START = /^(deb|cred|cargo|abono)/
-
-// Los estados de cuenta de estos bancos estan en bolivares.
-export const STATEMENT_CURRENCY = 'VEF'

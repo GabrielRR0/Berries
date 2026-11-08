@@ -2,6 +2,9 @@
 // archivo por tema. Para ajustar el reconocimiento se edita el archivo del tema, no
 // la logica que lo usa.
 export * from './bankLabels'
+export * from './bdvStatementShapes'
+export * from './bdvStatementSignals'
+export * from './bdvStatementTypeWords'
 export * from './binanceLabels'
 export * from './binancePayLabels'
 export * from './categoryHints'

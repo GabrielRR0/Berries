@@ -48,11 +48,11 @@ describe('SettingsMenuMain - header e iconos', () => {
     expect(wrapper.text()).toContain('¿Qué es Menú?')
   })
 
-  it('agrupa los enlaces en "Tus finanzas" y "Herramientas"', () => {
+  it('agrupa los enlaces en secciones', () => {
     const wrapper = mountSettings()
 
     const labels = wrapper.findAll('.menu-section-label').map((el) => el.text())
-    expect(labels).toEqual(['Tus finanzas', 'Modo offline', 'Herramientas'])
+    expect(labels).toEqual(['Tus finanzas', 'Apariencia', 'Modo offline', 'Herramientas'])
   })
 
   it('cada item del menu tiene un icono propio', () => {
@@ -63,10 +63,26 @@ describe('SettingsMenuMain - header e iconos', () => {
     const wrapper = mount(SettingsMenuMain)
 
     const items = wrapper.findAll('.menu-item')
-    expect(items).toHaveLength(7)
+    expect(items).toHaveLength(9)
     for (const item of items) {
       expect(item.find('.icon-badge svg').exists()).toBe(true)
     }
+  })
+})
+
+describe('SettingsMenuMain - banco de escaneo', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+  })
+
+  // Sin stubear RouterLink: el stub descarta el contenido de sus slots.
+  it('lista "Banco de escaneo" con el banco elegido y enlaza a su pantalla', () => {
+    const wrapper = mount(SettingsMenuMain, { global: { stubs: { RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' } } } })
+
+    const item = wrapper.findAll('.menu-item').find((link) => link.text().includes('Banco de escaneo'))
+    expect(item?.attributes('href')).toBe('/ajustes/banco')
+    expect(item?.find('.menu-item-value').text()).toBe('Banco de Venezuela')
   })
 })
 

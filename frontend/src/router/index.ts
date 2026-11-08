@@ -128,6 +128,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/ajustes/banco',
+      name: 'ajustes-banco',
+      component: () => import('../components/settings/ScanBankSettingsMain.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/pendientes',
       name: 'pendientes',
       component: () => import('../components/offline/PendingSyncMain.vue'),
