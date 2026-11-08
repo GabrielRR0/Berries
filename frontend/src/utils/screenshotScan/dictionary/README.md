@@ -21,6 +21,7 @@ Los patrones se comparan contra texto **en minúsculas y sin tildes** (`depósit
 | `binancePayLabels.ts` | Lista "Activos > Pay" y "Detalles del pago" de Binance Pay | Binance cambia un texto |
 | `p2pOrderLabels.ts` | Etiquetas del historial de órdenes P2P | Binance cambia un texto |
 | `fiatSymbols.ts` | Moneda del importe de una orden P2P (Bs, $, COP…) | Comprar/vender USDT con otra moneda |
+| `bankStatementLabels.ts` | Solo lo genérico del estado de cuenta en tabla: sinónimos de columnas, fecha y hora | Otro nombre de columna |
 | `bankLabels.ts` | Etiquetas de los comprobantes de cada banco | Un banco cambia su comprobante |
 | `listPatterns.ts` | Montos y horas de las listas de movimientos | Otro formato de monto u hora |
 | `imageKindWords.ts` | Cómo distinguir una lista de un movimiento suelto | Ajustar la detección de listas |
@@ -33,3 +34,22 @@ Los patrones se comparan contra texto **en minúsculas y sin tildes** (`depósit
 4. `../bankMovementProfiles.ts`: una función `extractX` que llama a `extractBankMovement` con sus etiquetas.
 5. `../scanText.ts`: un `case` para su tipo.
 6. Añade el texto OCR de una captura real como caso en `../specs/`.
+
+## Agregar un banco al estado de cuenta en tabla
+
+El estado de cuenta en tabla (`../bankStatement/`) separa el **motor** (ubicar columnas y filas, comprobar
+el saldo, que no sabe de bancos) de los **perfiles de banco** (`../bankStatement/profiles/`), que son los
+que dicen qué cambia de un banco a otro: moneda, forma de las cifras, palabras de débito/crédito,
+cuántas cifras de la referencia comparten una comisión y su operación, y qué títulos lo delatan.
+Hoy solo existe `bdv.ts` (Banco de Venezuela, el único probado).
+
+1. `../bankStatement/profiles/<banco>.ts`: un `StatementProfile` (copia `bdv.ts` y ajusta cada campo).
+2. `../bankStatement/profiles/types.ts`: añade su id a `BankId`.
+3. `../bankStatement/profiles/index.ts`: añádelo a `STATEMENT_PROFILES`. Con eso aparece solo en
+   Ajustes > Banco de escaneo (`BANK_OPTIONS`) y el resto del código lo recibe por `getProfile(id)`.
+4. Añade un spec con el texto OCR de una captura real del banco en `../specs/`.
+
+Reglas de la carpeta `bankStatement/` (las vigila `../specs/bankStatementStructure.spec.ts`): cada
+archivo tiene como máximo 180 líneas, `index.ts` solo importa y exporta, toda función declara su tipo de
+retorno y no se usan tipos complejos (`ReturnType`, `Partial<Record<…>>`, `any`): se declara una
+`interface` plana en `types.ts`.

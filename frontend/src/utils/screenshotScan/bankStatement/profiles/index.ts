@@ -12,10 +12,11 @@ export const STATEMENT_PROFILES: StatementProfile[] = [BDV_PROFILE]
 export interface BankOption {
   id: BankId
   label: string
+  description: string
 }
 
 // Lo que ofrece la pantalla de Ajustes.
-export const BANK_OPTIONS: BankOption[] = STATEMENT_PROFILES.map((profile) => ({ id: profile.id, label: profile.label }))
+export const BANK_OPTIONS: BankOption[] = STATEMENT_PROFILES.map((profile) => ({ id: profile.id, label: profile.label, description: profile.description }))
 
 // Devuelve el perfil del banco; sin banco, o con uno desconocido, el de por defecto.
 export function getProfile(id?: BankId | null): StatementProfile {

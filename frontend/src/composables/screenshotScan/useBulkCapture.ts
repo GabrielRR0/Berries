@@ -1,4 +1,5 @@
 import { computed, ref, watch } from 'vue'
+import { useScanBank } from './useScanBank'
 import { recognizeScreenshot } from '../../services/screenshotScan/screenshot-scan.service'
 import { checkDuplicates, createDraftsBulk, createTransactionsBulk } from '../../services/transactions/transactions.service'
 import { useTransactionsStore } from '../../stores/transactions.store'
@@ -61,6 +62,8 @@ const KIND_LABEL: Record<ImageKind, string> = {
 // enlazan los recibidos del banco con las ordenes P2P (que traen los USDT).
 export function useBulkCapture(initialWalletId = '') {
   const walletsStore = useWalletsStore()
+  // Banco elegido en Ajustes: de el depende como se lee el estado de cuenta.
+  const { bankId } = useScanBank()
   const transactionsStore = useTransactionsStore()
 
   const selectedWalletId = ref(initialWalletId)
@@ -204,6 +207,7 @@ export function useBulkCapture(initialWalletId = '') {
         defaultDate: defaultDate.value,
         scope: scope.value,
         includeFees: includeFees.value,
+        bank: bankId.value,
       })
       // El contexto elegido antes de subir (gastos, ingresos, P2P) decide como se toman las filas.
       const newRows = applyScanContext(result.rows, { scope: scope.value, transferKind: transferKind.value })

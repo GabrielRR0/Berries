@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useScanBank } from '../../composables/screenshotScan/useScanBank'
 import { useAccentTheme } from '../../composables/theme/useAccentTheme'
 import { useAvatarInitials } from '../../composables/auth/useAvatarInitials'
 import { useAuthStore } from '../../stores/auth.store'
@@ -28,6 +29,7 @@ const offlineCachePreferences = useOfflineCachePreferencesStore()
 
 const avatarInitials = useAvatarInitials()
 const { palette: accentPalette } = useAccentTheme()
+const { bankLabel } = useScanBank()
 const showHelpSheet = ref(false)
 
 const displayName = computed(() => authStore.user?.displayName || authStore.user?.email || 'Usuario')
@@ -243,6 +245,18 @@ async function onDeleteAccount() {
               </svg>
             </IconBadge>
             <span class="menu-item-label">Tasas</span>
+            <span class="menu-item-arrow" aria-hidden="true">›</span>
+          </RouterLink>
+
+          <RouterLink to="/ajustes/banco" class="menu-item">
+            <IconBadge size="sm">
+              <!-- Banco: edificio con columnas. -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9.5 12 4l9 5.5M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </IconBadge>
+            <span class="menu-item-label">Banco de escaneo</span>
+            <span class="menu-item-value">{{ bankLabel }}</span>
             <span class="menu-item-arrow" aria-hidden="true">›</span>
           </RouterLink>
         </nav>

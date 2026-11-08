@@ -6,6 +6,7 @@ import type { StatementProfile } from './types'
 export const BDV_PROFILE: StatementProfile = {
   id: 'bdv',
   label: 'Banco de Venezuela',
+  description: 'Estado de cuenta de BDVenlínea personas, en bolívares.',
   currency: 'VEF',
   numberLocale: 'es',
   amountShape: /^-?\d[\d.]*,\d{2}$/,

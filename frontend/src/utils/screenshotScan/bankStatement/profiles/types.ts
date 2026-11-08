@@ -11,6 +11,8 @@ export interface StatementProfile {
   id: BankId
   // Nombre que se muestra en Ajustes.
   label: string
+  // Una frase para Ajustes: que captura de este banco se lee.
+  description: string
   // Moneda de todos los movimientos de este banco (codigo de la app, por ejemplo 'VEF').
   currency: string
   // Como se escriben las cifras: en espanol "1.006,51", en ingles "1,006.51".

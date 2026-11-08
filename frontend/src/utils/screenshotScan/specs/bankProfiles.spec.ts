@@ -7,7 +7,8 @@ const WIDTH = 1918
 
 describe('perfiles de banco del estado de cuenta', () => {
   it('hoy solo existe Banco de Venezuela, y es el de por defecto', () => {
-    expect(BANK_OPTIONS).toEqual([{ id: 'bdv', label: 'Banco de Venezuela' }])
+    expect(BANK_OPTIONS.map((option) => [option.id, option.label])).toEqual([['bdv', 'Banco de Venezuela']])
+    expect(BANK_OPTIONS[0]!.description).not.toBe('')
     expect(DEFAULT_BANK_ID).toBe('bdv')
     expect(getProfile().id).toBe('bdv')
   })
