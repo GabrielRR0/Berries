@@ -157,8 +157,9 @@ function inferColumnsFromRows(words: OcrWord[]): Columns | null {
   const height = Math.max(median(words.map((word) => word.y1 - word.y0)), 1)
   if (amountXs.length === 0 || balanceXs.length === 0 || biggest < height) return null
 
+  const dateStart = Math.min(...dates.map((word) => word.x0))
   const starts: Partial<Record<StatementColumn, number>> = {
-    date: Math.min(...dates.map((word) => word.x0)),
+    date: dateStart,
     debit: typeStart,
     amount: Math.min(...amountXs),
     balance: Math.min(...balanceXs),
@@ -168,7 +169,7 @@ function inferColumnsFromRows(words: OcrWord[]): Columns | null {
     // La descripcion empieza donde termina la referencia.
     starts.description = Math.max(...references.map((word) => word.x1)) + 1
   } else {
-    starts.description = (starts.date + typeStart) / 2
+    starts.description = (dateStart + typeStart) / 2
   }
   // Sin titulos todo lo que hay es cuerpo de la tabla.
   return { mode: 'typed', starts, headerBottom: -1 }
