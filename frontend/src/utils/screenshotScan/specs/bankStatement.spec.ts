@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseBankStatement } from '../bankStatementParser'
+import { parseBankStatement } from '../bankStatement'
 import { rowFingerprint } from '../rowFingerprint'
 import { classifyImageKind, rowsFromImage } from '../rowsFromImage'
 import { BANK_STATEMENT_WORDS, STATEMENT_ROWS, TODAY, genericTableWords, layoutOf, line, statementWords } from './listFixtures'

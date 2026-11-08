@@ -1,4 +1,4 @@
-import { statementDescriptionRegion } from '../../utils/screenshotScan/bankStatementParser'
+import { statementDescriptionRegion } from '../../utils/screenshotScan/bankStatement'
 import { replaceWordsInRegion, scaleWords, upscaleFactorFor } from '../../utils/screenshotScan/ocrLayout'
 import type { OcrBox, OcrWord } from '../../utils/screenshotScan/ocrLayout'
 import { isGreenAt, prepareImageForOcr, scaleCanvas } from '../../utils/screenshotScan/prepareImage'

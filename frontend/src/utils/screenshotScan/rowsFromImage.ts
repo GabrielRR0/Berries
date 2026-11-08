@@ -1,7 +1,7 @@
 import { parseBankList } from './bankListParser'
-import { parseBankStatement } from './bankStatementParser'
+import { getProfile, looksLikeStatement, parseBankStatement } from './bankStatement'
+import type { BankId } from './bankStatement'
 import { BANK_LIST_FORMATS, DEFAULT_COLOR_CODES_DIRECTION } from './dictionary/bankListFormats'
-import { MIN_STATEMENT_DATES, MIN_STATEMENT_TITLED_DATES, STATEMENT_DATE_GLOBAL, STATEMENT_KIND_SIGNALS, STATEMENT_TYPE_WORD_GLOBAL } from './dictionary/bankStatementLabels'
 import {
   BOLIVAR_AMOUNT_GLOBAL,
   MIN_LIST_AMOUNTS,
@@ -28,20 +28,19 @@ const MISSING_DATE_FLAG = 'Falta la fecha.'
 // una lista de movimientos del banco, la lista de Binance Pay, un solo movimiento o algo que no se reconoce.
 export type ImageKind = 'bank_statement' | 'p2p_orders' | 'bank_list' | 'binance_pay' | 'single' | 'unknown'
 
-export function classifyImageKind(text: string, options: { allowStatement?: boolean } = {}): ImageKind {
+export interface ClassifyOptions {
+  // false = no probar con el estado de cuenta (se usa cuando ya se vio que no se pudo leer como tabla).
+  allowStatement?: boolean
+  // Banco elegido en Ajustes: de el salen las senales del estado de cuenta.
+  bank?: BankId
+}
+
+export function classifyImageKind(text: string, options: ClassifyOptions = {}): ImageKind {
   const normalized = normalizeForMatch(text)
 
-  // Estado de cuenta en tabla: aparecen sus titulos (Fecha, Descripcion/Concepto, Monto/Importe/Debito...)
-  // y varias fechas de fila (un comprobante suelto trae una sola). Ver dictionary/bankStatementLabels.ts.
-  if (options.allowStatement !== false) {
-    const dates = (normalized.match(STATEMENT_DATE_GLOBAL) ?? []).length
-    const hasTitles = STATEMENT_KIND_SIGNALS.every((signal) => signal.test(normalized))
-    const typeWords = (normalized.match(STATEMENT_TYPE_WORD_GLOBAL) ?? []).length
-    // Una captura recortada puede traer pocas filas (con titulos bastan dos) o ninguna fila de titulos (se
-    // reconoce por la palabra Debito / Credito de cada fila).
-    if ((hasTitles && dates >= MIN_STATEMENT_TITLED_DATES) || (dates >= MIN_STATEMENT_DATES && typeWords >= MIN_STATEMENT_DATES)) {
-      return 'bank_statement'
-    }
+  // Estado de cuenta en tabla (ver bankStatement/statementKind.ts).
+  if (options.allowStatement !== false && looksLikeStatement(normalized, getProfile(options.bank))) {
+    return 'bank_statement'
   }
 
   const orderStarts = (normalized.match(ORDER_START_GLOBAL) ?? []).length
@@ -148,6 +147,8 @@ export interface RowsFromImageOptions {
   scope?: ScanScope
   // false = ignorar las comisiones del banco.
   includeFees?: boolean
+  // Banco elegido en Ajustes (de el depende como se lee su estado de cuenta); sin valor, el de por defecto.
+  bank?: BankId
 }
 
 // Reconoce el formato de la lista por su titulo, para saber si el color distingue recibido de pagado.
@@ -173,7 +174,7 @@ export interface RowsFromImage {
 }
 
 export function rowsFromImage(layout: LayoutInput, options: RowsFromImageOptions): RowsFromImage {
-  let kind = classifyImageKind(layout.text)
+  let kind = classifyImageKind(layout.text, { bank: options.bank })
 
   if (kind === 'bank_statement') {
     // El estado de cuenta dice explicitamente si cada movimiento es debito o credito: el filtro de
@@ -182,10 +183,11 @@ export function rowsFromImage(layout: LayoutInput, options: RowsFromImageOptions
       imageWidth: layout.width,
       defaultDate: options.defaultDate,
       includeFees: options.includeFees,
+      bank: options.bank,
     })
     if (rows.length > 0) return { kind, rows: keepScope(rows, options.scope ?? 'all'), readCount: rows.length }
     // Parecia una tabla pero no se pudieron ubicar sus columnas: se prueban los otros lectores.
-    kind = classifyImageKind(layout.text, { allowStatement: false })
+    kind = classifyImageKind(layout.text, { allowStatement: false, bank: options.bank })
   }
   if (kind === 'p2p_orders') {
     const rows = parseP2pOrderList(groupSegments(layout.words, layout.width), options.today)
