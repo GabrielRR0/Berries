@@ -17,8 +17,8 @@ export const STATEMENT_COLUMN_SYNONYMS: Record<StatementColumn, RegExp[]> = {
   description: [/^descrip/, /^concepto/, /^detalle/, /^observacion/],
   amount: [/^mont/, /^import/, /^valor/],
   balance: [/^sald/],
-  debit: [/^debito/, /^cargo/, /^retiro/],
-  credit: [/^credito/, /^abono/, /^deposito/],
+  debit: [/^debit/, /^cargo/, /^retiro/],
+  credit: [/^credit/, /^abon/, /^deposit/],
 }
 
 // Como se reparten el debito y el credito en la tabla (se deduce de los titulos):

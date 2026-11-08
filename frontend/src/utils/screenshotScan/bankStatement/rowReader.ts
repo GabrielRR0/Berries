@@ -33,8 +33,10 @@ export function readCells(body: OcrWord[], columns: Columns, tolerance: number, 
 }
 
 // Un numero de una celda ("-25.000,00"): su valor sin signo y si traia el menos. null si no hay numero.
+// Si la celda trae pedazos sueltos que el OCR invento ("-14, 20.000,00"), se prefiere el numero completo.
 export function readAmount(text: string, profile: StatementProfile): ReadAmount | null {
-  const token = text.match(/-?\s*\d[\d.,]*/)?.[0]
+  const tokens = text.match(/-?\s*\d[\d.,]*/g) ?? []
+  const token = tokens.find((candidate) => profile.amountShape.test(candidate.replace(/\s+/g, ''))) ?? tokens[0]
   if (!token) return null
   const value = parseLocalizedNumber(token, profile.numberLocale)
   return value === null ? null : { value, negative: token.trim().startsWith('-') }

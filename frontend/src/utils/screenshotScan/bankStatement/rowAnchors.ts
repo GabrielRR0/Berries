@@ -34,7 +34,9 @@ export function findAnchors(body: OcrWord[], columns: Columns, tolerance: number
     // El OCR a veces lee mal la palabra de tipo ("DEBITO" -> "pero") y esa fila se fundiria con la vecina:
     // el monto tambien sale una vez por fila, asi que se usa el que ubique mas filas.
     const byType = dedupeAnchors(inColumns(['debit']).filter((word) => profile.typeWordStart.test(normalizeForMatch(word.text))))
-    const byAmount = dedupeAnchors(inColumns(['amount']).filter((word) => HAS_DIGIT.test(word.text)))
+    // Solo cuenta un monto completo ("14,00", "-500,00"): los pedazos que el OCR inventa ("-14,", ".418,")
+    // inflarian el recuento con filas que no existen.
+    const byAmount = dedupeAnchors(inColumns(['amount']).filter((word) => profile.amountShape.test(word.text)))
     anchors = byAmount.length > byType.length ? byAmount : byType
   } else if (columns.mode === 'split') {
     anchors = dedupeAnchors(inColumns(['debit', 'credit']).filter((word) => HAS_DIGIT.test(word.text)))

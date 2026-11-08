@@ -138,6 +138,21 @@ describe('estado de cuenta en tabla (BDVenlinea personas)', () => {
     expect(rows.every((row) => row.flags.length === 0)).toBe(true)
   })
 
+  it('el titulo "Crédito" deformado ("Créditc") sigue siendo la columna de tipo, aunque el OCR pierda los signos "-"', () => {
+    // Pasa con una captura recortada real: sin la columna de credito el lector tomaba la tabla por "monto con
+    // signo" y, sin signos, marcaba todos los gastos como ingresos.
+    const misread = BANK_STATEMENT_WORDS.map((word) => {
+      if (word.text === 'Crédito') return { ...word, text: 'Créditc' }
+      return /^-\d/.test(word.text) ? { ...word, text: word.text.slice(1) } : word
+    })
+    const rows = parseBankStatement(misread, { imageWidth: WIDTH, defaultDate: null })
+
+    expect(rows.map((row) => [row.amount, row.direction])).toEqual(
+      parseBankStatement(BANK_STATEMENT_WORDS, { imageWidth: WIDTH, defaultDate: null }).map((row) => [row.amount, row.direction]),
+    )
+    expect(rows.filter((row) => row.direction === 'out')).toHaveLength(4)
+  })
+
   it('las palabras fantasma de Tesseract (fragmentos de 1 px o tapados por otra palabra) no desordenan las filas', () => {
     const first = BANK_STATEMENT_WORDS.find((word) => word.text === '0677241403397')!
     const ghosts = [
@@ -150,6 +165,15 @@ describe('estado de cuenta en tabla (BDVenlinea personas)', () => {
 
     expect(rows).toHaveLength(9)
     expect(rows[0]).toMatchObject({ amount: 16000, reference: '0677241403397' })
+  })
+
+  it('un pedazo de monto inventado ("-14,") de altura normal, entre dos filas, no crea una fila nueva', () => {
+    const first = BANK_STATEMENT_WORDS.find((word) => word.text === '0677241403397')!
+    const fragment = { text: '-14,', x0: 1137, x1: 1163, y0: first.y1 + 25, y1: first.y1 + 37 }
+
+    const rows = parseBankStatement([...BANK_STATEMENT_WORDS, fragment], { imageWidth: WIDTH, defaultDate: null })
+
+    expect(rows.map((row) => row.amount)).toEqual([16000, 20000, 10000, 5100, 500, 2500, 4850, 6000, 12697.7])
   })
 
   it('una letra mal leida en DEBITO / CREDITO no desordena las filas', () => {

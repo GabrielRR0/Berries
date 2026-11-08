@@ -37,15 +37,16 @@ function bestHeaderRow(hits: HeaderHit[], lineHeight: number): HeaderHit[] {
   return rows.reduce((current, candidate) => (distinct(candidate) > distinct(current) ? candidate : current))
 }
 
-// "Debito / Credito" en una columna: el titulo trae una barra entre las dos palabras.
-function hasSlashBetween(words: OcrWord[], debit: OcrWord, credit: OcrWord, lineHeight: number): boolean {
+// "Debito / Credito" en una columna: el titulo trae una barra a la derecha de "Debito" (y antes del final de
+// "Credito", si se leyo: el OCR a veces lo deforma, por ejemplo "Creditc").
+function hasSlashAfterDebit(words: OcrWord[], debit: OcrWord, credit: OcrWord | undefined, lineHeight: number): boolean {
   return words.some(
     (word) =>
       word.text.trim() === '/' &&
       centerY(word) >= centerY(debit) - lineHeight &&
       centerY(word) <= centerY(debit) + lineHeight &&
       word.x0 >= debit.x0 &&
-      word.x1 <= credit.x1,
+      (credit === undefined || word.x1 <= credit.x1),
   )
 }
 
@@ -69,7 +70,7 @@ export function findColumnsFromHeaders(words: OcrWord[]): Columns | null {
   const debit = found.get('debit')
   const credit = found.get('credit')
   const hasAmount = found.has('amount')
-  const typed = debit !== undefined && credit !== undefined && hasSlashBetween(words, debit, credit, lineHeight)
+  const typed = debit !== undefined && hasSlashAfterDebit(words, debit, credit, lineHeight)
 
   const starts: ColumnStarts = {}
   for (const [column, word] of found) starts[column] = word.x0
