@@ -7,7 +7,13 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.modules.analytics.contracts.resources import CategoryBreakdownItemResource, CategoryMonthlyTrendItemResource, CategoryMonthlyTrendResource
-from app.modules.analytics.services.period_totals import WalletCurrencyConverter, user_default_currency, transactions_in_range
+from app.modules.analytics.services.period_totals import (
+    WalletCurrencyConverter,
+    month_exists,
+    registration_day,
+    transactions_in_range,
+    user_default_currency,
+)
 from app.modules.analytics.utils.months import month_bounds, resolve_month, shift_month
 
 
@@ -58,7 +64,13 @@ def get_category_monthly_trend(
     categorías no debería ver 20+ filas de sparkline)."""
     months = max(1, min(months, 24))
     current_month = resolve_month(None)
-    ordered_months = [shift_month(current_month, -offset) for offset in range(months - 1, -1, -1)]
+    registered = registration_day(db, user_id)
+    # Sin meses anteriores al registro (el mes actual siempre queda).
+    ordered_months = [
+        month
+        for month in (shift_month(current_month, -offset) for offset in range(months - 1, -1, -1))
+        if month == current_month or month_exists(month, registered)
+    ]
     converter = WalletCurrencyConverter(db, user_id, user_default_currency(db, user_id))
 
     totals_by_month: list[dict[str, Decimal]] = []

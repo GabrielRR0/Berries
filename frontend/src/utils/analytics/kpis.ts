@@ -44,7 +44,10 @@ export function buildKpiTiles(input: KpiInput): StatTile[] {
       id: 'net',
       label: 'Ahorro neto',
       value: money(summary.netSavings),
-      hint: `Mes pasado: ${money(summary.previousPeriodNetSavings)}`,
+      hint:
+        summary.previousPeriodNetSavings === null
+          ? 'Tu primer mes en Berry'
+          : `Mes pasado: ${money(summary.previousPeriodNetSavings)}`,
       icon: 'swap',
       tone: 'neutral',
     },

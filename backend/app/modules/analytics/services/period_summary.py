@@ -31,7 +31,14 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.modules.analytics.contracts.resources import MonthlyComparisonItemResource, PeriodSummaryResource
-from app.modules.analytics.services.period_totals import WalletCurrencyConverter, user_default_currency, net_savings_for_month, sum_amount
+from app.modules.analytics.services.period_totals import (
+    WalletCurrencyConverter,
+    month_exists,
+    net_savings_for_month,
+    registration_day,
+    sum_amount,
+    user_default_currency,
+)
 from app.modules.analytics.utils.months import month_bounds, resolve_month, shift_month
 
 
@@ -47,8 +54,12 @@ def get_period_summary(db: Session, user_id: uuid.UUID, month: str | None = None
     total_expense = sum_amount(db, user_id, "expense", start, end, converter)
     net_savings = total_income - total_expense
 
+    # None si el mes anterior terminó antes de que el usuario se registrara: no hay con qué comparar.
+    registered = registration_day(db, user_id)
     previous_month = shift_month(resolved_month, -1)
-    previous_period_net_savings = net_savings_for_month(db, user_id, previous_month, converter)
+    previous_period_net_savings = (
+        net_savings_for_month(db, user_id, previous_month, converter) if month_exists(previous_month, registered) else None
+    )
 
     return PeriodSummaryResource(
         period=resolved_month,
@@ -61,11 +72,17 @@ def get_period_summary(db: Session, user_id: uuid.UUID, month: str | None = None
 
 def get_monthly_comparison(db: Session, user_id: uuid.UUID, months: int = 6) -> list[MonthlyComparisonItemResource]:
     """Una entrada por mes calendario, de más antiguo a más reciente, terminando en el
-    mes actual — exactamente `months` meses consecutivos, incluyendo los que no
-    tuvieron transacciones (con totales en cero, nunca se omiten)."""
+    mes actual — hasta `months` meses consecutivos desde que el usuario se
+    registró, incluyendo los que no tuvieron transacciones (con totales en cero)."""
     months = max(1, min(months, 24))
     current_month = resolve_month(None)
-    ordered_months = [shift_month(current_month, -offset) for offset in range(months - 1, -1, -1)]
+    registered = registration_day(db, user_id)
+    # Sin meses anteriores al registro (el mes actual siempre queda).
+    ordered_months = [
+        month
+        for month in (shift_month(current_month, -offset) for offset in range(months - 1, -1, -1))
+        if month == current_month or month_exists(month, registered)
+    ]
     converter = WalletCurrencyConverter(db, user_id, user_default_currency(db, user_id))
 
     items = []

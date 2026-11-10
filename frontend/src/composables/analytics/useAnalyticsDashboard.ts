@@ -26,6 +26,7 @@ import type {
 import { historyRange, timelineRange } from '../../utils/analytics/periods'
 import type { AnalyticsFilters } from './useAnalyticsFilters'
 import { useKeyedResource } from './useKeyedResource'
+import { clampToRegistration, useRegistrationDay } from './useRegistrationMonth'
 
 // Pide todo lo que muestra la pagina Analisis y lo mantiene al dia segun los filtros. Cada
 // bloque tiene su propio estado de carga y su propia clave de cache, asi cambiar la
@@ -43,13 +44,15 @@ export function useAnalyticsDashboard(filters: AnalyticsFilters) {
   const wallets = useKeyedResource<WalletBreakdownItem[]>()
   const top = useKeyedResource<TopTransaction[]>()
   const insights = useKeyedResource<Insight[]>()
+  // Los graficos de tendencia no arrancan antes del dia en que el usuario se registro.
+  const registrationDay = useRegistrationDay()
 
   function loadMonthData(force = false) {
     const key = filters.monthKey.value
     const history6 = historyRange(filters.year.value, filters.month.value)
     const options = { force }
     summary.load(`summary:${key}`, () => getPeriodSummary(key), options)
-    history.load(`history:${key}`, () => getTimeline('month', history6.dateFrom, history6.dateTo), options)
+    history.load(`history:${key}`, () => getTimeline('month', clampToRegistration(history6.dateFrom, registrationDay.value), history6.dateTo), options)
     categories.load(`categories:${key}`, () => getCategoryBreakdown('expense', key), options)
     wallets.load(`wallets:${key}`, () => getWalletBreakdown(key), options)
     top.load(`top:${key}`, () => getTopTransactions(key, 5), options)
@@ -68,7 +71,7 @@ export function useAnalyticsDashboard(filters: AnalyticsFilters) {
     const wallet = walletId.value ?? undefined
     flow.load(
       `flow:${granularity.value}:${monthKey.value}:${wallet ?? 'all'}`,
-      () => getTimeline(granularity.value, range.dateFrom, range.dateTo, wallet),
+      () => getTimeline(granularity.value, clampToRegistration(range.dateFrom, registrationDay.value), range.dateTo, wallet),
       { force },
     )
   }

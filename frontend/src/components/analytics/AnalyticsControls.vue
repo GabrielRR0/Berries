@@ -4,11 +4,13 @@ import type {
   AnalyticsGranularity,
 } from '../../services/analytics/interfaces/analytics.interface'
 import { COMPARE_OPTIONS, GRANULARITY_OPTIONS } from '../../utils/analytics/periods'
+import { useRegistrationMonth } from '../../composables/analytics/useRegistrationMonth'
 import MonthPager from '../ui/MonthPager.vue'
 import PillToggle from '../ui/PillToggle.vue'
 
 // Barra de controles de Analisis: mes que se analiza, con que se compara y por cuanto
 // tiempo se agrupa el grafico de flujo. Solo conecta; el estado vive en useAnalyticsFilters.
+const registrationMonth = useRegistrationMonth()
 defineProps<{
   year: number
   month: number
@@ -24,7 +26,7 @@ const emit = defineEmits<{
 
 <template>
   <div class="analytics-controls">
-    <MonthPager :year="year" :month="month" variant="toolbar" @change="(y, m) => emit('changeMonth', y, m)" />
+    <MonthPager :year="year" :month="month" variant="toolbar" :min="registrationMonth" @change="(y, m) => emit('changeMonth', y, m)" />
 
     <div class="analytics-control">
       <span class="analytics-control-label">Comparar con</span>

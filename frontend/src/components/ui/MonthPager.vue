@@ -10,9 +10,12 @@ import { formatMonthYear } from '../../utils/formatters/formatDate'
 // variant: "pill" (default, pastilla chica), "hero" (movil, dentro del resumen del
 // mes) y "toolbar" (barra superior de escritorio). Los dos ultimos deshabilitan
 // la flecha siguiente en el mes actual - no hay movimientos del futuro que ver.
-const props = withDefaults(defineProps<{ year: number; month: number; variant?: 'pill' | 'hero' | 'toolbar' }>(), {
-  variant: 'pill',
-})
+// min: primer mes al que se puede ir (ej. el del registro del usuario en Analisis); sin
+// min no hay limite hacia atras.
+const props = withDefaults(
+  defineProps<{ year: number; month: number; variant?: 'pill' | 'hero' | 'toolbar'; min?: { year: number; month: number } | null }>(),
+  { variant: 'pill', min: null },
+)
 const emit = defineEmits<{ change: [year: number, month: number] }>()
 
 // La etiqueta del mes se desliza hacia el lado al que se navega.
@@ -28,6 +31,7 @@ const isCurrentMonth = computed(() => {
   const today = new Date()
   return props.year * 12 + props.month >= today.getFullYear() * 12 + today.getMonth()
 })
+const previousDisabled = computed(() => props.min !== null && props.year * 12 + props.month <= props.min.year * 12 + props.min.month)
 const nextDisabled = computed(() => props.variant !== 'pill' && isCurrentMonth.value)
 
 function goToPrevious() {
@@ -43,7 +47,7 @@ function goToNext() {
 
 <template>
   <div ref="root" class="month-pager" :class="variant">
-    <button type="button" class="month-pager-arrow" aria-label="Mes anterior" @click="goToPrevious">
+    <button type="button" class="month-pager-arrow" aria-label="Mes anterior" :disabled="previousDisabled" @click="goToPrevious">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M15 5 8 12l7 7" stroke-linecap="round" stroke-linejoin="round" />
       </svg>

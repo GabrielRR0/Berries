@@ -12,6 +12,7 @@
 // scrollear hacia abajo - pedido explicito del usuario, igual que las apps
 // nativas de telefono.
 import BrandMark from '../ui/BrandMark.vue'
+import HeaderAvatar from './HeaderAvatar.vue'
 
 withDefaults(defineProps<{ avatarInitials?: string; scrolled?: boolean; greeting?: string; name?: string }>(), {
   avatarInitials: '',
@@ -24,14 +25,7 @@ defineEmits<{ avatarClick: []; helpClick: [] }>()
 
 <template>
   <header class="top-header" :class="{ 'is-scrolled': scrolled }">
-    <button type="button" class="avatar-button" aria-label="Perfil" @click="$emit('avatarClick')">
-      <span v-if="avatarInitials">{{ avatarInitials }}</span>
-      <svg v-else viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path
-          d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.14 0-7.5 2.46-7.5 5.5V21h15v-1.5c0-3.04-3.36-5.5-7.5-5.5Z"
-        />
-      </svg>
-    </button>
+    <HeaderAvatar :initials="avatarInitials" @click="$emit('avatarClick')" />
 
     <div v-if="greeting" class="greeting">
       <span class="greeting-label">{{ greeting }}</span>

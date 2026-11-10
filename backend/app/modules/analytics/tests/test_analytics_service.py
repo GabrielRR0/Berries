@@ -15,7 +15,12 @@ from app.modules.wallets import create_wallet
 
 
 def _user(db, email="ana@example.com"):
-    return register_user(db, email, "clave12345", "Ana")
+    user = register_user(db, email, "clave12345", "Ana")
+    # Registrado "hace años": estos tests usan datos de meses pasados, y el análisis solo
+    # compara contra períodos posteriores al registro (ver registration_day).
+    user.created_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    db.commit()
+    return user
 
 
 def _wallet(db, user_id, name="Cash", currency="USD"):
@@ -452,9 +457,36 @@ def test_period_summary_uses_the_users_own_default_currency_as_target(db):
     """Si el usuario elige VEF como moneda por defecto (no todos son USD-first), la
     conversion tiene que apuntar ahi, no a USD siempre."""
     user = register_user(db, "caracas@example.com", "clave12345", "Caro", default_currency="VEF")
+    user.created_at = _dt(2020, 1, 1)
+    db.commit()
     usd_wallet = _wallet(db, user.id, "Efectivo", "USD")
     create_transaction(db, user.id, usd_wallet.id, "expense", Decimal("100"), "Comida", occurred_at=_dt(2024, 7, 1))
 
     summary = get_period_summary(db, user.id, "2024-07")
 
     assert summary.total_expense == Decimal("3650")  # 100 USD -> VEF al fallback 36.5
+
+
+def test_period_summary_has_no_previous_savings_when_that_month_is_before_registration(db):
+    user = _user(db)
+    user.created_at = _dt(2024, 3, 2)
+    db.commit()
+    wallet = _wallet(db, user.id)
+    create_transaction(db, user.id, wallet.id, "income", Decimal("1000.00"), "Salario", occurred_at=_dt(2024, 3, 3))
+
+    summary = get_period_summary(db, user.id, "2024-03")
+
+    assert summary.previous_period_net_savings is None
+    assert get_period_summary(db, user.id, "2024-04").previous_period_net_savings == Decimal("1000.00")
+
+
+def test_monthly_comparison_starts_at_the_registration_month(db):
+    user = _user(db)
+    now = datetime.now(timezone.utc)
+    previous_year, previous_month = _shift(now.year, now.month, -1)
+    user.created_at = datetime(previous_year, previous_month, 1, tzinfo=timezone.utc)
+    db.commit()
+
+    items = get_monthly_comparison(db, user.id, 6)
+
+    assert [item.month for item in items] == [f"{previous_year:04d}-{previous_month:02d}", f"{now.year:04d}-{now.month:02d}"]
