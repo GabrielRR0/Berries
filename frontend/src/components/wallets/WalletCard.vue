@@ -9,7 +9,10 @@ import IconBadge from '../ui/IconBadge.vue'
 // pasos inline (en vez de window.confirm nativo, para que se vea/sienta
 // parte de la UI de Berry en lugar de un dialogo del navegador). Quien la
 // usa (WalletsMain.vue) decide que hacer con el emit 'delete'.
-const props = defineProps<{ wallet: Wallet }>()
+const props = withDefaults(defineProps<{ wallet: Wallet; share?: number; movementCount?: number }>(), {
+  share: 0,
+  movementCount: 0,
+})
 const emit = defineEmits<{ delete: [walletId: string]; open: [walletId: string] }>()
 
 const confirmingDelete = ref(false)
@@ -51,6 +54,16 @@ function confirmDelete() {
       </p>
     </button>
 
+    <!-- Peso de la billetera sobre el patrimonio total (USD) y cuantos movimientos tiene. -->
+    <div class="wallet-meta">
+      <div class="wallet-share-bar" role="img" :aria-label="`${share}% de tu patrimonio`">
+        <span class="wallet-share-fill" :style="{ width: `${share}%` }" />
+      </div>
+      <p class="wallet-meta-text">
+        {{ share }}% del total · {{ movementCount }} {{ movementCount === 1 ? 'movimiento' : 'movimientos' }}
+      </p>
+    </div>
+
     <!-- Alto fijo + ambos estados position:absolute - mismo criterio que
          TransactionList.vue, para que confirmar el borrado nunca mueva nada
          fuera de la card (pedido explicito del usuario en esa pantalla,
@@ -65,6 +78,7 @@ function confirmDelete() {
           </div>
         </div>
         <div v-else class="wallet-actions">
+          <button type="button" class="wallet-open-trigger" @click="emit('open', wallet.id)">Ver cartola ›</button>
           <button type="button" class="wallet-delete-trigger" @click="requestDelete">Eliminar</button>
         </div>
       </Transition>
@@ -89,9 +103,12 @@ function confirmDelete() {
 }
 
 .wallet-main {
-  display: flex;
+  /* Icono + nombre arriba y el saldo en su propia fila: en tarjetas angostas un saldo largo
+     ("VEF 350.000,00") ya no se pisa con el nombre. */
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.875rem;
+  gap: 0.75rem 0.875rem;
   width: 100%;
   padding: 0;
   border: none;
@@ -120,10 +137,14 @@ function confirmDelete() {
 }
 
 .wallet-balance {
-  flex-shrink: 0;
-  font-size: 1.0625rem;
-  font-weight: 700;
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 /* Pulso rojo de una sola vez al pedir confirmacion - mismo criterio que
@@ -174,7 +195,54 @@ function confirmDelete() {
 }
 
 .wallet-actions {
-  justify-content: flex-end;
+  justify-content: space-between;
+}
+
+.wallet-open-trigger {
+  padding: 0.25rem 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.wallet-open-trigger:hover {
+  opacity: 0.8;
+}
+
+.wallet-meta {
+  margin-top: 0.875rem;
+}
+
+.wallet-share-bar {
+  height: 0.3125rem;
+  border-radius: 0.1875rem;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.wallet-share-fill {
+  display: block;
+  height: 100%;
+  border-radius: 0.1875rem;
+  background: var(--accent-bright);
+  transition: width var(--duration-base) var(--ease-out);
+}
+
+.wallet-meta-text {
+  margin: 0.375rem 0 0;
+  font-size: 0.71875rem;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallet-share-fill {
+    transition: none;
+  }
 }
 
 .wallet-delete-trigger {

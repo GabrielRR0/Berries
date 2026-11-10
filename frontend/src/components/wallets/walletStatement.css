@@ -3,7 +3,8 @@
 .statement {
   display: flex;
   flex-direction: column;
-  max-width: 40rem;
+  width: 100%;
+  max-width: 30rem;
   margin: 0 auto;
 }
 
@@ -58,6 +59,50 @@
   color: var(--text-muted);
 }
 
+.statement-net {
+  margin: 0.625rem 0 0;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.statement-section-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.statement-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.statement-stats-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.625rem;
+}
+
+.statement-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.statement-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
 .statement-empty {
   text-align: center;
   font-size: 0.875rem;
@@ -86,4 +131,34 @@
   font-size: 0.875rem;
   line-height: 1.6;
   color: var(--text-muted);
+}
+
+/* Tablet: mas ancho. */
+@media (min-width: 640px) {
+  .statement {
+    max-width: 44rem;
+  }
+}
+
+/* Escritorio: movimientos a la izquierda y comisiones por destino fijas a la derecha. */
+@media (min-width: 1024px) {
+  .statement {
+    max-width: 72rem;
+  }
+
+  .statement-content {
+    gap: 1.5rem;
+  }
+
+  .statement-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    align-items: start;
+    gap: 1.5rem;
+  }
+
+  .statement-aside {
+    position: sticky;
+    top: 5.5rem;
+  }
 }
