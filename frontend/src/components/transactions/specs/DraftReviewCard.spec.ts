@@ -168,6 +168,7 @@ describe('DraftReviewCard', () => {
       finalAmount: 41,
       finalCategory: 'Gym',
       finalDescription: 'gasté 41 USDT para pagar el gimnasio',
+      occurredAt: expect.any(String),
     })
     expect(wrapper.emitted('confirmed')).toBeTruthy()
   })

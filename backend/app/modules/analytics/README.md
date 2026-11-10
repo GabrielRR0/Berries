@@ -1,6 +1,6 @@
 # Módulo `analytics`
 
-Análisis: resumen del período, gastos por categoría y comparaciones mensuales.
+Análisis: resumen del período, gastos por categoría, series por día/semana/mes, comparativas, patrones semanales, desglose por billetera y recomendaciones.
 
 ## Rutas
 
@@ -10,6 +10,12 @@ Análisis: resumen del período, gastos por categoría y comparaciones mensuales
 | GET | `/api/analytics/categories` | con sesión |
 | GET | `/api/analytics/monthly` | con sesión |
 | GET | `/api/analytics/categories/trend` | con sesión |
+| GET | `/api/analytics/timeline` | con sesión |
+| GET | `/api/analytics/compare` | con sesión |
+| GET | `/api/analytics/patterns` | con sesión |
+| GET | `/api/analytics/wallets` | con sesión |
+| GET | `/api/analytics/top-transactions` | con sesión |
+| GET | `/api/analytics/insights` | con sesión |
 
 ## API pública (`__init__.py`)
 

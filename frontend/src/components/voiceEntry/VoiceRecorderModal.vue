@@ -59,9 +59,25 @@ function mapSpeechError(code: string): string {
   }
 }
 
+// Libera el micrófono de verdad. En Safari/iPhone, stop() a veces deja la sesión de audio
+// abierta (el indicador naranja del micrófono sigue encendido aunque ya no se escuche),
+// por eso al terminar se llama abort(), que sí corta la captura. Se sueltan los handlers
+// antes para que el onend que dispara abort() no vuelva a cambiar la fase.
+function releaseRecognition(target: BerrySpeechRecognition | null) {
+  if (!target) return
+  target.onresult = null
+  target.onerror = null
+  target.onend = null
+  try {
+    target.abort()
+  } catch {
+    // ya estaba detenido
+  }
+  if (recognition === target) recognition = null
+}
+
 function stopRecognition() {
-  recognition?.stop()
-  recognition = null
+  releaseRecognition(recognition)
 }
 
 function startListening() {
@@ -93,9 +109,11 @@ function startListening() {
   recognizer.onerror = (event) => {
     phase.value = 'idle'
     errorMessage.value = mapSpeechError(event.error)
+    releaseRecognition(recognizer)
   }
 
   recognizer.onend = () => {
+    releaseRecognition(recognizer)
     const finalText = finalTranscript.trim()
     if (finalText) {
       transcript.value = finalText
@@ -111,8 +129,24 @@ function startListening() {
   phase.value = 'listening'
 }
 
+// "Detener" pide el resultado final con stop(); el onend de arriba libera el micrófono.
+// Si el motor nunca llega a disparar onend (pasa en iOS), un respaldo lo corta a la fuerza.
 function stopListening() {
-  stopRecognition()
+  const current = recognition
+  if (!current) return
+  current.stop()
+  setTimeout(() => {
+    if (recognition === current) {
+      const hasText = (liveTranscript.value || '').trim()
+      releaseRecognition(current)
+      if (hasText) {
+        transcript.value = hasText
+        phase.value = 'reviewing'
+      } else {
+        phase.value = 'idle'
+      }
+    }
+  }, 1500)
 }
 
 async function onSubmit() {

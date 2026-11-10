@@ -67,12 +67,22 @@ describe('CategoryField', () => {
     await flushPromises()
 
     await wrapper.setProps({ modelValue: 'mer' })
+    // El filtro solo aplica cuando el usuario escribe (evento input), no con un valor precargado.
+    await wrapper.find('input').trigger('input')
 
     // "mer" no matchea EXACTO ninguna categoria existente, asi que ademas del
     // chip de sugerencia filtrado tambien aparece el de "+ Crear" - cubierto
     // aparte en su propio test.
     const suggestionChips = wrapper.findAll('.category-chip:not(.create)')
     expect(suggestionChips.map((chip) => chip.text())).toEqual(['Mercado'])
+  })
+
+  it('con un valor precargado (editar) muestra todas las categorias, no solo la actual', async () => {
+    const wrapper = mount(CategoryField, { props: { modelValue: 'Mercado', kind: 'expense' } })
+    await flushPromises()
+
+    const suggestionChips = wrapper.findAll('.category-chip:not(.create)')
+    expect(suggestionChips.map((chip) => chip.text())).toEqual(['Mercado', 'Gym'])
   })
 
   it('clickear un chip de sugerencia emite update:modelValue con ese nombre', async () => {

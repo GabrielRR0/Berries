@@ -231,6 +231,338 @@
    ]
   }
  },
+ "/api/analytics/compare": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "month",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    {
+     "in": "query",
+     "name": "against",
+     "required": false,
+     "schema": {
+      "default": "previous",
+      "enum": [
+       "previous",
+       "year_ago",
+       "average"
+      ],
+      "type": "string"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "against": {
+          "enum": [
+           "previous",
+           "year_ago",
+           "average"
+          ],
+          "type": "string"
+         },
+         "categories": {
+          "items": {
+           "properties": {
+            "category": {
+             "type": "string"
+            },
+            "current": {
+             "type": "string"
+            },
+            "delta_percent": {
+             "anyOf": [
+              {
+               "type": "number"
+              },
+              {
+               "type": "null"
+              }
+             ]
+            },
+            "previous": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "category",
+            "current",
+            "previous",
+            "delta_percent"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         },
+         "current_total": {
+          "type": "string"
+         },
+         "days_in_month": {
+          "type": "integer"
+         },
+         "delta_percent": {
+          "anyOf": [
+           {
+            "type": "number"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "elapsed_days": {
+          "type": "integer"
+         },
+         "period": {
+          "type": "string"
+         },
+         "previous_total": {
+          "type": "string"
+         },
+         "window_end": {
+          "format": "date",
+          "type": "string"
+         },
+         "window_start": {
+          "format": "date",
+          "type": "string"
+         }
+        },
+        "required": [
+         "period",
+         "against",
+         "window_start",
+         "window_end",
+         "elapsed_days",
+         "days_in_month",
+         "current_total",
+         "previous_total",
+         "delta_percent",
+         "categories"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/analytics/insights": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "month",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "amount": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "category": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "code": {
+           "type": "string"
+          },
+          "level": {
+           "enum": [
+            "alert",
+            "warning",
+            "info"
+           ],
+           "type": "string"
+          },
+          "percent": {
+           "anyOf": [
+            {
+             "type": "number"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "reference_amount": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          },
+          "weekday": {
+           "anyOf": [
+            {
+             "type": "integer"
+            },
+            {
+             "type": "null"
+            }
+           ]
+          }
+         },
+         "required": [
+          "code",
+          "level"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
  "/api/analytics/monthly": {
   "get": {
    "parameters": [
@@ -275,6 +607,182 @@
          "type": "object"
         },
         "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/analytics/patterns": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "weeks",
+     "required": false,
+     "schema": {
+      "default": 8,
+      "maximum": 26,
+      "minimum": 2,
+      "type": "integer"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "busiest_day": {
+          "anyOf": [
+           {
+            "properties": {
+             "day": {
+              "format": "date",
+              "type": "string"
+             },
+             "total": {
+              "type": "string"
+             }
+            },
+            "required": [
+             "day",
+             "total"
+            ],
+            "type": "object"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "busiest_weekday": {
+          "anyOf": [
+           {
+            "type": "integer"
+           },
+           {
+            "type": "null"
+           }
+          ]
+         },
+         "daily_average": {
+          "type": "string"
+         },
+         "first_day": {
+          "format": "date",
+          "type": "string"
+         },
+         "heat": {
+          "items": {
+           "properties": {
+            "day": {
+             "format": "date",
+             "type": "string"
+            },
+            "total": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "day",
+            "total"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         },
+         "last_day": {
+          "format": "date",
+          "type": "string"
+         },
+         "weekday_averages": {
+          "items": {
+           "properties": {
+            "average": {
+             "type": "string"
+            },
+            "weekday": {
+             "type": "integer"
+            }
+           },
+           "required": [
+            "weekday",
+            "average"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         },
+         "weekend_share": {
+          "type": "number"
+         },
+         "weeks": {
+          "type": "integer"
+         }
+        },
+        "required": [
+         "first_day",
+         "last_day",
+         "weeks",
+         "heat",
+         "weekday_averages",
+         "daily_average",
+         "weekend_share",
+         "busiest_weekday",
+         "busiest_day"
+        ],
+        "type": "object"
        }
       }
      }
@@ -379,6 +887,422 @@
          "previous_period_net_savings"
         ],
         "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/analytics/timeline": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "granularity",
+     "required": true,
+     "schema": {
+      "enum": [
+       "day",
+       "week",
+       "month"
+      ],
+      "type": "string"
+     }
+    },
+    {
+     "in": "query",
+     "name": "date_from",
+     "required": true,
+     "schema": {
+      "format": "date",
+      "type": "string"
+     }
+    },
+    {
+     "in": "query",
+     "name": "date_to",
+     "required": true,
+     "schema": {
+      "format": "date",
+      "type": "string"
+     }
+    },
+    {
+     "in": "query",
+     "name": "wallet_id",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "format": "uuid",
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "buckets": {
+          "items": {
+           "properties": {
+            "count": {
+             "type": "integer"
+            },
+            "net": {
+             "type": "string"
+            },
+            "start": {
+             "format": "date",
+             "type": "string"
+            },
+            "total_expense": {
+             "type": "string"
+            },
+            "total_income": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "start",
+            "total_income",
+            "total_expense",
+            "net",
+            "count"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         },
+         "granularity": {
+          "enum": [
+           "day",
+           "week",
+           "month"
+          ],
+          "type": "string"
+         }
+        },
+        "required": [
+         "granularity",
+         "buckets"
+        ],
+        "type": "object"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/analytics/top-transactions": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "type",
+     "required": false,
+     "schema": {
+      "default": "expense",
+      "enum": [
+       "income",
+       "expense"
+      ],
+      "type": "string"
+     }
+    },
+    {
+     "in": "query",
+     "name": "month",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    {
+     "in": "query",
+     "name": "limit",
+     "required": false,
+     "schema": {
+      "default": 5,
+      "maximum": 50,
+      "minimum": 1,
+      "type": "integer"
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "amount": {
+           "type": "string"
+          },
+          "category": {
+           "type": "string"
+          },
+          "id": {
+           "format": "uuid",
+           "type": "string"
+          },
+          "occurred_at": {
+           "format": "date-time",
+           "type": "string"
+          },
+          "wallet_name": {
+           "type": "string"
+          }
+         },
+         "required": [
+          "id",
+          "occurred_at",
+          "category",
+          "description",
+          "wallet_name",
+          "amount"
+         ],
+         "type": "object"
+        },
+        "type": "array"
+       }
+      }
+     }
+    },
+    "422": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "properties": {
+         "detail": {
+          "items": {
+           "properties": {
+            "loc": {
+             "items": {
+              "anyOf": [
+               {
+                "type": "string"
+               },
+               {
+                "type": "integer"
+               }
+              ]
+             },
+             "type": "array"
+            },
+            "msg": {
+             "type": "string"
+            },
+            "type": {
+             "type": "string"
+            }
+           },
+           "required": [
+            "loc",
+            "msg",
+            "type"
+           ],
+           "type": "object"
+          },
+          "type": "array"
+         }
+        },
+        "type": "object"
+       }
+      }
+     }
+    }
+   },
+   "security": [
+    {
+     "HTTPBearer": []
+    }
+   ]
+  }
+ },
+ "/api/analytics/wallets": {
+  "get": {
+   "parameters": [
+    {
+     "in": "query",
+     "name": "type",
+     "required": false,
+     "schema": {
+      "default": "expense",
+      "enum": [
+       "income",
+       "expense"
+      ],
+      "type": "string"
+     }
+    },
+    {
+     "in": "query",
+     "name": "month",
+     "required": false,
+     "schema": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    }
+   ],
+   "responses": {
+    "200": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "properties": {
+          "count": {
+           "type": "integer"
+          },
+          "currency": {
+           "type": "string"
+          },
+          "name": {
+           "type": "string"
+          },
+          "percentage": {
+           "type": "number"
+          },
+          "total": {
+           "type": "string"
+          },
+          "wallet_id": {
+           "format": "uuid",
+           "type": "string"
+          }
+         },
+         "required": [
+          "wallet_id",
+          "name",
+          "currency",
+          "total",
+          "percentage",
+          "count"
+         ],
+         "type": "object"
+        },
+        "type": "array"
        }
       }
      }

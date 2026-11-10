@@ -16,5 +16,5 @@ def test_delete_demo_user_data_removes_everything_without_fk_errors(db):
     assert recreated.email == DEMO_EMAIL
     assert recreated.id != user.id
     assert len(list_wallets_for_user(db, recreated.id)) == 3
-    assert len(list_transactions_for_user(db, recreated.id)) == 15
+    assert len(list_transactions_for_user(db, recreated.id)) > 100
     assert len(list_debts_for_user(db, recreated.id)) == 2

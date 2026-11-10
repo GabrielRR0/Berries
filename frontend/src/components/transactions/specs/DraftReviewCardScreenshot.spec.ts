@@ -56,7 +56,7 @@ describe('DraftReviewCard con un pendiente de captura', () => {
     const wrapper = mount(DraftReviewCard, { props: { draft: PENDING } })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('2026-10-08')
+    expect((wrapper.find('input[type="date"]').element as HTMLInputElement).value).toBe('2026-10-08')
     expect(wrapper.text()).toContain('Ref. 007608296806')
     expect((wrapper.findAll('select')[1]!.element as HTMLSelectElement).value).toBe('income')
   })
