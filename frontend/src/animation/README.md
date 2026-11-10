@@ -51,6 +51,9 @@ puede borrar o reemplazar sin tocar el componente.
 - `useSlidingIndicator.ts` → `TransactionTypeChips.vue`: la pastilla activa del control segmentado se desliza.
 - `useFadeTransition.ts` → `TransactionsMain.vue`: fundido + subida corta al reemplazar un bloque por otro.
 - `useDirectionalSwap.ts` → `MonthSummaryCards.vue` y `MonthPager.vue`: al cambiar de mes lo viejo sale (copia que se desvanece) mientras lo nuevo entra desde el lado hacia el que se navega: empuje continuo tipo iOS.
+- `vGrowColumn.ts` (directiva `v-grow-column="ratio"`) → `FlowChart.vue` (Analisis): barras verticales que crecen desde la base y se deslizan al cambiar el periodo. Hermana de `vGrowBar`; `data-grow-delay` escalona las barras.
+- `useDrawLine.ts` → `SavingsCurveCard.vue`: traza la curva de ahorro acumulado y despues hace aparecer el relleno; se repite al cambiar los datos.
+- `useStaggerReveal.ts`, `useFadeTransition.ts`, `useListStaggerTransition.ts`, `vGrowBar` y `vPress` tambien en la pagina Analisis (`components/analytics/`).
 - `prefersReducedMotion.ts`: lectura unica de "menos movimiento" que respetan
   todas las piezas de arriba.
 - `useSwipeSettle.ts` → `useSectionPager.ts` (composables/navigation/):

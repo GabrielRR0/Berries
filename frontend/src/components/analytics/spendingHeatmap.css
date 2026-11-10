@@ -1,0 +1,183 @@
+.patterns {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.patterns-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem 1.5rem;
+}
+
+.heat {
+  flex: 1 1 15rem;
+  display: flex;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.heat-weekdays {
+  display: grid;
+  grid-template-rows: repeat(7, 1.75rem);
+  gap: 0.3125rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.heat-weekdays li {
+  display: flex;
+  align-items: center;
+}
+
+.heat-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.heat-grid {
+  display: grid;
+  grid-template-rows: repeat(7, 1.75rem);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0.3125rem;
+}
+
+.heat-cell {
+  border-radius: 0.375rem;
+  border: 1px solid transparent;
+}
+
+.heat-cell.empty {
+  border: 1px dashed var(--border);
+}
+
+.heat-weeks {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0.3125rem;
+  margin: 0.375rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.heat-weeks li {
+  overflow: hidden;
+  font-size: 0.625rem;
+  color: var(--text-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.weekday-bars {
+  flex: 1 1 11rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.weekday-bar {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) 3.5rem;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.weekday-letter {
+  color: var(--text-muted);
+}
+
+.weekday-track {
+  height: 0.5rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--bg-inset);
+}
+
+.weekday-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: #4a4a52;
+}
+
+.weekday-bar.peak .weekday-fill {
+  background: var(--accent);
+}
+
+.weekday-value {
+  text-align: right;
+  color: var(--text-h);
+}
+
+.weekend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.weekend-captions,
+.weekend-figures {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.weekend-captions {
+  color: var(--text-muted);
+}
+
+.weekend-figures b {
+  color: var(--text-h);
+}
+
+.weekend-figures b.accent {
+  color: var(--accent);
+}
+
+.weekend-bar {
+  display: flex;
+  gap: 3px;
+  height: 0.75rem;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+
+.weekend-part {
+  flex-basis: 0;
+  min-width: 0;
+  transition: flex-grow var(--duration-base) var(--ease-out);
+}
+
+.weekend-part.weekdays {
+  background: #4a4a52;
+}
+
+.weekend-part.weekends {
+  background: var(--accent);
+}
+
+.patterns-summary {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* Cada etiqueta ("21 sep") es mas ancha que su columna: se muestra una de cada dos. */
+.heat-weeks li:nth-child(even) {
+  visibility: hidden;
+}

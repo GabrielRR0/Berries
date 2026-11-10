@@ -4,12 +4,12 @@ import type { AnalyticsCategoryType, CategoryMonthlyTrend } from '../../services
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
 
 // "Cuanto se gasta mes a mes en X categoria" (pedido explicito del usuario,
-// ej. "mercado", "gasolina") - a diferencia de CategoryPieChart.vue (una
+// ej. "mercado", "gasolina") - a diferencia de la dona de CategoryDonutCard.vue (una
 // torta de UN solo mes), esto muestra, categoria por categoria, como
 // evoluciona a lo largo de la ventana visible: el monto del mes mas
 // reciente + una mini-sparkline con el resto del historial. Sin libreria de
 // charts (ver limites del trabajo) - barras finas de CSS, mismo espiritu
-// hecho a mano que MonthlyComparisonTable.vue.
+// hecho a mano que FlowChart.vue.
 const props = withDefaults(
   defineProps<{ trend: CategoryMonthlyTrend | null; type: AnalyticsCategoryType; currency?: string }>(),
   { currency: 'USD' },
@@ -22,7 +22,7 @@ interface CategoryRow {
   deltaLabel: string | null
   // Solo para gastos, y solo cuando el gasto SUBIO respecto al mes anterior -
   // mismo criterio que el resto de la app (ver AnalyticsMain.vue/
-  // MonthlyComparisonTable.vue): el acento rojo se reserva para señalar algo
+  // FlowChart.vue): el acento rojo se reserva para señalar algo
   // que empeoro, nunca para "celebrar" que algo subio (un ingreso que sube es
   // bueno, pero la app no tiene un color de "positivo" - se queda neutro).
   deltaFlagged: boolean

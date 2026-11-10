@@ -5,6 +5,7 @@ Solo para pruebas visuales locales — reutiliza los services reales de cada dom
 que los datos sembrados respeten las mismas invariantes que datos reales (deltas de
 saldo aplicados, cuotas generadas correctamente, etc.)."""
 
+import random
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -39,7 +40,8 @@ def get_or_create_demo_user(db: Session) -> User:
     db.commit()
     db.refresh(user)
 
-    _seed_wallets_and_transactions(db, user)
+    wallets = _seed_wallets_and_transactions(db, user)
+    _seed_daily_history(db, user, wallets)
     _seed_debts(db, user)
     return user
 
@@ -55,7 +57,7 @@ def _months_ago(months: int, day: int) -> datetime:
     return datetime(year, month, day, 12, 0, tzinfo=timezone.utc)
 
 
-def _seed_wallets_and_transactions(db: Session, user: User) -> None:
+def _seed_wallets_and_transactions(db: Session, user: User) -> dict[str, object]:
     cash = create_wallet(db, user.id, "Efectivo", "USD")
     banco = create_wallet(db, user.id, "Banco de Venezuela", "VEF")
     binance = create_wallet(db, user.id, "Binance", "USDT")
@@ -91,6 +93,60 @@ def _seed_wallets_and_transactions(db: Session, user: User) -> None:
             occurred_at=_months_ago(months_back, day),
             source="manual",
         )
+    return {"cash": cash, "banco": banco, "binance": binance}
+
+
+# Historial diario para que Análisis tenga algo que mostrar por semana y por día:
+# gastos chicos casi todos los días de ~6 meses, con más peso viernes y sábado, más un
+# ingreso extra a mitad de mes. Determinista (misma semilla) para que las capturas sean
+# comparables entre corridas. Solo usa billeteras en USD/USDT: no depende de tasas externas.
+_HISTORY_DAYS = 180
+_WEEKDAY_WEIGHT = [0.5, 0.45, 0.5, 0.6, 1.1, 1.6, 0.9]  # lunes ... domingo
+# (categoría, descripción, monto mínimo, monto máximo, probabilidad base por día)
+_DAILY_EXPENSES = [
+    ("Mercado", "Compra", 18, 60, 0.22),
+    ("Restaurantes", "Comida fuera", 10, 45, 0.2),
+    ("Transporte", "Pasaje", 3, 18, 0.3),
+    ("Entretenimiento", "Salida", 8, 40, 0.1),
+]
+
+
+def _seed_daily_history(db: Session, user: User, wallets: dict[str, object]) -> None:
+    rng = random.Random(2026)
+    today = date.today()
+    spend_wallets = [wallets["cash"], wallets["binance"]]
+
+    for days_back in range(_HISTORY_DAYS):
+        day = today - timedelta(days=days_back)
+        weight = _WEEKDAY_WEIGHT[day.weekday()]
+        when = datetime(day.year, day.month, day.day, 13, 0, tzinfo=timezone.utc)
+
+        for category, description, low, high, chance in _DAILY_EXPENSES:
+            if rng.random() < chance * weight:
+                create_transaction(
+                    db,
+                    user.id,
+                    rng.choice(spend_wallets).id,
+                    "expense",
+                    Decimal(rng.randint(low, high)),
+                    category,
+                    description=description,
+                    occurred_at=when,
+                    source="manual",
+                )
+
+        if day.day == 15:
+            create_transaction(
+                db,
+                user.id,
+                wallets["cash"].id,
+                "income",
+                Decimal("600.00"),
+                "Ingreso",
+                description="Trabajo extra",
+                occurred_at=when,
+                source="manual",
+            )
 
 
 def _seed_debts(db: Session, user: User) -> None:

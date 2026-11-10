@@ -67,7 +67,7 @@ export class AnalyticsApiError extends Error {
 
 // Sin VITE_API_BASE_URL, queda '' y las rutas quedan relativas ('/api/...'):
 // funciona en dev via el proxy de vite.config.ts.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 function mapPeriodSummary(wire: PeriodSummaryWire): PeriodSummary {
   return {
@@ -102,7 +102,7 @@ function mapCategoryMonthlyTrend(wire: CategoryMonthlyTrendWire): CategoryMonthl
   }
 }
 
-async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
+export async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
   const body = await response.json().catch(() => null)
   return body?.detail ?? fallback
 }
@@ -110,7 +110,7 @@ async function parseErrorMessage(response: Response, fallback: string): Promise<
 // No hay una capa "API client" compartida a proposito (ver limites del
 // trabajo): cada funcion de este archivo llama useAuthStore() y arma sus
 // propios headers directo en el fetch.
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   const token = useAuthStore().token
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
