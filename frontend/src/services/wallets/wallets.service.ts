@@ -5,7 +5,13 @@
 // camelCase. Sin un cliente API compartido: el JWT se lee directo de
 // useAuthStore().token en cada llamada (ver plan de Berry).
 import { useAuthStore } from '../../stores/auth.store'
-import type { TransferParams, TransferResult, TransferUpdateParams, Wallet } from './interfaces/wallets.interface'
+import type {
+  TransferParams,
+  TransferResult,
+  TransferUpdateParams,
+  Wallet,
+  WalletStatement,
+} from './interfaces/wallets.interface'
 
 // Forma "sobre el cable": "balance" es un Decimal de Pydantic, que puede
 // serializarse como number o como string segun el caso - se acepta ambos y
@@ -17,6 +23,29 @@ interface WalletWire {
   currency: string
   balance: number | string
   created_at: string
+}
+
+interface WalletStatementEntryWire {
+  id: string
+  type: 'income' | 'expense'
+  amount: number | string
+  balance_before: number | string
+  balance_after: number | string
+  category: string
+  description: string | null
+  occurred_at: string
+  source: string
+  transfer_id: string | null
+  reference_amount_usd: number | string | null
+}
+
+interface WalletStatementWire {
+  wallet_id: string
+  wallet_name: string
+  currency: string
+  current_balance: number | string
+  opening_balance: number | string
+  entries: WalletStatementEntryWire[]
 }
 
 interface TransferResultWire {
@@ -87,6 +116,38 @@ export async function listWallets(): Promise<Wallet[]> {
 
   const wires = (await response.json()) as WalletWire[]
   return wires.map(mapWallet)
+}
+
+export async function getWalletStatement(walletId: string): Promise<WalletStatement> {
+  const response = await fetch(`${API_BASE_URL}/api/wallets/${walletId}/statement`, {
+    headers: authHeaders(),
+  })
+
+  if (!response.ok) {
+    throw new WalletsApiError(await parseErrorMessage(response, 'No se pudo cargar la cartola.'), response.status)
+  }
+
+  const wire = (await response.json()) as WalletStatementWire
+  return {
+    walletId: wire.wallet_id,
+    walletName: wire.wallet_name,
+    currency: wire.currency,
+    currentBalance: Number(wire.current_balance),
+    openingBalance: Number(wire.opening_balance),
+    entries: wire.entries.map((entry) => ({
+      id: entry.id,
+      type: entry.type,
+      amount: Number(entry.amount),
+      balanceBefore: Number(entry.balance_before),
+      balanceAfter: Number(entry.balance_after),
+      category: entry.category,
+      description: entry.description,
+      occurredAt: entry.occurred_at,
+      source: entry.source,
+      transferId: entry.transfer_id,
+      referenceAmountUsd: entry.reference_amount_usd === null ? null : Number(entry.reference_amount_usd),
+    })),
+  }
 }
 
 export async function deleteWallet(walletId: string): Promise<void> {

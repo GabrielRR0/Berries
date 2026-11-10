@@ -83,4 +83,62 @@ describe('useTransactionHistory', () => {
     expect(expandedId.value).toBeNull()
     expect(confirmingDeleteId.value).toBeNull()
   })
+
+  it('el detalle de cada fila incluye tipo, categoria, monto y origen', () => {
+    const { groups } = useTransactionHistory([tx({ id: 'a', description: 'Almuerzo', source: 'voice' })], WALLETS)
+
+    const labels = groups.value[0].rows[0].details.map((d) => d.label)
+    expect(labels).toEqual(expect.arrayContaining(['Fecha', 'Tipo', 'Categoría', 'Monto', 'Billetera', 'Origen', 'Descripción']))
+    expect(groups.value[0].rows[0].details.find((d) => d.label === 'Origen')?.value).toBe('Voz')
+    expect(groups.value[0].rows[0].details.find((d) => d.label === 'Tipo')?.value).toBe('Gasto')
+  })
+
+  describe('modo billetera (cartola)', () => {
+    const OUT = tx({ id: 'out', amount: 53.35, source: 'transfer', transferId: 'x', walletId: 'w-usd', occurredAt: '2026-10-21T15:00:00' })
+    const IN = tx({ id: 'in', type: 'income', amount: 55000, source: 'transfer', transferId: 'x', walletId: 'w-vef', occurredAt: '2026-10-21T15:00:00' })
+    const FEE = tx({ id: 'fee', amount: 0.06, category: 'Comisión', source: 'manual', transferId: 'x', walletId: 'w-usd', occurredAt: '2026-10-21T15:00:00' })
+    const balances = new Map([
+      ['out', { before: 100, after: 46.65 }],
+      ['fee', { before: 46.65, after: 46.59 }],
+    ])
+
+    it('no fusiona transferencias: cada movimiento es una fila, con signo y saldo', () => {
+      const { groups } = useTransactionHistory([FEE, OUT], WALLETS, 'USD', { allTransactions: [OUT, IN, FEE], balances })
+
+      const rows = groups.value[0].rows
+      expect(rows.map((r) => r.id)).toEqual(['fee', 'out'])
+      expect(rows[1].amount.startsWith('-')).toBe(true)
+      expect(rows[1].secondary).toBe('Saldo $46.65')
+      expect(rows[1].details.find((d) => d.label === 'Saldo antes')?.value).toBe('$100.00')
+      expect(rows[1].details.find((d) => d.label === 'Saldo después')?.value).toBe('$46.65')
+      expect(groups.value[0].net).toBeNull()
+    })
+
+    it('una pata de transferencia (y su comision) se edita con la transferencia completa', () => {
+      const { groups } = useTransactionHistory([FEE, OUT], WALLETS, 'USD', { allTransactions: [OUT, IN, FEE], balances })
+
+      for (const row of groups.value[0].rows) {
+        expect(row.edit?.kind).toBe('transfer')
+      }
+      const edit = groups.value[0].rows[1].edit
+      expect(edit?.kind === 'transfer' && edit.target).toMatchObject({
+        transferId: 'x',
+        fromWalletId: 'w-usd',
+        toWalletId: 'w-vef',
+        amount: 53.35,
+        fee: 0.06,
+        convertedAmount: 55000,
+      })
+    })
+
+    it('un movimiento normal se edita como siempre', () => {
+      const normal = tx({ id: 'n' })
+      const { groups } = useTransactionHistory([normal], WALLETS, 'USD', {
+        allTransactions: [normal],
+        balances: new Map(),
+      })
+
+      expect(groups.value[0].rows[0].edit).toEqual({ kind: 'transaction', transaction: normal })
+    })
+  })
 })

@@ -74,6 +74,12 @@ const router = createRouter({
       meta: { requiresAuth: true, order: 2, tabBar: { label: 'Cuentas', icon: 'cuentas' } },
     },
     {
+      path: '/cuentas/:id',
+      name: 'cuenta-cartola',
+      component: () => import('../components/wallets/WalletStatementMain.vue'),
+      meta: { requiresAuth: true, hideTabBar: true },
+    },
+    {
       path: '/ajustes',
       name: 'ajustes',
       component: () => import('../components/dashboard/SettingsMenuMain.vue'),

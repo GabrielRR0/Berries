@@ -12,6 +12,16 @@ describe('WalletCard', () => {
     expect(wrapper.text()).toContain('USD')
   })
 
+  it('emite "open" con el id al tocar la billetera, no al eliminar', async () => {
+    const wrapper = mount(WalletCard, { props: { wallet: WALLET } })
+
+    await wrapper.find('.wallet-delete-trigger').trigger('click')
+    expect(wrapper.emitted('open')).toBeFalsy()
+
+    await wrapper.find('.wallet-main').trigger('click')
+    expect(wrapper.emitted('open')).toEqual([['wallet-1']])
+  })
+
   it('muestra "¿Eliminar?" al pedir confirmacion', async () => {
     const wrapper = mount(WalletCard, { props: { wallet: WALLET } })
 

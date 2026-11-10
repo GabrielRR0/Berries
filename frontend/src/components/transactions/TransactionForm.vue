@@ -6,6 +6,7 @@ import type { Transaction, TransactionType } from '../../services/transactions/i
 import { submitWithOfflineFallback } from '../../composables/offline/useOfflineFallback'
 import type { PendingTransaction } from '../../stores/offlineQueue.store'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
+import { useOccurredAtField } from '../../composables/forms/useOccurredAtField'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseCard from '../ui/BaseCard.vue'
 import CategoryField from './CategoryField.vue'
@@ -45,49 +46,15 @@ const description = ref(props.editingTransaction?.description ?? '')
 const submitting = ref(false)
 const errorMessage = ref('')
 
-// Fecha del movimiento - pedido explicito del usuario ("ayer olvidé registrar un
-// gasto... no me sale ningún input para la fecha"): antes este form no tenia forma de
-// elegir la fecha (siempre quedaba "ahora"), aunque createTransaction() YA aceptaba un
-// occurredAt opcional (usado desde tests/otros flujos) - solo faltaba el input. Arranca
-// en HOY (formato YYYY-MM-DD en hora LOCAL, no UTC - un toISOString().slice(0,10)
-// corriente puede quedar en el dia anterior/siguiente cerca de medianoche segun el
-// huso horario). max=hoy: no tiene sentido registrar un movimiento "del futuro" (ni
-// siquiera editando uno viejo).
-function todayInputValue(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-// Editando: arranca en la fecha PROPIA del movimiento (en LOCAL, mismo criterio que
-// todayInputValue - un toISOString().slice(0,10) crudo puede correrse un dia segun el
-// huso horario), no en "hoy".
-function localDateInputValue(iso: string): string {
-  const date = new Date(iso)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-const todayValue = todayInputValue()
-const occurredAtDate = ref(props.editingTransaction ? localDateInputValue(props.editingTransaction.occurredAt) : todayValue)
-
-// Combina la fecha elegida con la hora ACTUAL (no medianoche ni mediodia fijo) - si el
-// usuario no toca el campo (se queda en "hoy"), esto da el mismo resultado que no mandar
-// occurredAt en absoluto (el backend igual default-ea a "ahora").
-function buildOccurredAt(): string {
-  const [year, month, day] = occurredAtDate.value.split('-').map(Number)
-  const now = new Date()
-  return new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString()
-}
-
-function openDatePicker(event: Event) {
-  const input = event.currentTarget as HTMLInputElement
-  input.showPicker?.()
-}
+// Fecha y hora del movimiento (ver useOccurredAtField.ts): arranca en la PROPIA del
+// movimiento al editar, o en "ahora" al crear. max=hoy en la fecha.
+const {
+  date: occurredAtDate,
+  time: occurredAtTime,
+  maxDate: todayValue,
+  buildOccurredAt,
+  openPicker: openDatePicker,
+} = useOccurredAtField(props.editingTransaction?.occurredAt)
 
 const selectedWallet = computed(() => walletsStore.wallets.find((wallet) => wallet.id === walletId.value) ?? null)
 
@@ -202,10 +169,16 @@ async function onSubmit() {
         Supera el saldo de esta billetera ({{ formatCurrency(selectedWallet?.balance ?? 0, selectedWallet?.currency ?? '') }}).
       </p>
 
-      <label class="field">
-        <span class="field-label">Fecha</span>
-        <input v-model="occurredAtDate" type="date" :max="todayValue" required @click="openDatePicker" />
-      </label>
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">Fecha</span>
+          <input v-model="occurredAtDate" type="date" :max="todayValue" required @click="openDatePicker" />
+        </label>
+        <label class="field">
+          <span class="field-label">Hora</span>
+          <input v-model="occurredAtTime" type="time" required @click="openDatePicker" />
+        </label>
+      </div>
 
       <CategoryField v-model="category" :kind="type" />
 
@@ -289,6 +262,16 @@ async function onSubmit() {
 .type-option.active {
   background: var(--accent);
   color: var(--accent-contrast);
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.field-row .field {
+  min-width: 0;
 }
 
 .field {

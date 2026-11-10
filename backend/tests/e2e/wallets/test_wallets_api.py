@@ -264,3 +264,66 @@ def test_wallet_endpoints_require_auth(client):
     response = client.get("/api/wallets")
 
     assert response.status_code == 401
+
+
+def _create_transaction(client, token, wallet_id, type_, amount, occurred_at):
+    return client.post(
+        "/api/transactions",
+        json={
+            "wallet_id": wallet_id,
+            "type": type_,
+            "amount": amount,
+            "category": "Prueba",
+            "occurred_at": occurred_at,
+        },
+        headers=_auth_headers(token),
+    )
+
+
+def test_statement_shows_running_balance_and_opening_balance(client):
+    token = _register(client)
+    wallet_id = client.post(
+        "/api/wallets",
+        json={"name": "Tether", "currency": "USDT", "initial_balance": "100"},
+        headers=_auth_headers(token),
+    ).json()["id"]
+    _create_transaction(client, token, wallet_id, "expense", "10", "2026-11-01T10:00:00Z")
+    _create_transaction(client, token, wallet_id, "income", "10", "2026-11-02T10:00:00Z")
+    _create_transaction(client, token, wallet_id, "expense", "25", "2026-11-03T10:00:00Z")
+
+    response = client.get(f"/api/wallets/{wallet_id}/statement", headers=_auth_headers(token))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert Decimal(body["opening_balance"]) == Decimal("100")
+    assert Decimal(body["current_balance"]) == Decimal("75")
+    # Del más reciente al más antiguo.
+    assert [(e["type"], Decimal(e["balance_before"]), Decimal(e["balance_after"])) for e in body["entries"]] == [
+        ("expense", Decimal("100"), Decimal("75")),
+        ("income", Decimal("90"), Decimal("100")),
+        ("expense", Decimal("100"), Decimal("90")),
+    ]
+
+
+def test_statement_only_includes_that_wallets_movements(client):
+    token = _register(client)
+    cash_id = _create_wallet(client, token, "Cash", "USD").json()["id"]
+    bank_id = _create_wallet(client, token, "Banco", "USD").json()["id"]
+    _create_transaction(client, token, cash_id, "income", "50", "2026-11-01T10:00:00Z")
+    _create_transaction(client, token, bank_id, "income", "70", "2026-11-01T11:00:00Z")
+
+    body = client.get(f"/api/wallets/{cash_id}/statement", headers=_auth_headers(token)).json()
+
+    assert len(body["entries"]) == 1
+    assert Decimal(body["entries"][0]["balance_after"]) == Decimal("50")
+    assert Decimal(body["opening_balance"]) == Decimal("0")
+
+
+def test_statement_rejects_other_users_wallet(client):
+    token_a = _register(client, "a@example.com")
+    token_b = _register(client, "b@example.com")
+    wallet_id = _create_wallet(client, token_a).json()["id"]
+
+    response = client.get(f"/api/wallets/{wallet_id}/statement", headers=_auth_headers(token_b))
+
+    assert response.status_code == 404

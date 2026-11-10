@@ -10,6 +10,7 @@ Billeteras y transferencias entre ellas.
 | PATCH | `/api/wallets/transfer/{transfer_id}` | con sesión |
 | POST | `/api/wallets` | con sesión |
 | GET | `/api/wallets` | con sesión |
+| GET | `/api/wallets/{wallet_id}/statement` | con sesión |
 | DELETE | `/api/wallets/{wallet_id}` | con sesión |
 
 ## API pública (`__init__.py`)

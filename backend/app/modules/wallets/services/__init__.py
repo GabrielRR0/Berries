@@ -8,12 +8,14 @@ from app.modules.wallets.services.wallet_service import (
     get_wallet_owned_by_user,
     list_wallets_for_user,
 )
+from app.modules.wallets.services.wallet_statement_service import get_wallet_statement
 
 __all__ = [
     "create_wallet",
     "delete_wallet",
     "execute_transfer",
     "get_wallet_owned_by_user",
+    "get_wallet_statement",
     "list_wallets_for_user",
     "update_transfer",
 ]

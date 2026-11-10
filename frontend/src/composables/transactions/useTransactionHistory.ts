@@ -46,6 +46,26 @@ export interface HistoryGroup {
   rows: HistoryRow[]
 }
 
+// Modo "billetera" (cartola, ver WalletStatementMain.vue): la lista es de UNA billetera, asi
+// que cada fila es un movimiento suelto (las dos patas de una transferencia viven en
+// billeteras distintas y no se fusionan), con el saldo que dejo. Una pata de transferencia
+// sigue siendo editable: se resuelve con la transferencia completa.
+export interface WalletHistoryOptions {
+  // Todos los movimientos del usuario: hacen falta para armar la transferencia completa de una pata.
+  allTransactions: MaybeRefOrGetter<Transaction[]>
+  // Saldo de la billetera antes y despues de cada movimiento (por id).
+  balances: MaybeRefOrGetter<Map<string, { before: number; after: number }>>
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  manual: 'Manual',
+  voice: 'Voz',
+  ocr: 'Foto de recibo',
+  screenshot: 'Captura',
+  bank: 'Banco',
+  transfer: 'Transferencia',
+}
+
 function dayKey(occurredAt: string): string {
   const date = new Date(occurredAt)
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
@@ -60,6 +80,7 @@ export function useTransactionHistory(
   transactions: MaybeRefOrGetter<Transaction[]>,
   wallets: MaybeRefOrGetter<Wallet[]>,
   fallbackCurrency: MaybeRefOrGetter<string> = 'USD',
+  walletMode?: WalletHistoryOptions,
 ) {
   const expandedId = ref<string | null>(null)
   const confirmingDeleteId = ref<string | null>(null)
@@ -85,19 +106,50 @@ export function useTransactionHistory(
     return { label: 'Fecha', value: `${formatDate(occurredAt)}, ${formatTime(occurredAt)}` }
   }
 
+  // Pata de transferencia -> la transferencia completa (para editarla), solo en modo billetera.
+  function transferEditFor(transaction: Transaction): HistoryRowEdit | null {
+    if (!walletMode || transaction.transferId === null) return null
+    const merged = mergeTransferLegs(toValue(walletMode.allTransactions)).find(
+      (item) => item.kind === 'transfer' && item.transferId === transaction.transferId,
+    )
+    if (!merged || merged.kind !== 'transfer') return null
+    return { kind: 'transfer', target: transferEditTarget(merged, currencyFor) }
+  }
+
+  function typeLabel(transaction: Transaction): string {
+    if (transaction.source === 'transfer') return 'Transferencia'
+    return transaction.type === 'expense' ? 'Gasto' : 'Ingreso'
+  }
+
   function singleRow(transaction: Transaction): HistoryRow {
     const isTransferLeg = transaction.source === 'transfer'
     const kind: HistoryRowKind = isTransferLeg ? 'transfer' : transaction.type
     const wallet = walletName(transaction.walletId)
-    const sign = isTransferLeg ? '' : transaction.type === 'expense' ? '-' : '+'
-    const details: HistoryRowDetail[] = [dateDetail(transaction.occurredAt), { label: 'Billetera', value: wallet }]
+    // En modo billetera todo movimiento resta o suma saldo: siempre lleva signo.
+    const sign = isTransferLeg && !walletMode ? '' : transaction.type === 'expense' ? '-' : '+'
+    const currency = currencyFor(transaction)
+    const balance = walletMode ? toValue(walletMode.balances).get(transaction.id) : undefined
+    const details: HistoryRowDetail[] = [
+      dateDetail(transaction.occurredAt),
+      { label: 'Tipo', value: typeLabel(transaction) },
+      { label: 'Categoría', value: transaction.category },
+      { label: 'Monto', value: formatCurrency(transaction.amount, currency) },
+      { label: 'Billetera', value: wallet },
+    ]
+    if (balance) {
+      details.push(
+        { label: 'Saldo antes', value: formatCurrency(balance.before, currency) },
+        { label: 'Saldo después', value: formatCurrency(balance.after, currency) },
+      )
+    }
+    details.push({ label: 'Origen', value: SOURCE_LABELS[transaction.source] ?? transaction.source })
     if (transaction.description) details.push({ label: 'Descripción', value: transaction.description })
     if (transaction.referenceAmountUsd !== null) {
       details.push({ label: 'Valor al momento', value: `≈ ${formatCurrency(transaction.referenceAmountUsd, 'USD')}` })
       if (transaction.referenceRate != null) {
         details.push({
           label: 'Tasa usada',
-          value: `${formatCurrency(transaction.referenceRate, currencyFor(transaction))} por USD · ${formatDate(transaction.occurredAt)}`,
+          value: `${formatCurrency(transaction.referenceRate, currency)} por USD · ${formatDate(transaction.occurredAt)}`,
         })
       }
     }
@@ -106,13 +158,16 @@ export function useTransactionHistory(
       kind,
       title: transaction.category,
       subtitle: transaction.description ? `${transaction.description} · ${wallet}` : wallet,
-      amount: `${sign}${formatCurrency(transaction.amount, currencyFor(transaction))}`,
-      amountTone: transaction.type === 'expense' && !isTransferLeg ? 'expense' : 'neutral',
-      secondary:
-        transaction.referenceAmountUsd !== null ? `≈ ${formatCurrency(transaction.referenceAmountUsd, 'USD')}` : '',
+      amount: `${sign}${formatCurrency(transaction.amount, currency)}`,
+      amountTone: transaction.type === 'expense' && (walletMode || !isTransferLeg) ? 'expense' : 'neutral',
+      secondary: balance
+        ? `Saldo ${formatCurrency(balance.after, currency)}`
+        : transaction.referenceAmountUsd !== null
+          ? `≈ ${formatCurrency(transaction.referenceAmountUsd, 'USD')}`
+          : '',
       details,
-      // Nunca sobre UNA pata suelta de transferencia: el backend la rechaza.
-      edit: transaction.transferId === null ? { kind: 'transaction', transaction } : null,
+      // Una pata suelta de transferencia solo se edita con la transferencia completa (modo billetera).
+      edit: transaction.transferId === null ? { kind: 'transaction', transaction } : transferEditFor(transaction),
       deleteId: transaction.id,
       isTransferDelete: transaction.transferId !== null,
       order: 0,
@@ -123,8 +178,11 @@ export function useTransactionHistory(
     const fee = item.feeLeg
     const details: HistoryRowDetail[] = [
       dateDetail(item.occurredAt),
+      { label: 'Tipo', value: 'Transferencia' },
       { label: 'Origen', value: walletName(item.fromLeg.walletId) },
       { label: 'Destino', value: walletName(item.toLeg.walletId) },
+      { label: 'Monto enviado', value: formatCurrency(item.fromLeg.amount, currencyFor(item.fromLeg)) },
+      { label: 'Monto recibido', value: formatCurrency(item.toLeg.amount, currencyFor(item.toLeg)) },
     ]
     if (fee) details.push({ label: 'Comisión', value: formatCurrency(fee.amount, currencyFor(fee)) })
     return {
@@ -163,7 +221,10 @@ export function useTransactionHistory(
   const groups = computed<HistoryGroup[]>(() => {
     const result: { group: HistoryGroup; net: number | null }[] = []
     const byKey = new Map<string, { group: HistoryGroup; net: number | null }>()
-    for (const item of mergeTransferLegs(toValue(transactions))) {
+    const items: TransactionListItem[] = walletMode
+      ? toValue(transactions).map((transaction) => ({ kind: 'single', transaction }))
+      : mergeTransferLegs(toValue(transactions))
+    for (const item of items) {
       const occurredAt = item.kind === 'transfer' ? item.occurredAt : item.transaction.occurredAt
       const key = dayKey(occurredAt)
       let entry = byKey.get(key)
@@ -180,7 +241,8 @@ export function useTransactionHistory(
     return result.map(({ group, net }) => ({
       ...group,
       rows: group.rows.map((row) => ({ ...row, order: order++ })),
-      net: net === null ? null : formatSignedUsd(net),
+      // La cartola muestra saldos por fila; el neto en USD no aplica a una sola billetera.
+      net: walletMode || net === null ? null : formatSignedUsd(net),
     }))
   })
 

@@ -1,0 +1,249 @@
+/* Estilos de WalletsMain.vue (Cuentas), fluido en tres tramos:
+   - movil (<640px): una columna - registrar, patrimonio, resumen, billeteras, comisiones.
+   - tablet (640-1023px): misma columna pero mas ancha, billeteras en dos columnas.
+   - escritorio (>=1024px): patrimonio y resumen arriba; abajo billeteras a la izquierda y
+     el panel de comisiones por ruta (fijo al hacer scroll) a la derecha. */
+.wallets-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 30rem;
+  margin: 0 auto;
+}
+
+.capture-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.new-wallet-trigger {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px dashed var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.new-wallet-trigger:hover {
+  opacity: 0.85;
+}
+
+.new-wallet-trigger:active {
+  transform: scale(0.98);
+  opacity: 0.75;
+}
+
+.transfer-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--text-h);
+  cursor: pointer;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.transfer-trigger svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.transfer-trigger:hover {
+  opacity: 0.85;
+}
+
+.transfer-trigger:active {
+  transform: scale(0.94);
+}
+
+.wallets-error {
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-muted);
+  color: var(--accent);
+  font-size: 0.8125rem;
+}
+
+.wallets-section-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 800;
+  color: var(--text-h);
+}
+
+.wallets-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.wallets-stats-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.625rem;
+}
+
+.wallets-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.wallets-primary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.wallets-loading {
+  margin-top: 0.75rem;
+}
+
+.wallets-empty {
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.wallets-empty-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.wallets-empty-text {
+  margin-top: 0.375rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.wallets-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.help-text {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* Animacion de alta/baja de la lista - mismo criterio que TransactionList.vue
+   (TransitionGroup, no un v-for plano). */
+.wallet-item-move,
+.wallet-item-enter-active,
+.wallet-item-leave-active {
+  transition:
+    transform var(--duration-base) var(--ease-out),
+    opacity var(--duration-base) var(--ease-out);
+}
+
+.wallet-item-enter-from {
+  opacity: 0;
+  transform: translateY(14px) scale(0.97);
+}
+
+.wallet-item-leave-to {
+  opacity: 0;
+  transform: translateX(28px) scale(0.94);
+}
+
+.wallet-item-leave-active {
+  position: absolute;
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallet-item-move,
+  .wallet-item-enter-active,
+  .wallet-item-leave-active {
+    transition: opacity var(--duration-fast) linear;
+  }
+
+  .wallet-item-enter-from,
+  .wallet-item-leave-to {
+    transform: none;
+  }
+}
+
+/* Tablet: mas ancho y las billeteras en dos columnas. */
+@media (min-width: 640px) {
+  .wallets-main {
+    max-width: 44rem;
+  }
+
+  .wallets-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+}
+
+/* Escritorio: dos columnas, el panel de comisiones queda a la vista al hacer scroll. */
+@media (min-width: 1024px) {
+  .wallets-main {
+    max-width: 72rem;
+    gap: 1.5rem;
+  }
+
+  .wallets-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    align-items: start;
+    gap: 1.5rem;
+  }
+
+  .wallets-aside {
+    position: sticky;
+    top: 5.5rem;
+  }
+
+  .wallets-list {
+    grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  }
+}
+
+/* "appear" (no :nth-child sobre .wallet-item) - dispara solo en el mount inicial real. */
+@media (min-width: 1024px) and (prefers-reduced-motion: no-preference) {
+  .wallet-item-appear-active {
+    animation: content-enter var(--duration-base) var(--ease-out) backwards;
+  }
+
+  .wallets-list > .wallet-item-appear-active:nth-child(2) {
+    animation-delay: 50ms;
+  }
+
+  .wallets-list > .wallet-item-appear-active:nth-child(3) {
+    animation-delay: 100ms;
+  }
+
+  .wallets-list > .wallet-item-appear-active:nth-child(4) {
+    animation-delay: 150ms;
+  }
+
+  .wallets-list > .wallet-item-appear-active:nth-child(n + 5) {
+    animation-delay: 200ms;
+  }
+}

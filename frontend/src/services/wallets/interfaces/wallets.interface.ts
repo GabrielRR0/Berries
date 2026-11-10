@@ -27,6 +27,34 @@ export interface TransferParams {
   note?: string
 }
 
+// Cartola de una billetera (GET /api/wallets/{id}/statement): sus movimientos con el
+// saldo justo antes y justo despues de cada uno. `entries` viene del mas reciente al
+// mas antiguo. `openingBalance` es lo que ya habia antes del primer movimiento
+// registrado (saldo inicial, ajustes directos...): saldo actual menos el neto de todos
+// los movimientos.
+export interface WalletStatementEntry {
+  id: string
+  type: 'income' | 'expense'
+  amount: number
+  balanceBefore: number
+  balanceAfter: number
+  category: string
+  description: string | null
+  occurredAt: string
+  source: string
+  transferId: string | null
+  referenceAmountUsd: number | null
+}
+
+export interface WalletStatement {
+  walletId: string
+  walletName: string
+  currency: string
+  currentBalance: number
+  openingBalance: number
+  entries: WalletStatementEntry[]
+}
+
 export interface TransferResult {
   fromWallet: Wallet
   toWallet: Wallet
