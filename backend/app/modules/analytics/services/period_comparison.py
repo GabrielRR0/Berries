@@ -9,7 +9,13 @@ from sqlalchemy.orm import Session
 
 from app.modules.analytics.contracts.enums import CompareAgainst
 from app.modules.analytics.contracts.resources import CategoryComparisonItemResource, PeriodComparisonResource
-from app.modules.analytics.services.period_totals import WalletCurrencyConverter, transactions_in_range, user_default_currency
+from app.modules.analytics.services.period_totals import (
+    WalletCurrencyConverter,
+    registration_day,
+    transactions_in_range,
+    user_default_currency,
+    window_exists,
+)
 from app.modules.analytics.utils.months import resolve_month
 from app.modules.analytics.utils.periods import day_range_bounds, elapsed_window, month_dates, shifted_window, utc_today
 
@@ -48,17 +54,28 @@ def get_period_comparison(
 
     current = _category_totals(db, user_id, window, converter)
 
+    # Solo se compara contra períodos que existen desde que el usuario se registró: un mes
+    # que terminó antes de su registro no tiene datos reales, comparar contra él es ruido.
+    registered = registration_day(db, user_id)
+
+    previous: dict[str, Decimal] = {}
     if against == "average":
         summed: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
+        months_used = 0
         for offset in range(1, _AVERAGE_MONTHS + 1):
-            for category, total in _category_totals(
-                db, user_id, shifted_window(window, resolved_month, -offset), converter
-            ).items():
+            past_window = shifted_window(window, resolved_month, -offset)
+            if not window_exists(past_window[1], registered):
+                continue
+            months_used += 1
+            for category, total in _category_totals(db, user_id, past_window, converter).items():
                 summed[category] += total
-        previous = {category: total / _AVERAGE_MONTHS for category, total in summed.items()}
+        if months_used:
+            previous = {category: total / months_used for category, total in summed.items()}
     else:
         delta = -12 if against == "year_ago" else -1
-        previous = _category_totals(db, user_id, shifted_window(window, resolved_month, delta), converter)
+        past_window = shifted_window(window, resolved_month, delta)
+        if window_exists(past_window[1], registered):
+            previous = _category_totals(db, user_id, past_window, converter)
 
     zero = Decimal("0")
     items = [

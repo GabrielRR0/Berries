@@ -9,7 +9,8 @@ export interface PeriodSummary {
   totalIncome: number
   totalExpense: number
   netSavings: number
-  previousPeriodNetSavings: number
+  // null: el mes anterior es previo al registro del usuario, no hay con que comparar.
+  previousPeriodNetSavings: number | null
 }
 
 export interface CategoryBreakdown {

@@ -6,6 +6,16 @@ def _register(client, email="ana@example.com"):
     response = client.post(
         "/api/auth/register", json={"email": email, "password": "supersecret123", "display_name": "Ana"}
     )
+    # Registrado "hace años": estos tests usan fechas pasadas y el análisis ignora lo
+    # anterior al registro del usuario.
+    from sqlalchemy import update
+
+    from app.modules.auth import User
+    from conftest import TestSessionLocal
+
+    with TestSessionLocal() as session:
+        session.execute(update(User).where(User.email == email).values(created_at=datetime(2020, 1, 1, tzinfo=timezone.utc)))
+        session.commit()
     return response.json()["access_token"]
 
 

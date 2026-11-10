@@ -11,7 +11,9 @@ from app.modules.analytics.services.insight_rules import build_insights
 from app.modules.analytics.services.period_comparison import get_period_comparison
 from app.modules.analytics.services.period_totals import (
     WalletCurrencyConverter,
+    month_exists,
     net_savings_for_month,
+    registration_day,
     transactions_in_range,
     user_default_currency,
 )
@@ -34,10 +36,17 @@ def get_insights(
     comparison = get_period_comparison(db, user_id, resolved_month, "previous", today)
     patterns = get_spending_patterns(db, user_id, 8, today)
 
+    # Solo cuentan los meses anteriores desde que el usuario se registró.
+    registered = registration_day(db, user_id)
     prior_total = Decimal("0")
     prior_transactions = 0
+    prior_months = 0
     for offset in range(1, _PRIOR_MONTHS + 1):
-        start, end = month_bounds(shift_month(resolved_month, -offset))
+        prior_month = shift_month(resolved_month, -offset)
+        if not month_exists(prior_month, registered):
+            continue
+        prior_months += 1
+        start, end = month_bounds(prior_month)
         rows = transactions_in_range(db, user_id, "expense", start, end)
         prior_transactions += len(rows)
         prior_total += sum((converter.amount_of(row) for row in rows), Decimal("0"))
@@ -48,10 +57,14 @@ def get_insights(
         elapsed_days=comparison.elapsed_days,
         days_in_month=comparison.days_in_month,
         is_current_month=first_day <= today <= last_day,
-        average_prior_expense=prior_total / _PRIOR_MONTHS,
+        average_prior_expense=prior_total / prior_months if prior_months else Decimal("0"),
         prior_transactions=prior_transactions,
         categories=comparison.categories,
         weekend_share=patterns.weekend_share,
         busiest_weekday=patterns.busiest_weekday,
-        previous_net_savings=net_savings_for_month(db, user_id, shift_month(resolved_month, -1), converter),
+        previous_net_savings=(
+            net_savings_for_month(db, user_id, shift_month(resolved_month, -1), converter)
+            if month_exists(shift_month(resolved_month, -1), registered)
+            else Decimal("0")
+        ),
     )

@@ -59,7 +59,6 @@
   }
 }
 
-.avatar-button,
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -85,18 +84,15 @@
     transform var(--duration-fast) var(--ease-out);
 }
 
-.avatar-button svg,
 .icon-button svg {
   width: 1.125rem;
   height: 1.125rem;
 }
 
-.avatar-button:hover,
 .icon-button:hover {
   opacity: 0.85;
 }
 
-.avatar-button:active,
 .icon-button:active {
   transform: scale(0.9);
 }
@@ -115,23 +111,7 @@
   gap: 0.5rem;
 }
 
-/* Variante con saludo (Inicio): avatar con degradado de marca y boton de
-   ayuda en cuadrado redondeado, como el mockup aprobado. */
-.avatar-button {
-  width: 2.75rem;
-  height: 2.75rem;
-  min-width: 2.75rem;
-  padding: 0;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  line-height: 1;
-  border-color: transparent;
-  background: linear-gradient(135deg, var(--accent), #7f1d1d);
-  color: var(--accent-contrast);
-  font-size: 0.9375rem;
-  font-weight: 700;
-}
-
+/* Boton de ayuda en cuadrado redondeado. El circulo de perfil vive en headerAvatar.css. */
 .icon-button {
   width: 2.75rem;
   height: 2.75rem;

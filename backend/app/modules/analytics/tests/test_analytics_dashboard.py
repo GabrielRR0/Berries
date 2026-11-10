@@ -15,7 +15,12 @@ TODAY = date(2026, 11, 9)  # lunes
 
 
 def _user(db, email="ana@example.com"):
-    return register_user(db, email, "clave12345", "Ana")
+    user = register_user(db, email, "clave12345", "Ana")
+    # Registrado "hace años": estos tests usan datos de meses pasados, y el análisis solo
+    # compara contra períodos posteriores al registro (ver registration_day).
+    user.created_at = datetime(2020, 1, 1, tzinfo=timezone.utc)
+    db.commit()
+    return user
 
 
 def _dt(year, month, day):
@@ -237,3 +242,79 @@ def test_insights_flag_overspending_against_the_three_month_average(db):
     overspend = next(item for item in result if item.code == "projected_overspend")
     assert overspend.level == "alert"
     assert overspend.reference_amount == Decimal("300")
+
+
+# --- nada se compara con fechas anteriores al registro -------------------------------
+
+
+def _registered_on(db, user, day):
+    user.created_at = datetime(day.year, day.month, day.day, tzinfo=timezone.utc)
+    db.commit()
+
+
+def test_comparison_ignores_a_previous_month_that_ended_before_registration(db):
+    user = _user(db)
+    wallet = create_wallet(db, user.id, "Cash", "USD")
+    _spend(db, user, wallet, "100", "Mercado", _dt(2026, 11, 5))
+    _spend(db, user, wallet, "50", "Mercado", _dt(2026, 10, 5))  # dato "viejo", antes del registro
+    _registered_on(db, user, date(2026, 11, 1))
+
+    result = get_period_comparison(db, user.id, "2026-11", "previous", TODAY)
+
+    assert result.previous_total == Decimal("0")
+    assert result.delta_percent is None
+
+
+def test_comparison_year_ago_ignores_a_window_before_registration(db):
+    user = _user(db)
+    wallet = create_wallet(db, user.id, "Cash", "USD")
+    _spend(db, user, wallet, "100", "Mercado", _dt(2026, 11, 5))
+    _spend(db, user, wallet, "70", "Mercado", _dt(2025, 11, 5))
+    _registered_on(db, user, date(2026, 9, 1))
+
+    result = get_period_comparison(db, user.id, "2026-11", "year_ago", TODAY)
+
+    assert result.previous_total == Decimal("0")
+
+
+def test_comparison_average_only_uses_months_since_registration(db):
+    user = _user(db)
+    wallet = create_wallet(db, user.id, "Cash", "USD")
+    _spend(db, user, wallet, "100", "Mercado", _dt(2026, 11, 5))
+    _spend(db, user, wallet, "60", "Mercado", _dt(2026, 10, 5))
+    _spend(db, user, wallet, "900", "Mercado", _dt(2026, 8, 5))  # antes del registro: no cuenta
+    _registered_on(db, user, date(2026, 10, 1))
+
+    result = get_period_comparison(db, user.id, "2026-11", "average", TODAY)
+
+    # Solo octubre cuenta, y se divide entre 1 mes (no entre 3).
+    assert result.previous_total == Decimal("60")
+
+
+def test_transactions_dated_before_registration_are_left_out_of_every_analysis(db):
+    user = _user(db)
+    wallet = create_wallet(db, user.id, "Cash", "USD")
+    _spend(db, user, wallet, "500", "Viejo", _dt(2026, 10, 20))
+    _spend(db, user, wallet, "40", "Mercado", _dt(2026, 11, 5))
+    _registered_on(db, user, date(2026, 11, 1))
+
+    from app.modules.analytics.services.category_breakdown import get_category_monthly_trend
+    from app.modules.analytics.services.period_summary import get_period_summary
+
+    assert get_period_summary(db, user.id, "2026-10").total_expense == Decimal("0")
+    assert get_period_summary(db, user.id, "2026-11").total_expense == Decimal("40")
+    trend = get_category_monthly_trend(db, user.id, "expense", 6)
+    assert trend.months == ["2026-11"]
+    assert [item.category for item in trend.categories] == ["Mercado"]
+
+
+def test_spending_patterns_do_not_count_days_before_registration(db):
+    user = _user(db)
+    wallet = create_wallet(db, user.id, "Cash", "USD")
+    _spend(db, user, wallet, "90", "Mercado", _dt(2026, 11, 9))
+    _registered_on(db, user, date(2026, 11, 8))
+
+    result = get_spending_patterns(db, user.id, 2, TODAY)
+
+    # Solo cuentan el 8 y el 9 de noviembre: 90 / 2 dias.
+    assert result.daily_average == Decimal("45")

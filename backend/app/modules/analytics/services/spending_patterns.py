@@ -8,7 +8,12 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.modules.analytics.contracts.resources import HeatCellResource, SpendingPatternsResource, WeekdayAverageResource
-from app.modules.analytics.services.period_totals import WalletCurrencyConverter, transactions_in_range, user_default_currency
+from app.modules.analytics.services.period_totals import (
+    WalletCurrencyConverter,
+    registration_day,
+    transactions_in_range,
+    user_default_currency,
+)
 from app.modules.analytics.utils.periods import day_range_bounds, to_utc_date, utc_today
 
 _MIN_WEEKS = 2
@@ -37,12 +42,18 @@ def get_spending_patterns(
     heat: list[HeatCellResource] = []
     weekday_totals = [zero] * 7
     weekday_days = [0] * 7
+    registered = registration_day(db, user_id)
+    counted_days = 0
     cursor = first_day
     while cursor <= last_day:
         total = daily.get(cursor, zero)
         heat.append(HeatCellResource(day=cursor, total=total))
-        weekday_totals[cursor.weekday()] += total
-        weekday_days[cursor.weekday()] += 1
+        # Los dias anteriores al registro quedan en la grilla (en cero) pero no cuentan para
+        # los promedios: el usuario aun no estaba en Berry.
+        if registered is None or cursor >= registered:
+            weekday_totals[cursor.weekday()] += total
+            weekday_days[cursor.weekday()] += 1
+            counted_days += 1
         cursor += timedelta(days=1)
 
     grand_total = sum(weekday_totals, zero)
@@ -59,7 +70,7 @@ def get_spending_patterns(
         weeks=weeks,
         heat=heat,
         weekday_averages=averages,
-        daily_average=grand_total / len(heat),
+        daily_average=grand_total / counted_days if counted_days else zero,
         weekend_share=float(weekend_total / grand_total) if grand_total > 0 else 0.0,
         busiest_weekday=max(averages, key=lambda item: item.average).weekday if grand_total > 0 else None,
         busiest_day=busiest_day,

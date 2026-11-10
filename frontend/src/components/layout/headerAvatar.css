@@ -1,0 +1,67 @@
+/* Circulo del header (perfil). Rehecho desde cero:
+   - Circular de verdad: caja cuadrada fija (width = height, sin min/max ni padding
+     ni flex-shrink) + border-radius 50%. Ningun contenido puede estirarla porque el
+     contenido va en una capa interna centrada con grid.
+   - Se adapta al tema: todo sale de las variables del acento elegido (--accent-rgb,
+     --accent-strong-rgb, --accent-contrast); nada de colores fijos. */
+.header-avatar {
+  --avatar-size: 2.75rem;
+
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  flex: 0 0 var(--avatar-size);
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+
+  /* Degradado del acento: de su tono base a uno mas oscuro derivado del mismo
+     acento (mezcla con negro), asi cambia solo con el tema. */
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.28), transparent 55%),
+    linear-gradient(145deg, var(--accent), color-mix(in srgb, var(--accent-strong) 55%, #000));
+  color: var(--accent-contrast);
+  /* Anillo fino del propio acento + sombra: separa el circulo del fondo en cualquier tema. */
+  box-shadow:
+    0 0 0 1px rgba(var(--accent-rgb), 0.45),
+    0 4px 14px rgba(var(--accent-rgb), 0.28);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.header-avatar:hover {
+  box-shadow:
+    0 0 0 1px rgba(var(--accent-rgb), 0.65),
+    0 6px 18px rgba(var(--accent-rgb), 0.38);
+}
+
+.header-avatar:active {
+  transform: scale(0.92);
+}
+
+.header-avatar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.header-avatar-initials {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.header-avatar-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+}

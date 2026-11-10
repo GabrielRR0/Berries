@@ -870,7 +870,14 @@
           "type": "string"
          },
          "previous_period_net_savings": {
-          "type": "string"
+          "anyOf": [
+           {
+            "type": "string"
+           },
+           {
+            "type": "null"
+           }
+          ]
          },
          "total_expense": {
           "type": "string"

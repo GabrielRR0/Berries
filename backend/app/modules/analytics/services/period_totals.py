@@ -1,13 +1,14 @@
 """Piezas comunes de los cálculos: movimientos de un período y sumas convertidas a la moneda del usuario."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.modules.analytics.utils.months import month_bounds
+from app.modules.analytics.utils.periods import month_dates, to_utc_date
 from app.modules.auth import User
 from app.modules.currency import get_conversion_rate, reference_fields_in_usd
 from app.modules.transactions import Transaction
@@ -74,6 +75,23 @@ class WalletCurrencyConverter:
         return usd_value * self._usd_to_target()
 
 
+def registration_day(db: Session, user_id: uuid.UUID) -> date | None:
+    """Día (UTC) en que el usuario se registró: el "momento 0" de Berry para él. Ningún
+    análisis compara contra períodos que terminaron antes de esa fecha."""
+    user = db.get(User, user_id)
+    return to_utc_date(user.created_at) if user is not None and user.created_at is not None else None
+
+
+def window_exists(window_end: date, registered: date | None) -> bool:
+    """True si un tramo (que termina en `window_end`) no quedó entero antes del registro."""
+    return registered is None or window_end >= registered
+
+
+def month_exists(month: str, registered: date | None) -> bool:
+    """True si el mes 'YYYY-MM' no terminó antes de que el usuario se registrara."""
+    return window_exists(month_dates(month)[1], registered)
+
+
 def user_default_currency(db: Session, user_id: uuid.UUID) -> str:
     user = db.get(User, user_id)
     return user.default_currency if user else "USD"
@@ -90,6 +108,14 @@ def transactions_in_range(db: Session, user_id: uuid.UUID, kind: str, start: dat
     # joinedload(Transaction.currency_ref): WalletCurrencyConverter.amount_of() lee
     # transaction.currency por fila - sin precargar la relación, cada acceso dispararía
     # su propio SELECT perezoso (N+1) en vez de traer todo en esta única consulta.
+    #
+    # Regla de Analisis: nada se calcula sobre fechas en las que el usuario todavia no
+    # estaba registrado. Este es el unico punto por el que pasan todas las lecturas de
+    # movimientos de analytics, asi que aqui se recorta el inicio del rango al dia de registro
+    # (un movimiento cargado con fecha anterior queda fuera de totales, comparativas y graficos).
+    registered = registration_day(db, user_id)
+    if registered is not None:
+        start = max(start, datetime(registered.year, registered.month, registered.day, tzinfo=timezone.utc))
     return list(
         db.scalars(
             select(Transaction)

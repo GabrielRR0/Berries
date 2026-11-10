@@ -26,7 +26,7 @@ interface PeriodSummaryWire {
   total_income: number | string
   total_expense: number | string
   net_savings: number | string
-  previous_period_net_savings: number | string
+  previous_period_net_savings: number | string | null
 }
 
 interface CategoryBreakdownWire {
@@ -75,7 +75,8 @@ function mapPeriodSummary(wire: PeriodSummaryWire): PeriodSummary {
     totalIncome: Number(wire.total_income),
     totalExpense: Number(wire.total_expense),
     netSavings: Number(wire.net_savings),
-    previousPeriodNetSavings: Number(wire.previous_period_net_savings),
+    previousPeriodNetSavings:
+      wire.previous_period_net_savings === null ? null : Number(wire.previous_period_net_savings),
   }
 }
 
