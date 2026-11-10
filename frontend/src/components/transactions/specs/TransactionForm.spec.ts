@@ -192,6 +192,29 @@ describe('TransactionForm', () => {
       expect(wrapper.emitted('created')).toBeFalsy()
     })
 
+    it('editar sin tocar la fecha/hora conserva el instante original, y la hora se puede cambiar', async () => {
+      const original = new Date(2026, 0, 15, 8, 5, 42)
+      const existing = { ...EXISTING, occurredAt: original.toISOString() }
+      const wrapper = mount(TransactionForm, { props: { editingTransaction: existing } })
+      await flushPromises()
+
+      expect((wrapper.find('input[type="time"]').element as HTMLInputElement).value).toBe('08:05')
+      await wrapper.find('form').trigger('submit.prevent')
+      await flushPromises()
+      expect(updateTransaction).toHaveBeenLastCalledWith(
+        'tx-existing',
+        expect.objectContaining({ occurredAt: original.toISOString() }),
+      )
+
+      await wrapper.find('input[type="time"]').setValue('21:30')
+      await wrapper.find('form').trigger('submit.prevent')
+      await flushPromises()
+      expect(updateTransaction).toHaveBeenLastCalledWith(
+        'tx-existing',
+        expect.objectContaining({ occurredAt: new Date(2026, 0, 15, 21, 30, 42).toISOString() }),
+      )
+    })
+
     it('permite cambiar la wallet del movimiento', async () => {
       const wrapper = mount(TransactionForm, { props: { editingTransaction: EXISTING } })
       await flushPromises()

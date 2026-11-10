@@ -10,7 +10,7 @@ import IconBadge from '../ui/IconBadge.vue'
 // parte de la UI de Berry en lugar de un dialogo del navegador). Quien la
 // usa (WalletsMain.vue) decide que hacer con el emit 'delete'.
 const props = defineProps<{ wallet: Wallet }>()
-const emit = defineEmits<{ delete: [walletId: string] }>()
+const emit = defineEmits<{ delete: [walletId: string]; open: [walletId: string] }>()
 
 const confirmingDelete = ref(false)
 
@@ -30,7 +30,9 @@ function confirmDelete() {
 
 <template>
   <BaseCard class="wallet-card" :class="{ 'is-confirming-delete': confirmingDelete }">
-    <div class="wallet-main">
+    <!-- Tocar la parte de arriba abre la cartola de la billetera; "Eliminar" (footer)
+         queda fuera para no abrirla al borrar. -->
+    <button type="button" class="wallet-main" :aria-label="`Ver cartola de ${wallet.name}`" @click="emit('open', wallet.id)">
       <IconBadge>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="6" width="18" height="13" rx="2" />
@@ -47,7 +49,7 @@ function confirmDelete() {
       <p class="wallet-balance">
         <AnimatedCurrency :value="wallet.balance" :currency="wallet.currency" />
       </p>
-    </div>
+    </button>
 
     <!-- Alto fijo + ambos estados position:absolute - mismo criterio que
          TransactionList.vue, para que confirmar el borrado nunca mueva nada
@@ -90,6 +92,14 @@ function confirmDelete() {
   display: flex;
   align-items: center;
   gap: 0.875rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .wallet-info {

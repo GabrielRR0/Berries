@@ -7,6 +7,7 @@ import {
   deleteWallet,
   listWallets,
   transferBetweenWallets,
+  getWalletStatement,
   updateTransfer,
 } from '../wallets.service'
 
@@ -253,5 +254,60 @@ describe('wallets.service', () => {
       expect((error as WalletsApiError).status).toBe(404)
       expect((error as WalletsApiError).message).toBe('Transferencia no encontrada.')
     })
+  })
+})
+
+describe('getWalletStatement', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    useAuthStore().token = 'jwt-token'
+    vi.stubGlobal('fetch', vi.fn())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('pide /statement de la billetera y mapea a camelCase con numeros', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      mockResponse({
+        wallet_id: 'wallet-1',
+        wallet_name: 'Tether',
+        currency: 'USDT',
+        current_balance: '90.00',
+        opening_balance: '100.00',
+        entries: [
+          {
+            id: 't1',
+            type: 'expense',
+            amount: '10.00',
+            balance_before: '100.00',
+            balance_after: '90.00',
+            category: 'Comida',
+            description: null,
+            occurred_at: '2026-11-08T15:00:00Z',
+            source: 'manual',
+            transfer_id: null,
+            reference_amount_usd: null,
+          },
+        ],
+      }),
+    )
+
+    const result = await getWalletStatement('wallet-1')
+
+    expect(vi.mocked(fetch).mock.calls[0][0]).toContain('/api/wallets/wallet-1/statement')
+    expect(result.currentBalance).toBe(90)
+    expect(result.openingBalance).toBe(100)
+    expect(result.entries[0]).toMatchObject({ amount: 10, balanceBefore: 100, balanceAfter: 90, referenceAmountUsd: null })
+  })
+
+  it('lanza WalletsApiError con el detail del backend', async () => {
+    vi.mocked(fetch).mockResolvedValue(mockResponse({ detail: 'Billetera no encontrada' }, { ok: false, status: 404 }))
+
+    const error: unknown = await getWalletStatement('x').catch((e: unknown) => e)
+
+    expect(error).toBeInstanceOf(WalletsApiError)
+    expect((error as WalletsApiError).message).toBe('Billetera no encontrada')
   })
 })

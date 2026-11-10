@@ -4,6 +4,7 @@ import type { TransferEditTarget } from '../../services/wallets/interfaces/walle
 import { useWalletsStore } from '../../stores/wallets.store'
 import { submitWithOfflineFallback } from '../../composables/offline/useOfflineFallback'
 import type { PendingTransfer } from '../../stores/offlineQueue.store'
+import { useOccurredAtField } from '../../composables/forms/useOccurredAtField'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseCard from '../ui/BaseCard.vue'
 
@@ -36,31 +37,14 @@ const convertedAmount = ref<number | null>(props.editingTransfer?.convertedAmoun
 const submitting = ref(false)
 const errorMessage = ref('')
 
-// Fecha - mismo criterio que TransactionForm.vue (formato YYYY-MM-DD en hora
-// LOCAL, max=hoy, combinar con la hora actual al enviar).
-function todayInputValue(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
-
-function localDateInputValue(iso: string): string {
-  const date = new Date(iso)
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-const todayValue = todayInputValue()
-const occurredAtDate = ref(props.editingTransfer ? localDateInputValue(props.editingTransfer.occurredAt) : todayValue)
-
-function buildOccurredAt(): string {
-  const [year, month, day] = occurredAtDate.value.split('-').map(Number)
-  const now = new Date()
-  return new Date(year, month - 1, day, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString()
-}
-
-function openDatePicker(event: Event) {
-  const input = event.currentTarget as HTMLInputElement
-  input.showPicker?.()
-}
+// Fecha y hora (ver useOccurredAtField.ts): mismo criterio que TransactionForm.vue.
+const {
+  date: occurredAtDate,
+  time: occurredAtTime,
+  maxDate: todayValue,
+  buildOccurredAt,
+  openPicker: openDatePicker,
+} = useOccurredAtField(props.editingTransfer?.occurredAt)
 
 const fromWallet = computed(() => walletsStore.wallets.find((wallet) => wallet.id === fromWalletId.value) ?? null)
 const toWallet = computed(() => walletsStore.wallets.find((wallet) => wallet.id === toWalletId.value) ?? null)
@@ -184,10 +168,16 @@ async function onSubmit() {
         </span>
       </label>
 
-      <label class="field">
-        <span class="field-label">Fecha</span>
-        <input v-model="occurredAtDate" type="date" :max="todayValue" required @click="openDatePicker" />
-      </label>
+      <div class="field-row">
+        <label class="field">
+          <span class="field-label">Fecha</span>
+          <input v-model="occurredAtDate" type="date" :max="todayValue" required @click="openDatePicker" />
+        </label>
+        <label class="field">
+          <span class="field-label">Hora</span>
+          <input v-model="occurredAtTime" type="time" required @click="openDatePicker" />
+        </label>
+      </div>
 
       <p v-if="errorMessage" class="form-error" role="alert">{{ errorMessage }}</p>
 
@@ -217,6 +207,16 @@ async function onSubmit() {
   flex-direction: column;
   gap: 1rem;
   margin-top: 1rem;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.field-row .field {
+  min-width: 0;
 }
 
 .field {

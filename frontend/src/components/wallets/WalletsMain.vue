@@ -48,6 +48,10 @@ function goBack() {
   router.push({ name: 'dashboard' })
 }
 
+function onOpenWallet(walletId: string) {
+  router.push({ name: 'cuenta-cartola', params: { id: walletId } })
+}
+
 function onWalletCreated() {
   showCreateSheet.value = false
 }
@@ -118,7 +122,13 @@ async function onDeleteWallet(walletId: string) {
           appear
           appear-active-class="wallet-item-appear-active"
         >
-          <WalletCard v-for="wallet in walletsStore.wallets" :key="wallet.id" :wallet="wallet" @delete="onDeleteWallet" />
+          <WalletCard
+            v-for="wallet in walletsStore.wallets"
+            :key="wallet.id"
+            :wallet="wallet"
+            @open="onOpenWallet"
+            @delete="onDeleteWallet"
+          />
         </TransitionGroup>
       </Transition>
     </div>
@@ -126,7 +136,8 @@ async function onDeleteWallet(walletId: string) {
     <BottomSheet v-if="showHelpSheet" title="¿Qué es Cuentas?" @close="showHelpSheet = false">
       <p class="help-text">
         Aquí ves todas tus billeteras y cuánto tienes en cada una, en su propia moneda. Puedes crear una nueva,
-        transferir dinero entre dos que ya tengas, o eliminar una que ya no uses.
+        transferir dinero entre dos que ya tengas, o eliminar una que ya no uses. Toca una billetera para ver su
+        cartola: todos sus movimientos con el saldo que quedó después de cada uno.
       </p>
     </BottomSheet>
 

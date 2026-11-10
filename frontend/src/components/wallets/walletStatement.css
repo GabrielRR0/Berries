@@ -1,0 +1,89 @@
+/* Estilos de WalletStatementMain.vue (cartola de una billetera). Las filas son las de
+   TransactionHistory.vue (transactionHistory.css); aca solo lo propio de la pantalla. */
+.statement {
+  display: flex;
+  flex-direction: column;
+  max-width: 40rem;
+  margin: 0 auto;
+}
+
+.statement-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.375rem;
+}
+
+.statement-loading {
+  margin-top: 1.5rem;
+}
+
+.statement-error,
+.statement-warning {
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-border);
+  background: var(--accent-muted);
+  color: var(--accent);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.statement-error {
+  margin-top: 1.5rem;
+}
+
+.statement-summary {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+.statement-wallet {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.statement-balance {
+  margin-top: 0.375rem;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.statement-balance-label {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.statement-empty {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.statement-opening {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--glass-border);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.statement-opening-value {
+  color: var(--text-h);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.statement-help {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}

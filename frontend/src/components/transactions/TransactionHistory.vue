@@ -3,6 +3,7 @@ import { vPress } from '../../animation/vPress'
 import { useCollapseTransition } from '../../animation/useCollapseTransition'
 import { useListStaggerTransition } from '../../animation/useListStaggerTransition'
 import { useTransactionHistory } from '../../composables/transactions/useTransactionHistory'
+import type { WalletHistoryOptions } from '../../composables/transactions/useTransactionHistory'
 import type { Transaction } from '../../services/transactions/interfaces/transactions.interface'
 import type { TransferEditTarget, Wallet } from '../../services/wallets/interfaces/wallets.interface'
 
@@ -11,9 +12,17 @@ import type { TransferEditTarget, Wallet } from '../../services/wallets/interfac
 // siempre. Toda la logica (fusion de transferencias, neto por dia, estado de
 // fila abierta) vive en composables/transactions/useTransactionHistory.ts;
 // los estilos en transactionHistory.css. Inicio sigue usando TransactionList.vue.
-const props = withDefaults(defineProps<{ transactions: Transaction[]; wallets: Wallet[]; fallbackCurrency?: string }>(), {
-  fallbackCurrency: 'USD',
-})
+// walletMode (cartola de una billetera, ver WalletStatementMain.vue): mismas filas y mismas
+// acciones, pero con el saldo antes/despues de cada movimiento.
+const props = withDefaults(
+  defineProps<{
+    transactions: Transaction[]
+    wallets: Wallet[]
+    fallbackCurrency?: string
+    walletMode?: WalletHistoryOptions
+  }>(),
+  { fallbackCurrency: 'USD', walletMode: undefined },
+)
 const emit = defineEmits<{
   delete: [transactionId: string]
   edit: [transaction: Transaction]
@@ -24,6 +33,7 @@ const { groups, expandedId, confirmingDeleteId, toggleRow, requestDelete, cancel
   () => props.transactions,
   () => props.wallets,
   () => props.fallbackCurrency,
+  props.walletMode,
 )
 
 // Entrada escalonada de filas y apertura del detalle: animaciones de Motion (src/animation/).

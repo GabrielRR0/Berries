@@ -12,3 +12,5 @@ Todo lo que entra y sale por HTTP, y nada más. No importa de controllers ni de 
 
 - `transfer_resource.py` — `TransferResource`
 - `wallet_resource.py` — `WalletResource`
+- `wallet_statement_entry_resource.py` — `WalletStatementEntryResource`
+- `wallet_statement_resource.py` — `WalletStatementResource`
