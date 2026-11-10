@@ -33,8 +33,13 @@ const trimmedText = computed(() => text.value.trim())
 // Chips de sugerencia: filtra por lo ya escrito (si hay algo), limitado a un puñado
 // para no ensuciar el formulario - no es un dropdown flotante (sin z-index/blur que
 // manejar), mismo criterio simple que el resto de Berry.
+// typed: el filtro solo aplica una vez que el usuario escribe. Al editar un movimiento el
+// campo llega precargado con su categoria; si filtraramos por ese valor solo veria ese
+// chip y no podria elegir otra categoria.
+const typed = ref(false)
+
 const suggestions = computed(() => {
-  const query = trimmedText.value.toLowerCase()
+  const query = typed.value ? trimmedText.value.toLowerCase() : ''
   const list = query ? categories.value.filter((category) => category.name.toLowerCase().includes(query)) : categories.value
   return list.slice(0, 8)
 })
@@ -45,6 +50,7 @@ const canCreate = computed(() => {
 })
 
 function selectSuggestion(name: string) {
+  typed.value = false
   text.value = name
 }
 
@@ -68,7 +74,7 @@ async function onCreate() {
   <div class="category-field">
     <label class="field">
       <span class="field-label">Categoría</span>
-      <input v-model="text" type="text" required maxlength="80" placeholder="Ej. Mercado" />
+      <input v-model="text" type="text" required maxlength="80" placeholder="Ej. Mercado" @input="typed = true" />
     </label>
 
     <div v-if="suggestions.length > 0 || canCreate" class="category-suggestions">

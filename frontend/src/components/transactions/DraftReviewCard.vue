@@ -4,6 +4,7 @@ import { useWalletsStore } from '../../stores/wallets.store'
 import { confirmDraft, confirmDraftAsTransfer, discardDraft } from '../../services/transactions/transactions.service'
 import type { Draft, Transaction, TransactionType } from '../../services/transactions/interfaces/transactions.interface'
 import { formatCurrency } from '../../utils/formatters/formatCurrency'
+import { useOccurredAtField } from '../../composables/forms/useOccurredAtField'
 import BaseButton from '../ui/BaseButton.vue'
 import BaseCard from '../ui/BaseCard.vue'
 import CategoryField from './CategoryField.vue'
@@ -66,7 +67,15 @@ const canTransfer = computed(
     (sentAmount.value ?? 0) > 0,
 )
 
-const draftDate = computed(() => (props.draft.occurredAt ? props.draft.occurredAt.slice(0, 10) : null))
+// Fecha y hora editables (mismo composable que TransactionForm.vue): arrancan en las del
+// borrador si ya las traia (capturas) o en "ahora" si no (voz), y se mandan al confirmar.
+const {
+  date: occurredAtDate,
+  time: occurredAtTime,
+  maxDate: todayValue,
+  buildOccurredAt,
+  openPicker: openDatePicker,
+} = useOccurredAtField(props.draft.occurredAt)
 const category = ref(props.draft.parsedCategory ?? '')
 const description = ref(props.draft.parsedDescription ?? '')
 const isSubmitting = ref(false)
@@ -98,7 +107,7 @@ async function onConfirm() {
       finalAmount: amount.value as number,
       finalCategory: category.value.trim(),
       finalDescription: description.value.trim() || undefined,
-      occurredAt: props.draft.occurredAt ?? undefined,
+      occurredAt: buildOccurredAt(),
       fee: props.draft.fee ?? undefined,
     })
     // Va el draft.id explicito ademas de la transaction creada - son ids de
@@ -125,7 +134,7 @@ async function onConfirmTransfer() {
       toWalletId: walletId.value,
       sentAmount: sentAmount.value as number,
       fee: transferFee.value ?? undefined,
-      occurredAt: props.draft.occurredAt ?? undefined,
+      occurredAt: buildOccurredAt(),
     })
     emit('transferred', props.draft.id)
   } catch (error) {
@@ -153,10 +162,7 @@ async function onDiscard() {
   <BaseCard class="draft-card">
     <p class="draft-source">Borrador vía {{ draft.source }}</p>
     <p v-if="draft.rawInput" class="draft-raw-input">"{{ draft.rawInput }}"</p>
-    <p v-if="draftDate || draft.reference" class="draft-meta">
-      <span v-if="draftDate">{{ draftDate }}</span>
-      <span v-if="draft.reference"> · Ref. {{ draft.reference }}</span>
-    </p>
+    <p v-if="draft.reference" class="draft-meta">Ref. {{ draft.reference }}</p>
 
     <div v-if="isScreenshotDraft && type === 'income'" class="draft-mode" role="tablist">
       <button type="button" class="draft-mode-chip" :class="{ active: !asTransfer }" role="tab" :aria-selected="!asTransfer" @click="asTransfer = false">
@@ -177,6 +183,17 @@ async function onDiscard() {
           </option>
         </select>
       </label>
+
+      <div class="draft-fields-row draft-fields-even">
+        <label class="field">
+          <span class="field-label">Fecha</span>
+          <input v-model="occurredAtDate" type="date" :max="todayValue" required @click="openDatePicker" />
+        </label>
+        <label class="field">
+          <span class="field-label">Hora</span>
+          <input v-model="occurredAtTime" type="time" required @click="openDatePicker" />
+        </label>
+      </div>
 
       <template v-if="asTransfer">
         <label class="field">
@@ -309,6 +326,10 @@ async function onDiscard() {
      campo Monto (input + boton Max) se salia de la tarjeta. Monto un poco mas ancho. */
   grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
   gap: 0.75rem;
+}
+
+.draft-fields-even {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 .field {

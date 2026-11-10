@@ -56,6 +56,16 @@ const {
   openPicker: openDatePicker,
 } = useOccurredAtField(props.editingTransaction?.occurredAt)
 
+// Las categorias son por tipo (gasto/ingreso): al cambiar el tipo en el form, la categoria
+// que ya estaba puesta deja de aplicar, asi que se limpia para elegir una del nuevo tipo.
+// Volver al tipo original del movimiento que se edita restaura su categoria.
+function selectType(next: TransactionType) {
+  if (type.value === next) return
+  type.value = next
+  const original = props.editingTransaction
+  category.value = original && original.type === next ? original.category : ''
+}
+
 const selectedWallet = computed(() => walletsStore.wallets.find((wallet) => wallet.id === walletId.value) ?? null)
 
 // "Usé todo lo que tenía" en un click - pedido explicito del usuario, mismo criterio
@@ -131,7 +141,7 @@ async function onSubmit() {
           role="tab"
           :aria-selected="type === 'expense'"
           :class="{ active: type === 'expense' }"
-          @click="type = 'expense'"
+          @click="selectType('expense')"
         >
           Gasto
         </button>
@@ -141,7 +151,7 @@ async function onSubmit() {
           role="tab"
           :aria-selected="type === 'income'"
           :class="{ active: type === 'income' }"
-          @click="type = 'income'"
+          @click="selectType('income')"
         >
           Ingreso
         </button>
